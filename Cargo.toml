@@ -2,7 +2,8 @@
 name = "booru-rs"
 version = "0.1.0"
 edition = "2021"
-licence = "MIT/Apache-2.0"
+description = "An async Booru client for Rust"
+license = "MIT/Apache-2.0"
 
 [dependencies]
 reqwest = { version = "0.11.12", features = ["json"] }
