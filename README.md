@@ -13,11 +13,15 @@ The client currently supports:
 
 ## Example
 ```rust
-let client = GelbooruClient::new(None);
-let posts = client.get_posts_by_tag("kafuu_chino rating:general").await.unwrap();
-```
-Another way of  inputing the rating is using the `GelbooruRating` enum
-```rust
-let client = GelbooruClient::new(None);
-let posts = client.get_posts_by_tag_and_rating("kafuu_chino", GelbooruRating::General).await.unwrap() ;
+let posts = GelbooruClient::builder()
+    .tag("kafuu_chino".to_string())
+    .tag("2girls")
+    .rating(GelbooruRating::General)
+    .sort(GelbooruSort::Score)
+    .limit(5)
+    .random(true)
+    .blacklist_tag(GelbooruRating::Explicit.to_string())
+    .get()
+    .await
+    .expect("There was an error retrieveng posts from the API");
 ```

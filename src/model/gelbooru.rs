@@ -1,7 +1,9 @@
 //! Models for Gelbooru
+use core::fmt;
+
 use serde::{Serialize, Deserialize};
 
-/// GelbooruPost
+/// Individual post from [`GelbooruResponse`]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GelbooruPost {
     /// The ID of the post
@@ -44,4 +46,30 @@ pub enum GelbooruRating {
     Safe,
     Sensitive,
     General
+}
+
+impl fmt::Display for GelbooruRating {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let lovercase_tag = format!("{:?}", self).to_lowercase();
+        write!(f, "{lovercase_tag}")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum GelbooruSort {
+    Id,
+    Score,
+    Rating,
+    User,
+    Height,
+    Width,
+    Source,
+    Updated
+}
+
+impl fmt::Display for GelbooruSort {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let lovercase_tag = format!("{:?}", self).to_lowercase();
+        write!(f, "{lovercase_tag}")
+    }
 }
