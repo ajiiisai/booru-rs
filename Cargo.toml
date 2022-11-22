@@ -6,6 +6,7 @@ description = "An async Booru client for Rust"
 license = "MIT/Apache-2.0"
 documentation = "https://docs.rs/booru-rs"
 repository = "https://github.com/ajiiisai/booru-rs"
+readme = "README.md"
 
 [dependencies]
 reqwest = { version = "0.11.12", features = ["json"] }
