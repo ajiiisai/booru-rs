@@ -100,7 +100,7 @@ impl GelbooruClientBuilder {
     }
 
     /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
-    pub async fn get(&self) -> Result<Vec<GelbooruPost>, String> {
+    pub async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
         let tag_string = self.tags.join(" ");
         let response = self.client
             .get("https://gelbooru.com/index.php")
@@ -112,11 +112,11 @@ impl GelbooruClientBuilder {
                 ("tags", &tag_string),
                 ("json", "1")])
             .send()
-            .await.expect("Error sending request")
+            .await?
             .json::<GelbooruResponse>()
-            .await.expect("Error parsing response");
+            .await?;
 
-        let posts = response.posts;
+        let posts = response.posts.clone();
         Ok(posts)
     }
 }
