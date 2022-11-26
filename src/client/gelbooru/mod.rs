@@ -81,7 +81,7 @@ impl GelbooruClientBuilder {
     }
 
     /// Directly get a post by its unique Id
-    pub async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, String> {
+    pub async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
         let response = self.client
             .get("https://gelbooru.com/index.php")
             .query(&[
@@ -91,9 +91,9 @@ impl GelbooruClientBuilder {
                 ("id", id.to_string().as_str()),
                 ("json", "1")])
             .send()
-            .await.expect("Error sending request")
+            .await?
             .json::<GelbooruResponse>()
-            .await.expect("Error parsing response");
+            .await?;
 
         let post = response.posts[0].clone();
         Ok(post)

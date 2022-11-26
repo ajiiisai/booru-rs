@@ -106,5 +106,12 @@ fn parse_rating_tags() {
 
 #[test]
 fn parse_sort_tags() {
+    assert_eq!("id", GelbooruSort::Id.to_string());
     assert_eq!("score", GelbooruSort::Score.to_string());
+    assert_eq!("rating", GelbooruSort::Rating.to_string());
+    assert_eq!("user", GelbooruSort::User.to_string());
+    assert_eq!("height", GelbooruSort::Height.to_string());
+    assert_eq!("width", GelbooruSort::Width.to_string());
+    assert_eq!("source", GelbooruSort::Source.to_string());
+    assert_eq!("updated", GelbooruSort::Updated.to_string());
 }
