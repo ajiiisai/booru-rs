@@ -15,7 +15,7 @@ The client currently supports:
 ```rust
 let posts = GelbooruClient::builder()
     .tag("kafuu_chino".to_string())
-    .tag("2girls")
+    .tag("2girls".to_string())
     .rating(GelbooruRating::General)
     .sort(GelbooruSort::Score)
     .limit(5)
@@ -23,5 +23,5 @@ let posts = GelbooruClient::builder()
     .blacklist_tag(GelbooruRating::Explicit.to_string())
     .get()
     .await
-    .expect("There was an error retrieveng posts from the API");
+    .expect("There was an error retrieving posts from the API");
 ```
