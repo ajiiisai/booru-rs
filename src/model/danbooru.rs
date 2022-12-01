@@ -54,10 +54,14 @@ pub struct DanbooruPost {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum DanbooruRating {
-    E,
-    Q,
-    S,
-    G,
+    #[serde(rename = "e")]
+    Explicit,
+    #[serde(rename = "q")]
+    Questionable,
+    #[serde(rename = "s")]
+    Sensitive,
+    #[serde(rename = "g")]
+    General,
 }
 
 impl fmt::Display for DanbooruRating {

@@ -15,7 +15,7 @@ async fn get_posts_with_tag() {
 async fn get_posts_with_rating() {
     let posts = DanbooruClient::builder()
         .tag("kafuu_chino".to_string())
-        .rating(DanbooruRating::G)
+        .rating(DanbooruRating::General)
         .get()
         .await;
 
@@ -39,7 +39,7 @@ async fn get_posts_with_sort() {
 async fn get_posts_with_blacklist_tag() {
     let posts = DanbooruClient::builder()
         .tag("kafuu_chino".to_string())
-        .blacklist_tag(DanbooruRating::E.to_string())
+        .blacklist_tag(DanbooruRating::Explicit.to_string())
         .get()
         .await;
 
@@ -51,7 +51,7 @@ async fn get_posts_with_blacklist_tag() {
 async fn get_posts_with_limit() {
     let posts = DanbooruClient::builder()
         .tag("kafuu_chino".to_string())
-        .rating(DanbooruRating::G)
+        .rating(DanbooruRating::General)
         .limit(3)
         .get()
         .await;
@@ -97,10 +97,10 @@ async fn get_post_by_id() {
 
 #[test]
 fn parse_rating_tags() {
-    assert_eq!("e", DanbooruRating::E.to_string());
-    assert_eq!("q", DanbooruRating::Q.to_string());
-    assert_eq!("s", DanbooruRating::S.to_string());
-    assert_eq!("g", DanbooruRating::G.to_string());
+    assert_eq!("explicit", DanbooruRating::Explicit.to_string());
+    assert_eq!("questionable", DanbooruRating::Questionable.to_string());
+    assert_eq!("sensitive", DanbooruRating::Sensitive.to_string());
+    assert_eq!("general", DanbooruRating::General.to_string());
 }
 
 #[test]
