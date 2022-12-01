@@ -50,7 +50,7 @@ pub struct DanbooruPost {
     pub bit_flags: u32,
 }
 
-/// Post's rating. Check the [Danbooru's ratings wiki](https://danbooru.com/index.php?page=help&topic=rating)
+/// Post's rating. Check the [Danbooru's ratings wiki](https://danbooru.donmai.us/wiki_pages/howto:rate)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum DanbooruRating {
