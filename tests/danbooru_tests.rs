@@ -1,11 +1,11 @@
-use booru_rs::{client::danbooru::DanbooruClient, model::danbooru::{DanbooruRating, DanbooruSort}};
+use booru_rs::{
+    client::danbooru::DanbooruClient,
+    model::danbooru::{DanbooruRating, DanbooruSort},
+};
 
 #[tokio::test]
 async fn get_posts_with_tag() {
-    let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .get()
-        .await;
+    let posts = DanbooruClient::builder().tag("kafuu_chino").get().await;
 
     assert!(posts.is_ok());
     assert_eq!(true, posts.unwrap().len() > 0);
@@ -14,7 +14,7 @@ async fn get_posts_with_tag() {
 #[tokio::test]
 async fn get_posts_with_rating() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .rating(DanbooruRating::General)
         .get()
         .await;
@@ -26,7 +26,7 @@ async fn get_posts_with_rating() {
 #[tokio::test]
 async fn get_posts_with_sort() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .sort(DanbooruSort::Score)
         .get()
         .await;
@@ -38,8 +38,8 @@ async fn get_posts_with_sort() {
 #[tokio::test]
 async fn get_posts_with_blacklist_tag() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .blacklist_tag(DanbooruRating::Explicit.to_string())
+        .tag("kafuu_chino")
+        .blacklist_tag(DanbooruRating::Explicit)
         .get()
         .await;
 
@@ -50,7 +50,7 @@ async fn get_posts_with_blacklist_tag() {
 #[tokio::test]
 async fn get_posts_with_limit() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .rating(DanbooruRating::General)
         .limit(3)
         .get()
@@ -63,8 +63,8 @@ async fn get_posts_with_limit() {
 #[tokio::test]
 async fn get_posts_multiple_tags() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .tag("bangs".to_string())
+        .tag("kafuu_chino")
+        .tag("bangs")
         .limit(3)
         .get()
         .await;
@@ -76,7 +76,7 @@ async fn get_posts_multiple_tags() {
 #[tokio::test]
 async fn get_random_posts() {
     let posts = DanbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .random(true)
         .get()
         .await;
@@ -87,12 +87,13 @@ async fn get_random_posts() {
 
 #[tokio::test]
 async fn get_post_by_id() {
-    let post = DanbooruClient::builder()
-        .get_by_id(5817461)
-        .await;
+    let post = DanbooruClient::builder().get_by_id(5817461).await;
 
     assert!(post.is_ok());
-    assert_eq!("569b8df8a16d7b42b4c244bfa0b6a838", post.unwrap().md5.unwrap());
+    assert_eq!(
+        "569b8df8a16d7b42b4c244bfa0b6a838",
+        post.unwrap().md5.unwrap()
+    );
 }
 
 #[test]

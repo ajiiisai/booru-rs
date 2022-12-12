@@ -6,7 +6,7 @@ use crate::model::danbooru::*;
 #[allow(dead_code)]
 pub struct DanbooruClient {
     client: Client,
-    key: Option<String>
+    key: Option<String>,
 }
 
 impl DanbooruClient {
@@ -43,8 +43,11 @@ impl DanbooruClientBuilder {
     }
 
     /// Add a tag to the query
-    pub fn tag(mut self, tag: String) -> Self {
-        self.tags.push(tag);
+    pub fn tag<S: Into<String>>(mut self, tag: S) -> Self {
+        if self.tags.len() > 1 {
+            panic!("Danbooru only allows 2 tags per query");
+        }
+        self.tags.push(tag.into());
         self
     }
 
@@ -63,7 +66,7 @@ impl DanbooruClientBuilder {
     /// Retrieves the posts in a random order
     pub fn random(mut self, random: bool) -> Self {
         if random {
-            self.tags.push("order:random".to_string());
+            self.tags.push("order:random".into());
         }
         self
     }
@@ -75,14 +78,15 @@ impl DanbooruClientBuilder {
     }
 
     /// Blacklist a tag from the query
-    pub fn blacklist_tag(mut self, tag: String) -> Self {
-        self.tags.push(format!("-{tag}"));
+    pub fn blacklist_tag<S: Into<String>>(mut self, tag: S) -> Self {
+        self.tags.push(format!("-{}", tag.into()));
         self
     }
 
     /// Directly get a post by its unique Id
     pub async fn get_by_id(&self, id: u32) -> Result<DanbooruPost, reqwest::Error> {
-        let response = self.client
+        let response = self
+            .client
             .get(format!("https://danbooru.donmai.us/posts/{id}.json"))
             .send()
             .await?
@@ -95,7 +99,8 @@ impl DanbooruClientBuilder {
     /// Pack the [`DanbooruClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<DanbooruPost>, reqwest::Error> {
         let tag_string = self.tags.join(" ");
-        let response = self.client
+        let response = self
+            .client
             .get("https://danbooru.donmai.us/posts.json")
             .query(&[
                 ("limit", self.limit.to_string().as_str()),
@@ -105,8 +110,6 @@ impl DanbooruClientBuilder {
             .await?
             .json::<Vec<DanbooruPost>>()
             .await?;
-
-        println!("{response:#?}");
 
         Ok(response)
     }

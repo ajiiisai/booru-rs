@@ -1,11 +1,11 @@
-use booru_rs::{client::gelbooru::GelbooruClient, model::gelbooru::{GelbooruRating, GelbooruSort}};
+use booru_rs::{
+    client::gelbooru::GelbooruClient,
+    model::gelbooru::{GelbooruRating, GelbooruSort},
+};
 
 #[tokio::test]
 async fn get_posts_with_tag() {
-    let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .get()
-        .await;
+    let posts = GelbooruClient::builder().tag("kafuu_chino").get().await;
 
     assert!(posts.is_ok());
     assert_eq!(true, posts.unwrap().len() > 0);
@@ -14,7 +14,7 @@ async fn get_posts_with_tag() {
 #[tokio::test]
 async fn get_posts_with_rating() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .rating(GelbooruRating::General)
         .get()
         .await;
@@ -26,7 +26,7 @@ async fn get_posts_with_rating() {
 #[tokio::test]
 async fn get_posts_with_sort() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .sort(GelbooruSort::Score)
         .get()
         .await;
@@ -38,8 +38,8 @@ async fn get_posts_with_sort() {
 #[tokio::test]
 async fn get_posts_with_blacklist_tag() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .blacklist_tag(GelbooruRating::Explicit.to_string())
+        .tag("kafuu_chino")
+        .blacklist_tag(GelbooruRating::Explicit)
         .get()
         .await;
 
@@ -50,7 +50,7 @@ async fn get_posts_with_blacklist_tag() {
 #[tokio::test]
 async fn get_posts_with_limit() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .rating(GelbooruRating::General)
         .limit(3)
         .get()
@@ -63,8 +63,8 @@ async fn get_posts_with_limit() {
 #[tokio::test]
 async fn get_posts_multiple_tags() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
-        .tag("bangs".to_string())
+        .tag("kafuu_chino")
+        .tag("bangs")
         .limit(3)
         .get()
         .await;
@@ -76,7 +76,7 @@ async fn get_posts_multiple_tags() {
 #[tokio::test]
 async fn get_random_posts() {
     let posts = GelbooruClient::builder()
-        .tag("kafuu_chino".to_string())
+        .tag("kafuu_chino")
         .random(true)
         .get()
         .await;
@@ -87,9 +87,7 @@ async fn get_random_posts() {
 
 #[tokio::test]
 async fn get_post_by_id() {
-    let post = GelbooruClient::builder()
-        .get_by_id(7898595)
-        .await;
+    let post = GelbooruClient::builder().get_by_id(7898595).await;
 
     assert!(post.is_ok());
     assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);

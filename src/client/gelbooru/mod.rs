@@ -6,7 +6,7 @@ use crate::model::gelbooru::*;
 #[allow(dead_code)]
 pub struct GelbooruClient {
     client: Client,
-    key: Option<String>
+    key: Option<String>,
 }
 
 impl GelbooruClient {
@@ -15,7 +15,7 @@ impl GelbooruClient {
     }
 }
 
-/// Builder for [`GelbooruClient`] 
+/// Builder for [`GelbooruClient`]
 #[derive(Default)]
 pub struct GelbooruClientBuilder {
     client: Client,
@@ -43,8 +43,8 @@ impl GelbooruClientBuilder {
     }
 
     /// Add a tag to the query
-    pub fn tag(mut self, tag: String) -> Self {
-        self.tags.push(tag);
+    pub fn tag<S: Into<String>>(mut self, tag: S) -> Self {
+        self.tags.push(tag.into());
         self
     }
 
@@ -75,21 +75,23 @@ impl GelbooruClientBuilder {
     }
 
     /// Blacklist a tag from the query
-    pub fn blacklist_tag(mut self, tag: String) -> Self {
-        self.tags.push(format!("-{tag}"));
+    pub fn blacklist_tag<S: Into<String>>(mut self, tag: S) -> Self {
+        self.tags.push(format!("-{}", tag.into()));
         self
     }
 
     /// Directly get a post by its unique Id
     pub async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://gelbooru.com/index.php")
             .query(&[
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
                 ("id", id.to_string().as_str()),
-                ("json", "1")])
+                ("json", "1"),
+            ])
             .send()
             .await?
             .json::<GelbooruResponse>()
@@ -102,7 +104,8 @@ impl GelbooruClientBuilder {
     /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
         let tag_string = self.tags.join(" ");
-        let response = self.client
+        let response = self
+            .client
             .get("https://gelbooru.com/index.php")
             .query(&[
                 ("page", "dapi"),
@@ -110,7 +113,8 @@ impl GelbooruClientBuilder {
                 ("q", "index"),
                 ("limit", self.limit.to_string().as_str()),
                 ("tags", &tag_string),
-                ("json", "1")])
+                ("json", "1"),
+            ])
             .send()
             .await?
             .json::<GelbooruResponse>()

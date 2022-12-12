@@ -1,7 +1,7 @@
 //! Models for Danbooru
 use core::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DanbooruPost {
@@ -64,6 +64,12 @@ pub enum DanbooruRating {
     General,
 }
 
+impl From<DanbooruRating> for String {
+    fn from(rating: DanbooruRating) -> String {
+        rating.to_string()
+    }
+}
+
 impl fmt::Display for DanbooruRating {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let lowercase_tag = format!("{:?}", self).to_lowercase();
@@ -80,7 +86,7 @@ pub enum DanbooruSort {
     Height,
     Width,
     Source,
-    Updated
+    Updated,
 }
 
 impl fmt::Display for DanbooruSort {

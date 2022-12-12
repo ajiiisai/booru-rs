@@ -14,13 +14,13 @@ The client currently supports:
 ## Example
 ```rust
 let posts = GelbooruClient::builder()
-    .tag("kafuu_chino".to_string())
-    .tag("2girls".to_string())
+    .tag("kafuu_chino")
+    .tag("2girls")
     .rating(GelbooruRating::General)
     .sort(GelbooruSort::Score)
     .limit(5)
     .random(true)
-    .blacklist_tag(GelbooruRating::Explicit.to_string())
+    .blacklist_tag(GelbooruRating::Explicit)
     .get()
     .await
     .expect("There was an error retrieving posts from the API");

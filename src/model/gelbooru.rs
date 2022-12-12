@@ -1,7 +1,7 @@
 //! Models for Gelbooru
 use core::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Individual post from [`GelbooruResponse`]
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -27,14 +27,14 @@ pub struct GelbooruPost {
     /// Post's image source
     pub source: String,
     /// Post's rating
-    pub rating: GelbooruRating
+    pub rating: GelbooruRating,
 }
 
 /// Gelbooru's API response with a list a posts
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GelbooruResponse {
     #[serde(rename = "post")]
-    pub posts: Vec<GelbooruPost>
+    pub posts: Vec<GelbooruPost>,
 }
 
 /// Post's rating. Check the [Gelbooru's ratings wiki](https://gelbooru.com/index.php?page=help&topic=rating)
@@ -45,7 +45,13 @@ pub enum GelbooruRating {
     Questionable,
     Safe,
     Sensitive,
-    General
+    General,
+}
+
+impl From<GelbooruRating> for String {
+    fn from(rating: GelbooruRating) -> String {
+        rating.to_string()
+    }
 }
 
 impl fmt::Display for GelbooruRating {
@@ -64,7 +70,7 @@ pub enum GelbooruSort {
     Height,
     Width,
     Source,
-    Updated
+    Updated,
 }
 
 impl fmt::Display for GelbooruSort {
