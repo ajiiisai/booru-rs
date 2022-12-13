@@ -13,13 +13,19 @@ jobs:
         name:
           - stable
           - beta
+          - nightly
           - Windows
+          - MacOS
 
         include:
           - name: beta
             toolchain: beta
+          - name: nightly
+            toolchain: nightly
           - name: Windows
             os: windows-latest
+          - name: MacOS
+            os: macos-latest
 
     steps:
       - name: Checkout sources
@@ -34,60 +40,7 @@ jobs:
         run: echo "::add-matcher::.github/matchers/rust.json"
 
       - name: Cache
-        uses: Swatinem/rust-cache@v1
-
-      - name: Build
-        run: cargo build
-
-      - name: Test
-        run: cargo test
-
-  nightly:
-    name: Test (nightly)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install toolchain (nightly)
-        run: |
-          rustup install --profile minimal nightly
-          rustup override set nightly
-      - name: Add problem matchers
-        shell: bash
-        run: echo "::add-matcher::.github/matchers/rust.json"
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v1
-
-      - name: Build all features
-        run: cargo build
-
-      - name: Test all features
-        run: cargo test
-
-  macOS:
-    name: Test (macOS)
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install toolchain
-        run: |
-          rustup install --profile minimal stable
-          rustup override set stable
-      - name: Add problem matchers
-        shell: bash
-        run: echo "::add-matcher::.github/matchers/rust.json"
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v1
-
-      - name: Remove cargo build config
-        run: rm .cargo/config.toml
+        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build
