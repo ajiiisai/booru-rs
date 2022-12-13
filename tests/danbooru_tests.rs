@@ -27,7 +27,7 @@ async fn get_posts_with_rating() {
 async fn get_posts_with_sort() {
     let posts = DanbooruClient::builder()
         .tag("kafuu_chino")
-        .sort(DanbooruSort::Score)
+        .sort(DanbooruSort::Rating)
         .get()
         .await;
 
