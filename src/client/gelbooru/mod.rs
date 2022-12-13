@@ -97,8 +97,7 @@ impl GelbooruClientBuilder {
             .json::<GelbooruResponse>()
             .await?;
 
-        let post = response.posts[0].clone();
-        Ok(post)
+        Ok(response.posts[0].clone())
     }
 
     /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
@@ -120,7 +119,6 @@ impl GelbooruClientBuilder {
             .json::<GelbooruResponse>()
             .await?;
 
-        let posts = response.posts.clone();
-        Ok(posts)
+        Ok(response.posts)
     }
 }
