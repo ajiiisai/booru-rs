@@ -1,0 +1,96 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        name:
+          - stable
+          - beta
+          - Windows
+
+        include:
+          - name: beta
+            toolchain: beta
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        run: |
+          rustup install --profile minimal ${{ matrix.toolchain || 'stable' }}
+          rustup override set ${{ matrix.toolchain || 'stable' }}
+      - name: Add problem matchers
+        shell: bash
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test
+
+  nightly:
+    name: Test (nightly)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install toolchain (nightly)
+        run: |
+          rustup install --profile minimal nightly
+          rustup override set nightly
+      - name: Add problem matchers
+        shell: bash
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Build all features
+        run: cargo build --features full
+
+      - name: Test all features
+        run: cargo test --features full
+
+  macOS:
+    name: Test (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        run: |
+          rustup install --profile minimal stable
+          rustup override set stable
+      - name: Add problem matchers
+        shell: bash
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Remove cargo build config
+        run: rm .cargo/config.toml
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test
