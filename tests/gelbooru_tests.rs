@@ -8,7 +8,7 @@ async fn get_posts_with_tag() {
     let posts = GelbooruClient::builder().tag("kafuu_chino").get().await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -20,7 +20,7 @@ async fn get_posts_with_rating() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -32,7 +32,7 @@ async fn get_posts_with_sort() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -44,7 +44,7 @@ async fn get_posts_with_blacklist_tag() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -57,7 +57,7 @@ async fn get_posts_with_limit() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() == 3);
+    assert!(posts.unwrap().len() == 3);
 }
 
 #[tokio::test]
@@ -70,7 +70,7 @@ async fn get_posts_multiple_tags() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -82,7 +82,7 @@ async fn get_random_posts() {
         .await;
 
     assert!(posts.is_ok());
-    assert_eq!(true, posts.unwrap().len() > 0);
+    assert!(!posts.unwrap().is_empty());
 }
 
 #[tokio::test]
