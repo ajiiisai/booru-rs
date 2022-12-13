@@ -1,3 +1,4 @@
+![ci-badge][] [![crates.io version]][crates.io link] 
 # booru-rs
 An async Booru client for Rust
 
@@ -25,3 +26,7 @@ let posts = GelbooruClient::builder()
     .await
     .expect("There was an error retrieving posts from the API");
 ```
+
+[ci-badge]: https://img.shields.io/github/workflow/status/ajiiisai/booru-rs/CI?style=flat-square
+[crates.io link]: https://crates.io/crates/booru-rs
+[crates.io version]: https://img.shields.io/crates/v/booru-rs.svg?style=flat-square
