@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install toolchain
         run: |
@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install toolchain (nightly)
         run: |
@@ -62,10 +62,10 @@ jobs:
         uses: Swatinem/rust-cache@v1
 
       - name: Build all features
-        run: cargo build --features full
+        run: cargo build
 
       - name: Test all features
-        run: cargo test --features full
+        run: cargo test
 
   macOS:
     name: Test (macOS)
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install toolchain
         run: |
