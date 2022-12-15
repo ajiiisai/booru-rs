@@ -3,11 +3,7 @@ use reqwest::Client;
 use crate::model::danbooru::*;
 
 /// Client that sends requests to the Danbooru API to retrieve the data.
-#[allow(dead_code)]
-pub struct DanbooruClient {
-    client: Client,
-    key: Option<String>,
-}
+pub struct DanbooruClient;
 
 impl DanbooruClient {
     pub fn builder() -> DanbooruClientBuilder {
