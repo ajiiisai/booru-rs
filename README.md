@@ -27,6 +27,6 @@ let posts = GelbooruClient::builder()
     .expect("There was an error retrieving posts from the API");
 ```
 
-[ci-badge]: https://img.shields.io/github/workflow/status/ajiiisai/booru-rs/CI?style=flat-square
+[ci-badge]: https://img.shields.io/github/actions/workflow/status/ajiiisai/booru-rs/ci.yml?branch=main
 [crates.io link]: https://crates.io/crates/booru-rs
 [crates.io version]: https://img.shields.io/crates/v/booru-rs.svg?style=flat-square
