@@ -5,7 +5,11 @@ use booru_rs::{
 
 #[tokio::test]
 async fn get_posts_with_tag() {
-    let posts = DanbooruClient::builder().tag("kafuu_chino").get().await;
+    let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
+        .tag("kafuu_chino")
+        .get()
+        .await;
 
     assert!(posts.is_ok());
     assert!(!posts.unwrap().is_empty());
@@ -14,6 +18,7 @@ async fn get_posts_with_tag() {
 #[tokio::test]
 async fn get_posts_with_rating() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
         .rating(DanbooruRating::General)
         .get()
@@ -26,6 +31,7 @@ async fn get_posts_with_rating() {
 #[tokio::test]
 async fn get_posts_with_sort() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
         .sort(DanbooruSort::Rating)
         .get()
@@ -38,6 +44,7 @@ async fn get_posts_with_sort() {
 #[tokio::test]
 async fn get_posts_with_blacklist_tag() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
         .blacklist_tag(DanbooruRating::Explicit)
         .get()
@@ -50,8 +57,8 @@ async fn get_posts_with_blacklist_tag() {
 #[tokio::test]
 async fn get_posts_with_limit() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
-        .rating(DanbooruRating::General)
         .limit(3)
         .get()
         .await;
@@ -63,6 +70,7 @@ async fn get_posts_with_limit() {
 #[tokio::test]
 async fn get_posts_multiple_tags() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
         .tag("bangs")
         .limit(3)
@@ -76,6 +84,7 @@ async fn get_posts_multiple_tags() {
 #[tokio::test]
 async fn get_random_posts() {
     let posts = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
         .tag("kafuu_chino")
         .random(true)
         .get()
@@ -87,11 +96,14 @@ async fn get_random_posts() {
 
 #[tokio::test]
 async fn get_post_by_id() {
-    let post = DanbooruClient::builder().get_by_id(5817461).await;
+    let post = DanbooruClient::builder()
+        .change_default_url("https://testbooru.donmai.us")
+        .get_by_id(9423)
+        .await;
 
     assert!(post.is_ok());
     assert_eq!(
-        "569b8df8a16d7b42b4c244bfa0b6a838",
+        "15a1b49c26f5c684807a2f0b838f9e4c",
         post.unwrap().md5.unwrap()
     );
 }
