@@ -9,7 +9,7 @@ pub struct GelbooruClient;
 
 impl BooruClient<GelbooruClientBuilder> for GelbooruClient {
     fn builder() -> GelbooruClientBuilder {
-        GelbooruClientBuilder::default()
+        GelbooruClientBuilder::new()
     }
 }
 
@@ -21,6 +21,7 @@ pub struct GelbooruClientBuilder {
     user: Option<String>,
     tags: Vec<String>,
     limit: u32,
+    url: String,
 }
 
 #[async_trait]
@@ -32,6 +33,7 @@ impl BooruBuilder<GelbooruRating, GelbooruSort> for GelbooruClientBuilder {
             user: None,
             tags: vec![],
             limit: 100,
+            url: "https://gelbooru.com".to_string(),
         }
     }
     /// Set the API key and User for the requests (optional)
@@ -78,11 +80,19 @@ impl BooruBuilder<GelbooruRating, GelbooruSort> for GelbooruClientBuilder {
         self.tags.push(format!("-{}", tag.into()));
         self
     }
+
+    /// Change the default url for the client
+    fn default_url(mut self, url: &str) -> Self {
+        self.url = url.into();
+        self
+    }
+
     /// Directly get a post by its unique Id
     async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
+        let url = self.url.as_str();
         let response = self
             .client
-            .get("https://gelbooru.com/index.php")
+            .get(format!("{url}/index.php"))
             .query(&[
                 ("page", "dapi"),
                 ("s", "post"),
@@ -100,10 +110,11 @@ impl BooruBuilder<GelbooruRating, GelbooruSort> for GelbooruClientBuilder {
 
     /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
     async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
+        let url = self.url.as_str();
         let tag_string = self.tags.join(" ");
         let response = self
             .client
-            .get("https://gelbooru.com/index.php")
+            .get(format!("{url}/index.php"))
             .query(&[
                 ("page", "dapi"),
                 ("s", "post"),

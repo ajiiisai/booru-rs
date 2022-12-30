@@ -1,7 +1,7 @@
 use reqwest::Client;
 
 use crate::model::danbooru::*;
-use crate::utils::utils::get_headers;
+use crate::utils::general::get_headers;
 
 /// Client that sends requests to the Danbooru API to retrieve the data.
 pub struct DanbooruClient;
@@ -82,7 +82,8 @@ impl DanbooruClientBuilder {
         self
     }
 
-    pub fn change_default_url(mut self, url: &str) -> Self {
+    /// Change the default url for the client
+    pub fn default_url(mut self, url: &str) -> Self {
         self.url = url.into();
         self
     }
@@ -104,9 +105,10 @@ impl DanbooruClientBuilder {
     /// Pack the [`DanbooruClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<DanbooruPost>, reqwest::Error> {
         let tag_string = self.tags.join(" ");
+        let url = self.url.as_str();
         let response = self
             .client
-            .get(format!("https://testbooru.donmai.us/posts.json"))
+            .get(format!("{url}/posts.json"))
             .headers(get_headers())
             .query(&[
                 ("limit", self.limit.to_string().as_str()),
