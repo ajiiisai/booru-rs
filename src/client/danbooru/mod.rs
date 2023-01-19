@@ -1,17 +1,14 @@
 use reqwest::Client;
 
 use crate::model::danbooru::*;
+use crate::utils::general::get_headers;
 
 /// Client that sends requests to the Danbooru API to retrieve the data.
-#[allow(dead_code)]
-pub struct DanbooruClient {
-    client: Client,
-    key: Option<String>,
-}
+pub struct DanbooruClient;
 
 impl DanbooruClient {
     pub fn builder() -> DanbooruClientBuilder {
-        DanbooruClientBuilder::default()
+        DanbooruClientBuilder::new()
     }
 }
 
@@ -23,6 +20,7 @@ pub struct DanbooruClientBuilder {
     user: Option<String>,
     tags: Vec<String>,
     limit: u32,
+    url: String,
 }
 
 impl DanbooruClientBuilder {
@@ -33,6 +31,7 @@ impl DanbooruClientBuilder {
             user: None,
             tags: vec![],
             limit: 100,
+            url: "https://danbooru.donmai.us".to_string(),
         }
     }
     /// Set the API key and User for the requests (optional)
@@ -83,25 +82,34 @@ impl DanbooruClientBuilder {
         self
     }
 
+    /// Change the default url for the client
+    pub fn default_url(mut self, url: &str) -> Self {
+        self.url = url.into();
+        self
+    }
+
     /// Directly get a post by its unique Id
     pub async fn get_by_id(&self, id: u32) -> Result<DanbooruPost, reqwest::Error> {
+        let url = self.url.as_str();
         let response = self
             .client
-            .get(format!("https://danbooru.donmai.us/posts/{id}.json"))
+            .get(format!("{url}/posts/{id}.json"))
+            .headers(get_headers())
             .send()
             .await?
             .json::<DanbooruPost>()
             .await?;
-
         Ok(response)
     }
 
     /// Pack the [`DanbooruClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<DanbooruPost>, reqwest::Error> {
         let tag_string = self.tags.join(" ");
+        let url = self.url.as_str();
         let response = self
             .client
-            .get("https://danbooru.donmai.us/posts.json")
+            .get(format!("{url}/posts.json"))
+            .headers(get_headers())
             .query(&[
                 ("limit", self.limit.to_string().as_str()),
                 ("tags", &tag_string),
