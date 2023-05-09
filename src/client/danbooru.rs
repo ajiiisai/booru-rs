@@ -1,7 +1,17 @@
 use reqwest::Client;
 
 use crate::model::danbooru::*;
-use crate::utils::general::get_headers;
+use reqwest::{header, header::HeaderMap};
+
+// This is only here because of Danbooru, thanks Danbooru, really cool :)
+pub fn get_headers() -> HeaderMap {
+    let mut headers = header::HeaderMap::new();
+    headers.insert(
+        header::USER_AGENT,
+        header::HeaderValue::from_static("PostmanRuntime/7.30.0"),
+    );
+    headers
+}
 
 /// Client that sends requests to the Danbooru API to retrieve the data.
 pub struct DanbooruClient;
