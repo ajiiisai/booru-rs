@@ -65,7 +65,7 @@ mod gelbooru {
     async fn get_posts_multiple_tags() {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
-            .tag("bangs")
+            .tag("table")
             .limit(3)
             .get()
             .await;
