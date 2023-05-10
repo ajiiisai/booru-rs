@@ -1,31 +1,42 @@
-use crate::model::gelbooru::*;
-use async_trait::async_trait;
+use crate::model::{danbooru::DanbooruRating, gelbooru::GelbooruRating};
+use std::fmt;
 
 pub trait BooruClient<A> {
     fn builder() -> A;
 }
 
-#[async_trait]
-pub trait BooruBuilder<A, B> {
-    fn new() -> Self;
+pub enum Rating {
+    Danbooru(DanbooruRating),
+    Gelbooru(GelbooruRating),
+}
 
-    fn set_credentials(self, key: String, user: String) -> Self;
+impl From<DanbooruRating> for Rating {
+    fn from(value: DanbooruRating) -> Self {
+        Rating::Danbooru(value)
+    }
+}
 
-    fn tag<S: Into<String>>(self, tag: S) -> Self;
+impl From<GelbooruRating> for Rating {
+    fn from(value: GelbooruRating) -> Self {
+        Rating::Gelbooru(value)
+    }
+}
 
-    fn rating(self, rating: A) -> Self;
+#[derive(Debug, Clone)]
+pub enum Sort {
+    Id,
+    Score,
+    Rating,
+    User,
+    Height,
+    Width,
+    Source,
+    Updated,
+}
 
-    fn limit(self, limit: u32) -> Self;
-
-    fn random(self, random: bool) -> Self;
-
-    fn sort(self, order: B) -> Self;
-
-    fn blacklist_tag<S: Into<String>>(self, tag: S) -> Self;
-
-    fn default_url(self, url: &str) -> Self;
-
-    async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error>;
-
-    async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error>;
+impl fmt::Display for Sort {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let lowercase_tag = format!("{:?}", self).to_lowercase();
+        write!(f, "{lowercase_tag}")
+    }
 }

@@ -1,96 +1,25 @@
-use async_trait::async_trait;
-use reqwest::Client;
-
-use crate::client::generic::*;
+use super::{ClientBuilder, ClientType};
 use crate::model::gelbooru::*;
 
 /// Client that sends requests to the Gelbooru API to retrieve the data.
-pub struct GelbooruClient;
+pub struct GelbooruClient(ClientBuilder);
 
-impl BooruClient<GelbooruClientBuilder> for GelbooruClient {
-    fn builder() -> GelbooruClientBuilder {
-        GelbooruClientBuilder::new()
+impl From<ClientBuilder> for GelbooruClient {
+    fn from(value: ClientBuilder) -> Self {
+        Self(value)
     }
 }
 
-/// Builder for [`GelbooruClient`]
-#[derive(Default)]
-pub struct GelbooruClientBuilder {
-    client: Client,
-    key: Option<String>,
-    user: Option<String>,
-    tags: Vec<String>,
-    limit: u32,
-    url: String,
-}
-
-#[async_trait]
-impl BooruBuilder<GelbooruRating, GelbooruSort> for GelbooruClientBuilder {
-    fn new() -> Self {
-        GelbooruClientBuilder {
-            client: Client::new(),
-            key: None,
-            user: None,
-            tags: vec![],
-            limit: 100,
-            url: "https://gelbooru.com".to_string(),
-        }
-    }
-    /// Set the API key and User for the requests (optional)
-    fn set_credentials(mut self, key: String, user: String) -> Self {
-        self.key = Some(key);
-        self.user = Some(user);
-        self
-    }
-
-    /// Add a tag to the query
-    fn tag<S: Into<String>>(mut self, tag: S) -> Self {
-        self.tags.push(tag.into());
-        self
-    }
-
-    /// Add a [`GelbooruRating`] to the query
-    fn rating(mut self, rating: GelbooruRating) -> Self {
-        self.tags.push(format!("rating:{}", rating));
-        self
-    }
-
-    /// Set how many posts you want to retrieve (100 is the default and maximum)
-    fn limit(mut self, limit: u32) -> Self {
-        self.limit = limit;
-        self
-    }
-
-    /// Retrieves the posts in a random order
-    fn random(mut self, random: bool) -> Self {
-        if random {
-            self.tags.push("sort:random".to_string());
-        }
-        self
-    }
-
-    /// Add a [`GelbooruSort`] to the query
-    fn sort(mut self, order: GelbooruSort) -> Self {
-        self.tags.push(format!("sort:{}", order));
-        self
-    }
-
-    /// Blacklist a tag from the query
-    fn blacklist_tag<S: Into<String>>(mut self, tag: S) -> Self {
-        self.tags.push(format!("-{}", tag.into()));
-        self
-    }
-
-    /// Change the default url for the client
-    fn default_url(mut self, url: &str) -> Self {
-        self.url = url.into();
-        self
+impl GelbooruClient {
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::new(ClientType::Gelbooru)
     }
 
     /// Directly get a post by its unique Id
-    async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
-        let url = self.url.as_str();
-        let response = self
+    pub async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
+        let builder = &self.0;
+        let url = builder.url.as_str();
+        let response = builder
             .client
             .get(format!("{url}/index.php"))
             .query(&[
@@ -109,17 +38,18 @@ impl BooruBuilder<GelbooruRating, GelbooruSort> for GelbooruClientBuilder {
     }
 
     /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
-    async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
-        let url = self.url.as_str();
-        let tag_string = self.tags.join(" ");
-        let response = self
+    pub async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
+        let builder = &self.0;
+        let url = builder.url.as_str();
+        let tag_string = builder.tags.join(" ");
+        let response = builder
             .client
             .get(format!("{url}/index.php"))
             .query(&[
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
-                ("limit", self.limit.to_string().as_str()),
+                ("limit", builder.limit.to_string().as_str()),
                 ("tags", &tag_string),
                 ("json", "1"),
             ])

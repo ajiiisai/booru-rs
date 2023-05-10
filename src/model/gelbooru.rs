@@ -60,22 +60,3 @@ impl fmt::Display for GelbooruRating {
         write!(f, "{lovercase_tag}")
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum GelbooruSort {
-    Id,
-    Score,
-    Rating,
-    User,
-    Height,
-    Width,
-    Source,
-    Updated,
-}
-
-impl fmt::Display for GelbooruSort {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let lovercase_tag = format!("{:?}", self).to_lowercase();
-        write!(f, "{lovercase_tag}")
-    }
-}
