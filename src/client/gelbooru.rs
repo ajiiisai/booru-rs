@@ -37,7 +37,7 @@ impl GelbooruClient {
         Ok(response.posts[0].clone())
     }
 
-    /// Pack the [`GelbooruClientBuilder`] and sent the request to the API to retrieve the posts
+    /// Pack the [`ClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
         let builder = &self.0;
         let url = builder.url.as_str();

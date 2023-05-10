@@ -42,7 +42,7 @@ impl DanbooruClient {
         Ok(response)
     }
 
-    /// Pack the [`DanbooruClientBuilder`] and sent the request to the API to retrieve the posts
+    /// Pack the [`ClientBuilder`] and sent the request to the API to retrieve the posts
     pub async fn get(&self) -> Result<Vec<DanbooruPost>, reqwest::Error> {
         let builder = &self.0;
         let tag_string = builder.tags.join(" ");

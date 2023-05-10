@@ -22,6 +22,7 @@ let posts = GelbooruClient::builder()
     .limit(5)
     .random(true)
     .blacklist_tag(GelbooruRating::Explicit)
+    .build::<GelbooruClient>()
     .get()
     .await
     .expect("There was an error retrieving posts from the API");

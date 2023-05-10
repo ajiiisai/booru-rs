@@ -1,10 +1,6 @@
 use crate::model::{danbooru::DanbooruRating, gelbooru::GelbooruRating};
 use std::fmt;
 
-pub trait BooruClient<A> {
-    fn builder() -> A;
-}
-
 pub enum Rating {
     Danbooru(DanbooruRating),
     Gelbooru(GelbooruRating),

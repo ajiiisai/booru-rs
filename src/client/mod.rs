@@ -63,7 +63,8 @@ impl ClientBuilder {
         self
     }
 
-    /// Add a [`DanbooruRating`] to the query
+    /// Add a [`DanbooruRating`](crate::model::DanbooruRating) or
+    /// [`GelbooruRating`](crate::model::GelbooruRating) to the query
     pub fn rating<R: Into<Rating>>(mut self, rating: R) -> Self {
         let rating_tag = match rating.into() {
             Rating::Danbooru(rating) => {
@@ -105,7 +106,7 @@ impl ClientBuilder {
         self
     }
 
-    /// Add a [`DanbooruSort`] to the query
+    /// Add a [`Sort`] to the query
     pub fn sort(mut self, order: Sort) -> Self {
         let sort_tag = match self.client_type {
             ClientType::Danbooru => format!("order:{}", order),
@@ -127,6 +128,7 @@ impl ClientBuilder {
         self
     }
 
+    /// Convert the builder into the necessary client
     pub fn build<T: From<Self>>(self) -> T {
         T::from(self)
     }
