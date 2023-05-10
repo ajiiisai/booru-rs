@@ -13,6 +13,7 @@ The client currently supports:
 - [ ] More... ?
 
 ## Example
+Remember to bring the `Client` trait into scope with `use booru_rs::client::Client;`
 ```rust
 let posts = GelbooruClient::builder()
     .tag("kafuu_chino")
@@ -22,7 +23,7 @@ let posts = GelbooruClient::builder()
     .limit(5)
     .random(true)
     .blacklist_tag(GelbooruRating::Explicit)
-    .build::<GelbooruClient>()
+    .build()
     .get()
     .await
     .expect("There was an error retrieving posts from the API");

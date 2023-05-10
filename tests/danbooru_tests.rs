@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod danbooru {
     use booru_rs::{
-        client::{danbooru::DanbooruClient, generic::Sort},
+        client::{danbooru::DanbooruClient, generic::Sort, Client},
         model::danbooru::DanbooruRating,
     };
 
@@ -10,7 +10,7 @@ mod danbooru {
         let posts = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -24,7 +24,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .rating(DanbooruRating::General)
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -38,7 +38,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .sort(Sort::Rating)
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -52,7 +52,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .blacklist_tag(DanbooruRating::Explicit)
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -66,7 +66,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .limit(3)
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -81,7 +81,7 @@ mod danbooru {
             .tag("kafuu_chino")
             .tag("bangs")
             .limit(3)
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -95,7 +95,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .random()
-            .build::<DanbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -107,7 +107,7 @@ mod danbooru {
     async fn get_post_by_id() {
         let post = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
-            .build::<DanbooruClient>()
+            .build()
             .get_by_id(9423)
             .await;
 

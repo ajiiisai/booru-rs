@@ -1,4 +1,8 @@
-use reqwest::Client;
+use std::any::{Any, TypeId};
+
+use async_trait::async_trait;
+
+use crate::{DanbooruClient, GelbooruClient};
 
 use self::generic::{Rating, Sort};
 
@@ -6,41 +10,41 @@ pub mod danbooru;
 pub mod gelbooru;
 pub mod generic;
 
-pub struct ClientBuilder {
-    client: Client,
-    client_type: ClientType,
+pub struct ClientBuilder<T: Client> {
+    client: reqwest::Client,
     key: Option<String>,
     user: Option<String>,
     tags: Vec<String>,
     limit: u32,
     url: String,
+    _marker: std::marker::PhantomData<T>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ClientType {
-    Danbooru,
-    Gelbooru,
-}
+#[async_trait]
+pub trait Client: From<ClientBuilder<Self>> + Any {
+    type Post;
 
-impl ClientType {
-    fn get_url(&self) -> String {
-        match self {
-            ClientType::Danbooru => "https://danbooru.donmai.us".to_string(),
-            ClientType::Gelbooru => "https://gelbooru.com".to_string(),
-        }
+    const URL: &'static str;
+    const SORT: &'static str;
+
+    fn builder() -> ClientBuilder<Self> {
+        ClientBuilder::new()
     }
+
+    async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error>;
+    async fn get(&self) -> Result<Vec<Self::Post>, reqwest::Error>;
 }
 
-impl ClientBuilder {
-    pub fn new(client_type: ClientType) -> Self {
+impl<T: Client + Any> ClientBuilder<T> {
+    pub fn new() -> Self {
         Self {
-            client: Client::new(),
-            client_type,
+            client: reqwest::Client::new(),
             key: None,
             user: None,
             tags: vec![],
             limit: 100,
-            url: client_type.get_url(),
+            url: T::URL.to_string(),
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -53,11 +57,8 @@ impl ClientBuilder {
 
     /// Add a tag to the query
     pub fn tag<S: Into<String>>(mut self, tag: S) -> Self {
-        match self.client_type {
-            ClientType::Danbooru if self.tags.len() > 1 => {
-                panic!("Danbooru only allows 2 tags per query")
-            }
-            _ => {}
+        if TypeId::of::<DanbooruClient>() == TypeId::of::<T>() && self.tags.len() > 1 {
+            panic!("Danbooru only allows 2 tags per query")
         }
         self.tags.push(tag.into());
         self
@@ -69,19 +70,19 @@ impl ClientBuilder {
         let rating_tag = match rating.into() {
             Rating::Danbooru(rating) => {
                 assert_eq!(
-                    self.client_type,
-                    ClientType::Danbooru,
+                    TypeId::of::<T>(),
+                    TypeId::of::<DanbooruClient>(),
                     "{:?} `ClientBuilder` but tried to apply a Danbooru rating to it.",
-                    self.client_type
+                    TypeId::of::<DanbooruClient>(),
                 );
                 format!("rating:{}", rating)
             }
             Rating::Gelbooru(rating) => {
                 assert_eq!(
-                    self.client_type,
-                    ClientType::Gelbooru,
+                    TypeId::of::<T>(),
+                    TypeId::of::<GelbooruClient>(),
                     "{:?} `ClientBuilder` but tried to apply a Gelbooru rating to it.",
-                    self.client_type
+                    TypeId::of::<GelbooruClient>(),
                 );
                 format!("rating:{}", rating)
             }
@@ -98,21 +99,17 @@ impl ClientBuilder {
 
     /// Retrieves the posts in a random order
     pub fn random(mut self) -> Self {
-        let random_tag = match self.client_type {
-            ClientType::Danbooru => "order:random",
-            ClientType::Gelbooru => "sort:random",
-        };
-        self.tags.push(random_tag.into());
+        // let random_tag = match TypeId::of::<T>() {
+        //     ClientType::Danbooru => "order:random",
+        //     ClientType::Gelbooru => "sort:random",
+        // };
+        self.tags.push(format!("{}:random", T::SORT));
         self
     }
 
     /// Add a [`Sort`] to the query
     pub fn sort(mut self, order: Sort) -> Self {
-        let sort_tag = match self.client_type {
-            ClientType::Danbooru => format!("order:{}", order),
-            ClientType::Gelbooru => format!("sort:{}", order),
-        };
-        self.tags.push(sort_tag);
+        self.tags.push(format!("{}:{}", T::SORT, order));
         self
     }
 
@@ -129,7 +126,13 @@ impl ClientBuilder {
     }
 
     /// Convert the builder into the necessary client
-    pub fn build<T: From<Self>>(self) -> T {
+    pub fn build(self) -> T {
         T::from(self)
+    }
+}
+
+impl<T: Client + Any> Default for ClientBuilder<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }

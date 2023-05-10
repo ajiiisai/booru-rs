@@ -1,6 +1,7 @@
-use super::{ClientBuilder, ClientType};
+use super::{Client, ClientBuilder};
 use crate::model::danbooru::*;
 
+use async_trait::async_trait;
 use reqwest::{header, header::HeaderMap};
 
 // This is only here because of Danbooru, thanks Danbooru, really cool :)
@@ -14,21 +15,23 @@ pub fn get_headers() -> HeaderMap {
 }
 
 /// Client that sends requests to the Danbooru API to retrieve the data.
-pub struct DanbooruClient(ClientBuilder);
+pub struct DanbooruClient(ClientBuilder<Self>);
 
-impl From<ClientBuilder> for DanbooruClient {
-    fn from(value: ClientBuilder) -> Self {
+impl From<ClientBuilder<Self>> for DanbooruClient {
+    fn from(value: ClientBuilder<Self>) -> Self {
         Self(value)
     }
 }
 
-impl DanbooruClient {
-    pub fn builder() -> ClientBuilder {
-        ClientBuilder::new(ClientType::Danbooru)
-    }
+#[async_trait]
+impl Client for DanbooruClient {
+    type Post = DanbooruPost;
+
+    const URL: &'static str = "https://danbooru.donmai.us";
+    const SORT: &'static str = "order:random";
 
     /// Directly get a post by its unique Id
-    pub async fn get_by_id(&self, id: u32) -> Result<DanbooruPost, reqwest::Error> {
+    async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error> {
         let builder = &self.0;
         let url = builder.url.as_str();
         let response = builder
@@ -43,7 +46,7 @@ impl DanbooruClient {
     }
 
     /// Pack the [`ClientBuilder`] and sent the request to the API to retrieve the posts
-    pub async fn get(&self) -> Result<Vec<DanbooruPost>, reqwest::Error> {
+    async fn get(&self) -> Result<Vec<Self::Post>, reqwest::Error> {
         let builder = &self.0;
         let tag_string = builder.tags.join(" ");
         let url = builder.url.as_str();

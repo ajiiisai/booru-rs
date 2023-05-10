@@ -1,13 +1,15 @@
 //! ### Usage
 //! ```
 //! use booru_rs::{DanbooruClient, Sort, DanbooruRating};
+//! use booru_rs::client::Client;
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let posts = DanbooruClient::builder()
+//!         .default_url("https://testbooru.donmai.us")
 //!         .rating(DanbooruRating::General)
 //!         .sort(Sort::Score)
-//!         .build::<DanbooruClient>()
+//!         .build()
 //!         .get()
 //!         .await
 //!         .expect("There was an error. (•-•)");

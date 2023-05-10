@@ -1,6 +1,6 @@
 mod gelbooru {
     use booru_rs::{
-        client::{gelbooru::GelbooruClient, generic::*},
+        client::{gelbooru::GelbooruClient, generic::*, Client},
         model::gelbooru::GelbooruRating,
     };
 
@@ -8,7 +8,7 @@ mod gelbooru {
     async fn get_posts_with_tag() {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -21,7 +21,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .rating(GelbooruRating::General)
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -34,7 +34,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .sort(Sort::Score)
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -47,7 +47,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .blacklist_tag(GelbooruRating::Explicit)
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -61,7 +61,7 @@ mod gelbooru {
             .tag("kafuu_chino")
             .rating(GelbooruRating::General)
             .limit(3)
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -75,7 +75,7 @@ mod gelbooru {
             .tag("kafuu_chino")
             .tag("table")
             .limit(3)
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -88,7 +88,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .random()
-            .build::<GelbooruClient>()
+            .build()
             .get()
             .await;
 
@@ -98,10 +98,7 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = GelbooruClient::builder()
-            .build::<GelbooruClient>()
-            .get_by_id(7898595)
-            .await;
+        let post = GelbooruClient::builder().build().get_by_id(7898595).await;
 
         assert!(post.is_ok());
         assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);
