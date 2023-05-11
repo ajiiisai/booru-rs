@@ -1,26 +1,24 @@
 use async_trait::async_trait;
 
 use super::{Client, ClientBuilder};
-use crate::model::gelbooru::*;
+use crate::model::safebooru::SafebooruPost;
 
-/// Client that sends requests to the Gelbooru API to retrieve the data.
-pub struct GelbooruClient(ClientBuilder<Self>);
+pub struct SafebooruClient(ClientBuilder<Self>);
 
-impl From<ClientBuilder<Self>> for GelbooruClient {
+impl From<ClientBuilder<Self>> for SafebooruClient {
     fn from(value: ClientBuilder<Self>) -> Self {
         Self(value)
     }
 }
 
 #[async_trait]
-impl Client for GelbooruClient {
-    type Post = GelbooruPost;
+impl Client for SafebooruClient {
+    type Post = SafebooruPost;
 
-    const URL: &'static str = "https://gelbooru.com";
+    const URL: &'static str = "https://safebooru.org";
     const SORT: &'static str = "sort:";
 
-    /// Directly get a post by its unique Id
-    async fn get_by_id(&self, id: u32) -> Result<GelbooruPost, reqwest::Error> {
+    async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error> {
         let builder = &self.0;
         let url = builder.url.as_str();
         let response = builder
@@ -35,18 +33,21 @@ impl Client for GelbooruClient {
             ])
             .send()
             .await?
-            .json::<GelbooruResponse>()
+            .json::<Vec<SafebooruPost>>()
             .await?;
-
-        Ok(response.posts[0].clone())
+        // FIXME: Assumes there is a post with the given id. Same is true for the
+        // Gelbooru client.
+        Ok(response
+            .into_iter()
+            .next()
+            .expect("Requested an id that does not exist."))
     }
 
-    /// Pack the [`ClientBuilder`] and sent the request to the API to retrieve the posts
-    async fn get(&self) -> Result<Vec<GelbooruPost>, reqwest::Error> {
+    async fn get(&self) -> Result<Vec<Self::Post>, reqwest::Error> {
         let builder = &self.0;
         let url = builder.url.as_str();
-        let tag_string = builder.tags.join(" ");
-        let response = builder
+        let tags = builder.tags.join(" ");
+        Ok(builder
             .client
             .get(format!("{url}/index.php"))
             .query(&[
@@ -54,14 +55,12 @@ impl Client for GelbooruClient {
                 ("s", "post"),
                 ("q", "index"),
                 ("limit", builder.limit.to_string().as_str()),
-                ("tags", &tag_string),
+                ("tags", &tags),
                 ("json", "1"),
             ])
             .send()
             .await?
-            .json::<GelbooruResponse>()
-            .await?;
-
-        Ok(response.posts)
+            .json::<Vec<SafebooruPost>>()
+            .await?)
     }
 }

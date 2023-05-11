@@ -2,13 +2,17 @@ use std::any::{Any, TypeId};
 
 use async_trait::async_trait;
 
-use crate::{DanbooruClient, GelbooruClient};
-
-use self::generic::{Rating, Sort};
+use self::{
+    danbooru::DanbooruClient,
+    gelbooru::GelbooruClient,
+    generic::{Rating, Sort},
+    safebooru::SafebooruClient,
+};
 
 pub mod danbooru;
 pub mod gelbooru;
 pub mod generic;
+pub mod safebooru;
 
 pub struct ClientBuilder<T: Client> {
     client: reqwest::Client,
@@ -64,8 +68,11 @@ impl<T: Client + Any> ClientBuilder<T> {
         self
     }
 
-    /// Add a [`DanbooruRating`](crate::model::DanbooruRating) or
-    /// [`GelbooruRating`](crate::model::GelbooruRating) to the query
+    // REFACTOR: This can probably be cleaned up.
+    /// Add the client compatible rating. Will panic if the rating is not compatible.
+    /// - [`DanbooruRating`](crate::model::DanbooruRating) for DanbooruClient
+    /// - [`GelbooruRating`](crate::model::GelbooruRating) for GelbooruClient
+    /// - [`SafebooruRating`](crate::model::SafebooruRating) for SafebooruClient
     pub fn rating<R: Into<Rating>>(mut self, rating: R) -> Self {
         let rating_tag = match rating.into() {
             Rating::Danbooru(rating) => {
@@ -73,7 +80,7 @@ impl<T: Client + Any> ClientBuilder<T> {
                     TypeId::of::<T>(),
                     TypeId::of::<DanbooruClient>(),
                     "{:?} `ClientBuilder` but tried to apply a Danbooru rating to it.",
-                    TypeId::of::<DanbooruClient>(),
+                    TypeId::of::<T>(),
                 );
                 format!("rating:{}", rating)
             }
@@ -82,7 +89,16 @@ impl<T: Client + Any> ClientBuilder<T> {
                     TypeId::of::<T>(),
                     TypeId::of::<GelbooruClient>(),
                     "{:?} `ClientBuilder` but tried to apply a Gelbooru rating to it.",
-                    TypeId::of::<GelbooruClient>(),
+                    TypeId::of::<T>(),
+                );
+                format!("rating:{}", rating)
+            }
+            Rating::Safebooru(rating) => {
+                assert_eq!(
+                    TypeId::of::<T>(),
+                    TypeId::of::<SafebooruClient>(),
+                    "{:?} `ClientBuilder` but tried to apply a Safebooru rating to it.",
+                    TypeId::of::<T>(),
                 );
                 format!("rating:{}", rating)
             }

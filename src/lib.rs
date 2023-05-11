@@ -1,7 +1,6 @@
 //! ### Usage
 //! ```
-//! use booru_rs::{DanbooruClient, Sort, DanbooruRating};
-//! use booru_rs::client::Client;
+//! use booru_rs::{danbooru::{DanbooruClient, DanbooruRating}, Sort, Client};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -25,7 +24,19 @@ pub mod client;
 pub mod model;
 
 // Conveience
-pub use client::{
-    danbooru::DanbooruClient, gelbooru::GelbooruClient, generic::Rating, generic::Sort,
-};
-pub use model::{danbooru::DanbooruRating, gelbooru::GelbooruRating};
+pub use client::{generic::Sort, Client};
+
+pub mod safebooru {
+    pub use crate::client::safebooru::*;
+    pub use crate::model::safebooru::*;
+}
+
+pub mod gelbooru {
+    pub use crate::client::gelbooru::*;
+    pub use crate::model::gelbooru::*;
+}
+
+pub mod danbooru {
+    pub use crate::client::danbooru::*;
+    pub use crate::model::danbooru::*;
+}

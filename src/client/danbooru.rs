@@ -28,7 +28,7 @@ impl Client for DanbooruClient {
     type Post = DanbooruPost;
 
     const URL: &'static str = "https://danbooru.donmai.us";
-    const SORT: &'static str = "order:random";
+    const SORT: &'static str = "order:";
 
     /// Directly get a post by its unique Id
     async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error> {

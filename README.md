@@ -5,7 +5,7 @@ An async Booru client for Rust
 ##  Overview
 The client currently supports:
 - [x] Gelbooru
-- [ ] Safebooru
+- [x] Safebooru
 - [x] Danbooru
 - [ ] Konachan
 - [ ] R34
