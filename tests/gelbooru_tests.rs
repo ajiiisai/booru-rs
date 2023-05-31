@@ -1,12 +1,16 @@
 mod gelbooru {
     use booru_rs::{
-        client::{gelbooru::GelbooruClient, generic::*},
-        model::gelbooru::{GelbooruRating, GelbooruSort},
+        client::{gelbooru::GelbooruClient, generic::*, Client},
+        model::gelbooru::GelbooruRating,
     };
 
     #[tokio::test]
     async fn get_posts_with_tag() {
-        let posts = GelbooruClient::builder().tag("kafuu_chino").get().await;
+        let posts = GelbooruClient::builder()
+            .tag("kafuu_chino")
+            .build()
+            .get()
+            .await;
 
         assert!(posts.is_ok());
         assert!(!posts.unwrap().is_empty());
@@ -17,6 +21,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .rating(GelbooruRating::General)
+            .build()
             .get()
             .await;
 
@@ -28,7 +33,8 @@ mod gelbooru {
     async fn get_posts_with_sort() {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
-            .sort(GelbooruSort::Score)
+            .sort(Sort::Score)
+            .build()
             .get()
             .await;
 
@@ -41,6 +47,7 @@ mod gelbooru {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
             .blacklist_tag(GelbooruRating::Explicit)
+            .build()
             .get()
             .await;
 
@@ -54,6 +61,7 @@ mod gelbooru {
             .tag("kafuu_chino")
             .rating(GelbooruRating::General)
             .limit(3)
+            .build()
             .get()
             .await;
 
@@ -65,8 +73,9 @@ mod gelbooru {
     async fn get_posts_multiple_tags() {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
-            .tag("bangs")
+            .tag("table")
             .limit(3)
+            .build()
             .get()
             .await;
 
@@ -78,7 +87,8 @@ mod gelbooru {
     async fn get_random_posts() {
         let posts = GelbooruClient::builder()
             .tag("kafuu_chino")
-            .random(true)
+            .random()
+            .build()
             .get()
             .await;
 
@@ -88,7 +98,7 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = GelbooruClient::builder().get_by_id(7898595).await;
+        let post = GelbooruClient::builder().build().get_by_id(7898595).await;
 
         assert!(post.is_ok());
         assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);
@@ -105,13 +115,13 @@ mod gelbooru {
 
     #[test]
     fn parse_sort_tags() {
-        assert_eq!("id", GelbooruSort::Id.to_string());
-        assert_eq!("score", GelbooruSort::Score.to_string());
-        assert_eq!("rating", GelbooruSort::Rating.to_string());
-        assert_eq!("user", GelbooruSort::User.to_string());
-        assert_eq!("height", GelbooruSort::Height.to_string());
-        assert_eq!("width", GelbooruSort::Width.to_string());
-        assert_eq!("source", GelbooruSort::Source.to_string());
-        assert_eq!("updated", GelbooruSort::Updated.to_string());
+        assert_eq!("id", Sort::Id.to_string());
+        assert_eq!("score", Sort::Score.to_string());
+        assert_eq!("rating", Sort::Rating.to_string());
+        assert_eq!("user", Sort::User.to_string());
+        assert_eq!("height", Sort::Height.to_string());
+        assert_eq!("width", Sort::Width.to_string());
+        assert_eq!("source", Sort::Source.to_string());
+        assert_eq!("updated", Sort::Updated.to_string());
     }
 }

@@ -76,22 +76,3 @@ impl fmt::Display for DanbooruRating {
         write!(f, "{lowercase_tag}")
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum DanbooruSort {
-    Id,
-    Score,
-    Rating,
-    User,
-    Height,
-    Width,
-    Source,
-    Updated,
-}
-
-impl fmt::Display for DanbooruSort {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let lowercase_tag = format!("{:?}", self).to_lowercase();
-        write!(f, "{lowercase_tag}")
-    }
-}

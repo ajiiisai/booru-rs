@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod danbooru {
     use booru_rs::{
-        client::danbooru::DanbooruClient,
-        model::danbooru::{DanbooruRating, DanbooruSort},
+        client::{danbooru::DanbooruClient, generic::Sort, Client},
+        model::danbooru::DanbooruRating,
     };
 
     #[tokio::test]
@@ -10,6 +10,7 @@ mod danbooru {
         let posts = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
+            .build()
             .get()
             .await;
 
@@ -23,6 +24,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .rating(DanbooruRating::General)
+            .build()
             .get()
             .await;
 
@@ -35,7 +37,8 @@ mod danbooru {
         let posts = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
-            .sort(DanbooruSort::Rating)
+            .sort(Sort::Rating)
+            .build()
             .get()
             .await;
 
@@ -49,6 +52,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .blacklist_tag(DanbooruRating::Explicit)
+            .build()
             .get()
             .await;
 
@@ -62,6 +66,7 @@ mod danbooru {
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .limit(3)
+            .build()
             .get()
             .await;
 
@@ -76,6 +81,7 @@ mod danbooru {
             .tag("kafuu_chino")
             .tag("bangs")
             .limit(3)
+            .build()
             .get()
             .await;
 
@@ -88,7 +94,8 @@ mod danbooru {
         let posts = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
-            .random(true)
+            .random()
+            .build()
             .get()
             .await;
 
@@ -100,6 +107,7 @@ mod danbooru {
     async fn get_post_by_id() {
         let post = DanbooruClient::builder()
             .default_url("https://testbooru.donmai.us")
+            .build()
             .get_by_id(9423)
             .await;
 
@@ -120,13 +128,13 @@ mod danbooru {
 
     #[test]
     fn parse_sort_tags() {
-        assert_eq!("id", DanbooruSort::Id.to_string());
-        assert_eq!("score", DanbooruSort::Score.to_string());
-        assert_eq!("rating", DanbooruSort::Rating.to_string());
-        assert_eq!("user", DanbooruSort::User.to_string());
-        assert_eq!("height", DanbooruSort::Height.to_string());
-        assert_eq!("width", DanbooruSort::Width.to_string());
-        assert_eq!("source", DanbooruSort::Source.to_string());
-        assert_eq!("updated", DanbooruSort::Updated.to_string());
+        assert_eq!("id", Sort::Id.to_string());
+        assert_eq!("score", Sort::Score.to_string());
+        assert_eq!("rating", Sort::Rating.to_string());
+        assert_eq!("user", Sort::User.to_string());
+        assert_eq!("height", Sort::Height.to_string());
+        assert_eq!("width", Sort::Width.to_string());
+        assert_eq!("source", Sort::Source.to_string());
+        assert_eq!("updated", Sort::Updated.to_string());
     }
 }
