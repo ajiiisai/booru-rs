@@ -4,7 +4,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug, Clone)]
 pub struct SafebooruPost {
     pub id: u32,
-    pub score: u32,
+    pub score: Option<u32>, /// This can be `null` for really recent posts
     pub height: u32,
     pub width: u32,
     pub hash: String,
