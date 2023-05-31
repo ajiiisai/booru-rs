@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod safebooru {
     use booru_rs::{
-        client::{safebooru::SafebooruClient, generic::Sort, Client},
+        client::{generic::Sort, safebooru::SafebooruClient, Client},
         model::safebooru::SafebooruRating,
     };
 
@@ -98,16 +98,10 @@ mod safebooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = SafebooruClient::builder()
-            .build()
-            .get_by_id(4348760)
-            .await;
+        let post = SafebooruClient::builder().build().get_by_id(4348760).await;
 
         assert!(post.is_ok());
-        assert_eq!(
-            "3e407a7848804119f1064c2aac731545",
-            post.unwrap().hash
-        );
+        assert_eq!("3e407a7848804119f1064c2aac731545", post.unwrap().hash);
     }
 
     #[test]
