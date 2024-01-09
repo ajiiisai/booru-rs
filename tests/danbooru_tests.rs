@@ -136,7 +136,10 @@ mod danbooru {
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());
 
-        assert_ne!(post_from_first_page.unwrap()[0].id, post_from_specific_page.unwrap()[0].id);
+        assert_ne!(
+            post_from_first_page.unwrap()[0].id,
+            post_from_specific_page.unwrap()[0].id
+        );
     }
 
     #[test]
