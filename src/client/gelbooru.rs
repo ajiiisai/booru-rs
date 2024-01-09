@@ -53,6 +53,7 @@ impl Client for GelbooruClient {
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
+                ("pid", builder.page.to_string().as_str()),
                 ("limit", builder.limit.to_string().as_str()),
                 ("tags", &tag_string),
                 ("json", "1"),

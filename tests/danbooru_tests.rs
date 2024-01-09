@@ -118,6 +118,30 @@ mod danbooru {
         );
     }
 
+    #[tokio::test]
+    async fn get_posts_from_page() {
+        let post_from_first_page = DanbooruClient::builder()
+            .default_url("http://testbooru.donmai.us")
+            .build()
+            .get()
+            .await;
+
+        let post_from_specific_page = DanbooruClient::builder()
+            .default_url("http://testbooru.donmai.us")
+            .page(7)
+            .build()
+            .get()
+            .await;
+
+        assert!(post_from_first_page.is_ok());
+        assert!(post_from_specific_page.is_ok());
+
+        assert_ne!(
+            post_from_first_page.unwrap()[0].id,
+            post_from_specific_page.unwrap()[0].id
+        );
+    }
+
     #[test]
     fn parse_rating_tags() {
         assert_eq!("explicit", DanbooruRating::Explicit.to_string());

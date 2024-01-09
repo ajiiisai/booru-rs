@@ -56,6 +56,7 @@ impl Client for DanbooruClient {
             .headers(get_headers())
             .query(&[
                 ("limit", builder.limit.to_string().as_str()),
+                ("page", builder.page.to_string().as_str()),
                 ("tags", &tag_string),
             ])
             .send()

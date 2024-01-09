@@ -104,6 +104,21 @@ mod safebooru {
         assert_eq!("3e407a7848804119f1064c2aac731545", post.unwrap().hash);
     }
 
+    #[tokio::test]
+    async fn get_posts_from_page() {
+        let post_from_first_page = SafebooruClient::builder().build().get().await;
+
+        let post_from_specific_page = SafebooruClient::builder().page(7).build().get().await;
+
+        assert!(post_from_first_page.is_ok());
+        assert!(post_from_specific_page.is_ok());
+
+        assert_ne!(
+            post_from_first_page.unwrap()[0].id,
+            post_from_specific_page.unwrap()[0].id
+        );
+    }
+
     #[test]
     fn parse_rating_tags() {
         assert_eq!("safe", SafebooruRating::Safe.to_string());
