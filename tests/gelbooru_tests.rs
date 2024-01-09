@@ -104,6 +104,25 @@ mod gelbooru {
         assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);
     }
 
+    #[tokio::test]
+    async fn get_posts_from_page() {
+        let post_from_first_page = GelbooruClient::builder()
+            .build()
+            .get()
+            .await;
+
+        let post_from_specific_page = GelbooruClient::builder()
+            .page(7)
+            .build()
+            .get()
+            .await;
+
+        assert!(post_from_first_page.is_ok());
+        assert!(post_from_specific_page.is_ok());
+
+        assert_ne!(post_from_first_page.unwrap()[0].id, post_from_specific_page.unwrap()[0].id);
+    }
+
     #[test]
     fn parse_rating_tags() {
         assert_eq!("explicit", GelbooruRating::Explicit.to_string());

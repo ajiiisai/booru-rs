@@ -21,6 +21,7 @@ pub struct ClientBuilder<T: Client> {
     tags: Vec<String>,
     limit: u32,
     url: String,
+    page: u32,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -48,6 +49,7 @@ impl<T: Client + Any> ClientBuilder<T> {
             tags: vec![],
             limit: 100,
             url: T::URL.to_string(),
+            page: 0,
             _marker: std::marker::PhantomData,
         }
     }
@@ -138,6 +140,12 @@ impl<T: Client + Any> ClientBuilder<T> {
     /// Change the default url for the client
     pub fn default_url(mut self, url: &str) -> Self {
         self.url = url.into();
+        self
+    }
+
+    /// Add a specific indexed page to search from
+    pub fn page(mut self, page: u32) -> Self {
+        self.page = page;
         self
     }
 
