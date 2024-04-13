@@ -98,10 +98,7 @@ mod danbooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = DanbooruClient::builder()
-            .build()
-            .get_by_id(7452417)
-            .await;
+        let post = DanbooruClient::builder().build().get_by_id(7452417).await;
 
         assert!(post.is_ok());
         assert_eq!(
@@ -112,16 +109,9 @@ mod danbooru {
 
     #[tokio::test]
     async fn get_posts_from_page() {
-        let post_from_first_page = DanbooruClient::builder()
-            .build()
-            .get()
-            .await;
+        let post_from_first_page = DanbooruClient::builder().build().get().await;
 
-        let post_from_specific_page = DanbooruClient::builder()
-            .page(7)
-            .build()
-            .get()
-            .await;
+        let post_from_specific_page = DanbooruClient::builder().page(7).build().get().await;
 
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());
