@@ -1,6 +1,6 @@
 [package]
 name = "booru-rs"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 description = "An async Booru client for Rust"
 license = "MIT/Apache-2.0"
