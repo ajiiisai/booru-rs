@@ -8,7 +8,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_with_tag() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .build()
             .get()
@@ -21,7 +20,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_with_rating() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .rating(DanbooruRating::General)
             .build()
@@ -35,7 +33,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_with_sort() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .sort(Sort::Rating)
             .build()
@@ -49,7 +46,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_with_blacklist_tag() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .blacklist_tag(DanbooruRating::Explicit)
             .build()
@@ -63,7 +59,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_with_limit() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .limit(3)
             .build()
@@ -77,9 +72,8 @@ mod danbooru {
     #[tokio::test]
     async fn get_posts_multiple_tags() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
-            .tag("bangs")
+            .tag("1girl")
             .limit(3)
             .build()
             .get()
@@ -92,7 +86,6 @@ mod danbooru {
     #[tokio::test]
     async fn get_random_posts() {
         let posts = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
             .tag("kafuu_chino")
             .random()
             .build()
@@ -105,33 +98,20 @@ mod danbooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = DanbooruClient::builder()
-            .default_url("https://testbooru.donmai.us")
-            .build()
-            .get_by_id(9423)
-            .await;
+        let post = DanbooruClient::builder().build().get_by_id(7452417).await;
 
         assert!(post.is_ok());
         assert_eq!(
-            "15a1b49c26f5c684807a2f0b838f9e4c",
+            "d796ffc0c83585bb2e836f8d49653675",
             post.unwrap().md5.unwrap()
         );
     }
 
     #[tokio::test]
     async fn get_posts_from_page() {
-        let post_from_first_page = DanbooruClient::builder()
-            .default_url("http://testbooru.donmai.us")
-            .build()
-            .get()
-            .await;
+        let post_from_first_page = DanbooruClient::builder().build().get().await;
 
-        let post_from_specific_page = DanbooruClient::builder()
-            .default_url("http://testbooru.donmai.us")
-            .page(7)
-            .build()
-            .get()
-            .await;
+        let post_from_specific_page = DanbooruClient::builder().page(7).build().get().await;
 
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());

@@ -5,7 +5,6 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let posts = DanbooruClient::builder()
-//!         .default_url("https://testbooru.donmai.us")
 //!         .rating(DanbooruRating::General)
 //!         .sort(Sort::Score)
 //!         .build()
