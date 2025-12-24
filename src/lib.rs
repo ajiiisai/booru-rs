@@ -3,7 +3,7 @@
 //! An async Rust client for various booru image board APIs.
 //!
 //! This library provides a unified interface for querying multiple booru sites
-//! including Danbooru, Gelbooru, and Safebooru.
+//! including Danbooru, Gelbooru, Safebooru, and Rule34.
 //!
 //! ## Features
 //!
@@ -11,9 +11,13 @@
 //! - **Async/await**: Built on tokio and reqwest for efficient async I/O
 //! - **Connection pooling**: Shared HTTP client with automatic connection reuse
 //! - **Proper error handling**: No panics, all errors are returned as `Result` types
-//! - **Automatic retries**: Transient failures are retried with exponential backoff
-//! - **Async streams**: Paginate through results with async iterators
 //! - **Common trait**: Use the [`Post`] trait for generic code across booru sites
+//! - **Async streams**: Paginate through results with async iterators
+//! - **Image downloads**: Download images with progress tracking and concurrent downloads
+//! - **Automatic retries**: Transient failures are retried with exponential backoff
+//! - **Rate limiting**: Protect against API throttling
+//! - **Response caching**: Reduce redundant API calls
+//! - **Tag validation**: Catch common mistakes before making requests
 //!
 //! ## Quick Start
 //!

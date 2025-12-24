@@ -12,6 +12,8 @@ An async Rust client for various booru image board APIs.
 - **Proper error handling** — No panics, all errors are returned as `Result` types
 - **Common `Post` trait** — Write generic code that works with any booru site
 - **Async streams** — Paginate through results with async iterators
+- **Image downloads** — Download images with progress tracking and concurrent downloads
+- **Automatic retries** — Transient failures are retried with exponential backoff
 - **Rate limiting** — Protect against API throttling
 - **Response caching** — Reduce redundant API calls
 - **Tag validation** — Catch common mistakes before making requests
@@ -227,18 +229,22 @@ let tag = validate_tag_strict("  cat ears  ")?;  // Returns "cat_ears"
 
 ```rust
 use booru_rs::prelude::*;
+use booru_rs::client::ClientBuilder;
 
 let custom_client = reqwest::Client::builder()
     .timeout(std::time::Duration::from_secs(60))
     .build()?;
 
-let posts = SafebooruClient::builder()
-    .with_client(custom_client)
+// Use with_client to create a builder with custom HTTP client
+let posts = ClientBuilder::<SafebooruClient>::with_client(custom_client)
     .tag("nature")?
     .build()
     .get()
     .await?;
 ```
+
+> **Note:** Most users won't need a custom HTTP client. The default shared client
+> provides connection pooling and sensible timeouts.
 
 ### Downloading Images
 
@@ -253,27 +259,31 @@ let posts = SafebooruClient::builder()
     .get()
     .await?;
 
-// Download with default options
+// Download posts directly
 let downloader = Downloader::new();
 for post in &posts {
-    if let Some(url) = post.file_url() {
-        let result = downloader.download(url, Path::new("./downloads")).await?;
-        println!("Downloaded: {:?}", result.path);
-    }
+    let result = downloader.download_post(post, Path::new("./downloads")).await?;
+    println!("Downloaded: {}", result.path.display());
 }
 
 // Download with progress tracking
-let options = DownloadOptions::builder()
-    .skip_existing(true)
-    .on_progress(|progress| {
-        println!("{}% ({}/{})", 
-            progress.percentage(), 
-            progress.downloaded, 
-            progress.total.unwrap_or(0));
-    })
-    .build();
+for post in &posts {
+    let result = downloader
+        .download_post_with_progress(post, Path::new("./downloads"), |progress| {
+            println!("{}/{} bytes (post #{})", 
+                progress.downloaded, 
+                progress.total.unwrap_or(0),
+                progress.post_id);
+        })
+        .await?;
+}
 
-let downloader = Downloader::with_options(options);
+// Concurrent downloads (4 at a time)
+let results = downloader.download_posts(&posts, Path::new("./downloads"), 4).await;
+
+// Custom options
+let downloader = Downloader::new()
+    .options(DownloadOptions::default().overwrite().filename("{id}_{md5}.{ext}"));
 ```
 
 ### Gelbooru Authentication

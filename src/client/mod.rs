@@ -42,20 +42,18 @@
 //! ```no_run
 //! use booru_rs::prelude::*;
 //!
-//! # fn example() -> Result<()> {
+//! # async fn example() -> Result<()> {
 //! let custom_client = reqwest::Client::builder()
 //!     .timeout(std::time::Duration::from_secs(60))
 //!     .build()
 //!     .unwrap();
 //!
-//! let client = GelbooruClient::builder()
+//! // Use ClientBuilder::with_client to create a builder with custom HTTP client
+//! let posts = ClientBuilder::<SafebooruClient>::with_client(custom_client)
 //!     .tag("nature")?
-//!     .build();
-//!
-//! // Or use with_client to create a builder with a custom HTTP client:
-//! let client = <GelbooruClient as Client>::builder()
-//!     .tag("nature")?
-//!     .build();
+//!     .build()
+//!     .get()
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
