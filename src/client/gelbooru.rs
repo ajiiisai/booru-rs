@@ -1,8 +1,10 @@
 //! Gelbooru API client implementation.
 
-use super::{Client, ClientBuilder};
+use super::{Client, ClientBuilder, shared_client};
+use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::gelbooru::*;
+use serde::Deserialize;
 
 /// Client for interacting with the Gelbooru API.
 ///
@@ -146,5 +148,89 @@ impl Client for GelbooruClient {
         let data = response.json::<GelbooruResponse>().await?;
 
         Ok(data.posts)
+    }
+}
+
+/// Internal response type for Gelbooru autocomplete.
+#[derive(Debug, Deserialize)]
+struct GelbooruAutocompleteItem {
+    /// The tag name.
+    value: String,
+    /// Display label (includes post count).
+    label: String,
+    /// Tag category (optional).
+    #[serde(default)]
+    category: Option<String>,
+    /// Number of posts with this tag (optional).
+    #[serde(default)]
+    post_count: Option<u32>,
+}
+
+impl Autocomplete for GelbooruClient {
+    async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let client = shared_client();
+        let url = format!("{}/index.php", Self::URL);
+
+        let response = client
+            .get(&url)
+            .query(&[
+                ("page", "autocomplete2"),
+                ("term", query),
+                ("type", "tag_query"),
+                ("limit", &limit.to_string()),
+            ])
+            .send()
+            .await?;
+
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(BooruError::Unauthorized(
+                "Gelbooru requires API credentials for some endpoints".into(),
+            ));
+        }
+
+        let items: Vec<GelbooruAutocompleteItem> = response.json().await?;
+
+        Ok(items
+            .into_iter()
+            .map(|item| {
+                // Try to parse post count from label if not provided directly
+                let post_count = item
+                    .post_count
+                    .or_else(|| parse_post_count_from_label(&item.label));
+
+                // Convert category string to numeric ID if present
+                let category = item.category.as_deref().and_then(parse_category);
+
+                TagSuggestion {
+                    name: item.value,
+                    label: item.label,
+                    post_count,
+                    category,
+                }
+            })
+            .collect())
+    }
+}
+
+/// Parses category string to numeric ID.
+fn parse_category(cat: &str) -> Option<u8> {
+    match cat.to_lowercase().as_str() {
+        "general" | "tag" => Some(0),
+        "artist" => Some(1),
+        "copyright" | "series" => Some(3),
+        "character" => Some(4),
+        "meta" | "metadata" => Some(5),
+        _ => cat.parse().ok(),
+    }
+}
+
+/// Parses post count from a label like "tag_name (12345)".
+fn parse_post_count_from_label(label: &str) -> Option<u32> {
+    let start = label.rfind('(')?;
+    let end = label.rfind(')')?;
+    if start < end {
+        label[start + 1..end].parse().ok()
+    } else {
+        None
     }
 }
