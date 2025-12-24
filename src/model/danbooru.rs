@@ -1,9 +1,16 @@
-//! Models for Danbooru
-use core::fmt;
+//! Models for Danbooru API responses.
+//!
+//! This module contains the data structures for deserializing
+//! responses from the Danbooru API.
 
+use core::fmt;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A post from Danbooru.
+///
+/// This struct represents a single image post from Danbooru,
+/// including all metadata like tags, ratings, and file information.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DanbooruPost {
     pub id: u32,
     pub created_at: String,
@@ -50,8 +57,12 @@ pub struct DanbooruPost {
     pub bit_flags: u32,
 }
 
-/// Post's rating. Check the [Danbooru's ratings wiki](https://danbooru.donmai.us/wiki_pages/howto:rate)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Post rating classification.
+///
+/// Danbooru uses a four-tier rating system. See the
+/// [Danbooru ratings wiki](https://danbooru.donmai.us/wiki_pages/howto:rate)
+/// for detailed information.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum DanbooruRating {
     #[serde(rename = "e")]

@@ -1,10 +1,15 @@
-//! Models for Gelbooru
-use core::fmt;
+//! Models for Gelbooru API responses.
+//!
+//! This module contains the data structures for deserializing
+//! responses from the Gelbooru API.
 
+use core::fmt;
 use serde::{Deserialize, Serialize};
 
-/// Individual post from [`GelbooruResponse`]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A post from Gelbooru.
+///
+/// This struct represents a single image post from Gelbooru.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct GelbooruPost {
     /// The ID of the post
     pub id: u32,
@@ -30,15 +35,18 @@ pub struct GelbooruPost {
     pub rating: GelbooruRating,
 }
 
-/// Gelbooru's API response with a list a posts
-#[derive(Serialize, Deserialize, Debug)]
+/// Wrapper for Gelbooru's API response containing a list of posts.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GelbooruResponse {
     #[serde(rename = "post")]
     pub posts: Vec<GelbooruPost>,
 }
 
-/// Post's rating. Check the [Gelbooru's ratings wiki](https://gelbooru.com/index.php?page=help&topic=rating)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Post rating classification for Gelbooru.
+///
+/// See the [Gelbooru ratings wiki](https://gelbooru.com/index.php?page=help&topic=rating)
+/// for detailed information.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum GelbooruRating {
     Explicit,

@@ -1,0 +1,35 @@
+# Configuration for cargo-nextest
+# See: https://nexte.st/docs/configuration/
+
+[store]
+# Directory for storing test artifacts
+dir = "target/nextest"
+
+[profile.default]
+# Number of retries for flaky tests (useful for network-dependent tests)
+retries = 2
+
+# Time before a test is considered slow
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+# Fail fast on first test failure
+fail-fast = false
+
+# Number of threads for running tests
+# "num-cpus" uses all available CPU cores
+test-threads = "num-cpus"
+
+[profile.default.junit]
+# Generate JUnit XML reports for CI integration
+path = "target/nextest/junit.xml"
+report-name = "booru-rs tests"
+
+[profile.ci]
+# CI-specific profile with stricter settings
+retries = 1
+fail-fast = true
+slow-timeout = { period = "60s", terminate-after = 1 }
+
+[profile.ci.junit]
+path = "target/nextest/ci-junit.xml"
+report-name = "booru-rs CI tests"

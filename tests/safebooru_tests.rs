@@ -1,14 +1,15 @@
 #[cfg(test)]
 mod safebooru {
     use booru_rs::{
-        client::{generic::Sort, safebooru::SafebooruClient, Client},
-        model::safebooru::SafebooruRating,
+        client::{Client, generic::Sort, safebooru::SafebooruClient},
+        safebooru::SafebooruRating,
     };
 
     #[tokio::test]
     async fn get_posts_with_tag() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .build()
             .get()
             .await;
@@ -21,6 +22,7 @@ mod safebooru {
     async fn get_posts_with_rating() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .rating(SafebooruRating::General)
             .build()
             .get()
@@ -34,7 +36,8 @@ mod safebooru {
     async fn get_posts_with_sort() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
-            .sort(Sort::Rating)
+            .unwrap()
+            .sort(Sort::Score)
             .build()
             .get()
             .await;
@@ -47,6 +50,7 @@ mod safebooru {
     async fn get_posts_with_blacklist_tag() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .blacklist_tag(SafebooruRating::Explicit)
             .build()
             .get()
@@ -60,6 +64,7 @@ mod safebooru {
     async fn get_posts_with_limit() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .limit(3)
             .build()
             .get()
@@ -73,7 +78,9 @@ mod safebooru {
     async fn get_posts_multiple_tags() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .tag("bangs")
+            .unwrap()
             .limit(3)
             .build()
             .get()
@@ -87,6 +94,7 @@ mod safebooru {
     async fn get_random_posts() {
         let posts = SafebooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .random()
             .build()
             .get()

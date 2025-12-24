@@ -1,49 +1,186 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
 
 jobs:
-  test:
-    name: Test
-    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+  # Check formatting first (fast fail)
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
 
+  # Run clippy lints
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # Build and test on multiple platforms
+  test:
+    name: Test (${{ matrix.os }} / ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    needs: [fmt, clippy]
     strategy:
       fail-fast: false
       matrix:
-        name:
-          - stable
-          - beta
-          - nightly
-          - Windows
-          - MacOS
-
         include:
-          - name: beta
+          # MSRV check
+          - os: ubuntu-latest
+            toolchain: "1.92"
+          # Stable on all platforms
+          - os: ubuntu-latest
+            toolchain: stable
+          - os: windows-latest
+            toolchain: stable
+          - os: macos-latest
+            toolchain: stable
+          # Beta and nightly on Linux only
+          - os: ubuntu-latest
             toolchain: beta
-          - name: nightly
+          - os: ubuntu-latest
             toolchain: nightly
-          - name: Windows
-            os: windows-latest
-          - name: MacOS
-            os: macos-latest
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Install toolchain
-        run: |
-          rustup install --profile minimal ${{ matrix.toolchain || 'stable' }}
-          rustup override set ${{ matrix.toolchain || 'stable' }}
-      - name: Add problem matchers
-        shell: bash
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
 
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
 
       - name: Build
-        run: cargo build
+        run: cargo build --all-targets
 
-      - name: Test
-        run: cargo test
+      - name: Run tests
+        run: cargo nextest run --no-fail-fast
+
+      - name: Run doctests
+        run: cargo test --doc
+
+  # Test feature combinations
+  features:
+    name: Feature Combinations
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: No default features
+        run: cargo build --no-default-features
+
+      - name: Danbooru only
+        run: cargo build --no-default-features --features danbooru
+
+      - name: Gelbooru only
+        run: cargo build --no-default-features --features gelbooru
+
+      - name: Safebooru only
+        run: cargo build --no-default-features --features safebooru
+
+      - name: Rule34 only
+        run: cargo build --no-default-features --features rule34
+
+      - name: All features
+        run: cargo build --all-features
+
+  # Mock tests (no API credentials needed)
+  mock-tests:
+    name: Mock Tests
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: Run mock and unit tests
+        run: cargo nextest run -E "kind(lib) | test(mock)"
+
+  # Check documentation builds
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    needs: [fmt]
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --no-deps --document-private-items
+
+  # Security audit
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Minimal dependency versions check (ensures proper lower bounds)
+  minimal-versions:
+    name: Minimal Versions
+    runs-on: ubuntu-latest
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@cargo-minimal-versions
+      - run: cargo minimal-versions check --workspace --direct
+
+  # Final status check for branch protection
+  ci-success:
+    name: CI Success
+    if: always()
+    needs: [fmt, clippy, test, features, mock-tests, docs, audit, minimal-versions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.fmt.result }}" != "success" ]] ||
+             [[ "${{ needs.clippy.result }}" != "success" ]] ||
+             [[ "${{ needs.test.result }}" != "success" ]] ||
+             [[ "${{ needs.features.result }}" != "success" ]] ||
+             [[ "${{ needs.mock-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.docs.result }}" != "success" ]] ||
+             [[ "${{ needs.audit.result }}" != "success" ]] ||
+             [[ "${{ needs.minimal-versions.result }}" != "success" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All jobs passed!"
