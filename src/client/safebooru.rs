@@ -1,8 +1,33 @@
-use async_trait::async_trait;
+//! Safebooru API client implementation.
 
 use super::{Client, ClientBuilder};
-use crate::model::safebooru::SafebooruPost;
+use crate::error::{BooruError, Result};
+use crate::model::safebooru::{SafebooruPost, SafebooruRating};
 
+/// Client for interacting with the Safebooru API.
+///
+/// Safebooru is a SFW-only booru with no tag limits.
+///
+/// # Example
+///
+/// ```no_run
+/// use booru_rs::safebooru::{SafebooruClient, SafebooruRating};
+/// use booru_rs::client::Client;
+///
+/// # async fn example() -> booru_rs::error::Result<()> {
+/// let posts = SafebooruClient::builder()
+///     .tag("cat_ears")?
+///     .rating(SafebooruRating::General)
+///     .limit(10)
+///     .build()
+///     .get()
+///     .await?;
+///
+/// println!("Found {} posts", posts.len());
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
 pub struct SafebooruClient(ClientBuilder<Self>);
 
 impl From<ClientBuilder<Self>> for SafebooruClient {
@@ -11,16 +36,24 @@ impl From<ClientBuilder<Self>> for SafebooruClient {
     }
 }
 
-#[async_trait]
 impl Client for SafebooruClient {
     type Post = SafebooruPost;
+    type Rating = SafebooruRating;
 
     const URL: &'static str = "https://safebooru.org";
     const SORT: &'static str = "sort:";
+    const MAX_TAGS: Option<usize> = None;
 
-    async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error> {
+    /// Retrieves a single post by its unique ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
+    /// Returns other errors if the request fails or the response cannot be parsed.
+    async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
         let builder = &self.0;
-        let url = builder.url.as_str();
+        let url = &builder.url;
+
         let response = builder
             .client
             .get(format!("{url}/index.php"))
@@ -28,40 +61,47 @@ impl Client for SafebooruClient {
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
-                ("id", id.to_string().as_str()),
+                ("id", &id.to_string()),
                 ("json", "1"),
             ])
             .send()
             .await?
             .json::<Vec<SafebooruPost>>()
             .await?;
-        // FIXME: Assumes there is a post with the given id. Same is true for the
-        // Gelbooru client.
-        Ok(response
+
+        response
             .into_iter()
             .next()
-            .expect("Requested an id that does not exist."))
+            .ok_or(BooruError::PostNotFound(id))
     }
 
-    async fn get(&self) -> Result<Vec<Self::Post>, reqwest::Error> {
+    /// Retrieves posts matching the configured query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or if the response cannot be parsed.
+    async fn get(&self) -> Result<Vec<Self::Post>> {
         let builder = &self.0;
-        let url = builder.url.as_str();
+        let url = &builder.url;
         let tags = builder.tags.join(" ");
-        Ok(builder
+
+        let response = builder
             .client
             .get(format!("{url}/index.php"))
             .query(&[
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
-                ("pid", builder.page.to_string().as_str()),
-                ("limit", builder.limit.to_string().as_str()),
+                ("pid", &builder.page.to_string()),
+                ("limit", &builder.limit.to_string()),
                 ("tags", &tags),
                 ("json", "1"),
             ])
             .send()
             .await?
             .json::<Vec<SafebooruPost>>()
-            .await?)
+            .await?;
+
+        Ok(response)
     }
 }

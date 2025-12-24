@@ -1,14 +1,15 @@
 #[cfg(test)]
 mod danbooru {
     use booru_rs::{
-        client::{danbooru::DanbooruClient, generic::Sort, Client},
-        model::danbooru::DanbooruRating,
+        client::{Client, danbooru::DanbooruClient, generic::Sort},
+        danbooru::DanbooruRating,
     };
 
     #[tokio::test]
     async fn get_posts_with_tag() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .build()
             .get()
             .await;
@@ -21,6 +22,7 @@ mod danbooru {
     async fn get_posts_with_rating() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .rating(DanbooruRating::General)
             .build()
             .get()
@@ -34,6 +36,7 @@ mod danbooru {
     async fn get_posts_with_sort() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .sort(Sort::Rating)
             .build()
             .get()
@@ -47,6 +50,7 @@ mod danbooru {
     async fn get_posts_with_blacklist_tag() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .blacklist_tag(DanbooruRating::Explicit)
             .build()
             .get()
@@ -60,6 +64,7 @@ mod danbooru {
     async fn get_posts_with_limit() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .limit(3)
             .build()
             .get()
@@ -73,7 +78,9 @@ mod danbooru {
     async fn get_posts_multiple_tags() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .tag("1girl")
+            .unwrap()
             .limit(3)
             .build()
             .get()
@@ -87,6 +94,7 @@ mod danbooru {
     async fn get_random_posts() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
+            .unwrap()
             .random()
             .build()
             .get()

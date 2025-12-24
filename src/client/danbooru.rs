@@ -1,20 +1,47 @@
+//! Danbooru API client implementation.
+
 use super::{Client, ClientBuilder};
+use crate::error::Result;
 use crate::model::danbooru::*;
 
-use async_trait::async_trait;
-use reqwest::{header, header::HeaderMap};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 
-// This is only here because of Danbooru, thanks Danbooru, really cool :)
-pub fn get_headers() -> HeaderMap {
-    let mut headers = header::HeaderMap::new();
+/// Returns headers required for Danbooru API requests.
+///
+/// Danbooru requires a User-Agent header for requests.
+fn get_headers() -> HeaderMap {
+    let mut headers = HeaderMap::with_capacity(1);
     headers.insert(
         header::USER_AGENT,
-        header::HeaderValue::from_static("PostmanRuntime/7.30.0"),
+        HeaderValue::from_static("booru-rs/0.3.0"),
     );
     headers
 }
 
-/// Client that sends requests to the Danbooru API to retrieve the data.
+/// Client for interacting with the Danbooru API.
+///
+/// Danbooru has a limit of 2 tags per query for non-authenticated users.
+///
+/// # Example
+///
+/// ```no_run
+/// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
+/// use booru_rs::client::Client;
+///
+/// # async fn example() -> booru_rs::error::Result<()> {
+/// let posts = DanbooruClient::builder()
+///     .tag("cat_ears")?
+///     .rating(DanbooruRating::General)
+///     .limit(10)
+///     .build()
+///     .get()
+///     .await?;
+///
+/// println!("Found {} posts", posts.len());
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
 pub struct DanbooruClient(ClientBuilder<Self>);
 
 impl From<ClientBuilder<Self>> for DanbooruClient {
@@ -23,17 +50,23 @@ impl From<ClientBuilder<Self>> for DanbooruClient {
     }
 }
 
-#[async_trait]
 impl Client for DanbooruClient {
     type Post = DanbooruPost;
+    type Rating = DanbooruRating;
 
     const URL: &'static str = "https://danbooru.donmai.us";
     const SORT: &'static str = "order:";
+    const MAX_TAGS: Option<usize> = Some(2);
 
-    /// Directly get a post by its unique Id
-    async fn get_by_id(&self, id: u32) -> Result<Self::Post, reqwest::Error> {
+    /// Retrieves a single post by its unique ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or if the response cannot be parsed.
+    async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
         let builder = &self.0;
-        let url = builder.url.as_str();
+        let url = &builder.url;
+
         let response = builder
             .client
             .get(format!("{url}/posts/{id}.json"))
@@ -42,22 +75,28 @@ impl Client for DanbooruClient {
             .await?
             .json::<DanbooruPost>()
             .await?;
+
         Ok(response)
     }
 
-    /// Pack the [`ClientBuilder`] and sent the request to the API to retrieve the posts
-    async fn get(&self) -> Result<Vec<Self::Post>, reqwest::Error> {
+    /// Retrieves posts matching the configured query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or if the response cannot be parsed.
+    async fn get(&self) -> Result<Vec<Self::Post>> {
         let builder = &self.0;
         let tag_string = builder.tags.join(" ");
-        let url = builder.url.as_str();
+        let url = &builder.url;
+
         let response = builder
             .client
             .get(format!("{url}/posts.json"))
             .headers(get_headers())
             .query(&[
-                ("limit", builder.limit.to_string().as_str()),
-                ("page", builder.page.to_string().as_str()),
-                ("tags", &tag_string),
+                ("limit", builder.limit.to_string()),
+                ("page", builder.page.to_string()),
+                ("tags", tag_string),
             ])
             .send()
             .await?

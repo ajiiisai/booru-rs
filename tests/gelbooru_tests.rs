@@ -1,16 +1,40 @@
+//! Gelbooru API tests.
+//!
+//! These tests require API credentials. Set the following environment variables:
+//! - `GELBOORU_API_KEY`: Your Gelbooru API key
+//! - `GELBOORU_USER_ID`: Your Gelbooru user ID
+//!
+//! Tests will be skipped if credentials are not available.
+
 mod gelbooru {
     use booru_rs::{
-        client::{gelbooru::GelbooruClient, generic::*, Client},
-        model::gelbooru::GelbooruRating,
+        client::{Client, ClientBuilder, gelbooru::GelbooruClient, generic::*},
+        gelbooru::GelbooruRating,
     };
+
+    /// Returns a builder with credentials if available, or None to skip the test.
+    fn builder_with_credentials() -> Option<ClientBuilder<GelbooruClient>> {
+        let api_key = std::env::var("GELBOORU_API_KEY").ok()?;
+        let user_id = std::env::var("GELBOORU_USER_ID").ok()?;
+        Some(GelbooruClient::builder().set_credentials(api_key, user_id))
+    }
+
+    macro_rules! skip_without_credentials {
+        () => {
+            match builder_with_credentials() {
+                Some(builder) => builder,
+                None => {
+                    eprintln!("Skipping test: GELBOORU_API_KEY and GELBOORU_USER_ID not set");
+                    return;
+                }
+            }
+        };
+    }
 
     #[tokio::test]
     async fn get_posts_with_tag() {
-        let posts = GelbooruClient::builder()
-            .tag("kafuu_chino")
-            .build()
-            .get()
-            .await;
+        let builder = skip_without_credentials!();
+        let posts = builder.tag("kafuu_chino").unwrap().build().get().await;
 
         assert!(posts.is_ok());
         assert!(!posts.unwrap().is_empty());
@@ -18,8 +42,10 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_with_rating() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .rating(GelbooruRating::General)
             .build()
             .get()
@@ -31,8 +57,10 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_with_sort() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .sort(Sort::Score)
             .build()
             .get()
@@ -44,8 +72,10 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_with_blacklist_tag() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .blacklist_tag(GelbooruRating::Explicit)
             .build()
             .get()
@@ -57,8 +87,10 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_with_limit() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .rating(GelbooruRating::General)
             .limit(3)
             .build()
@@ -71,9 +103,12 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_multiple_tags() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .tag("table")
+            .unwrap()
             .limit(3)
             .build()
             .get()
@@ -85,8 +120,10 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_random_posts() {
-        let posts = GelbooruClient::builder()
+        let builder = skip_without_credentials!();
+        let posts = builder
             .tag("kafuu_chino")
+            .unwrap()
             .random()
             .build()
             .get()
@@ -98,7 +135,8 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_post_by_id() {
-        let post = GelbooruClient::builder().build().get_by_id(7898595).await;
+        let builder = skip_without_credentials!();
+        let post = builder.build().get_by_id(7898595).await;
 
         assert!(post.is_ok());
         assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);
@@ -106,9 +144,11 @@ mod gelbooru {
 
     #[tokio::test]
     async fn get_posts_from_page() {
-        let post_from_first_page = GelbooruClient::builder().build().get().await;
+        let builder = skip_without_credentials!();
+        let builder2 = builder_with_credentials().unwrap();
 
-        let post_from_specific_page = GelbooruClient::builder().page(7).build().get().await;
+        let post_from_first_page = builder.build().get().await;
+        let post_from_specific_page = builder2.page(7).build().get().await;
 
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());
