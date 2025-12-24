@@ -1,10 +1,12 @@
 //! Danbooru API client implementation.
 
-use super::{Client, ClientBuilder};
+use super::{Client, ClientBuilder, shared_client};
+use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::Result;
 use crate::model::danbooru::*;
 
 use reqwest::header::{self, HeaderMap, HeaderValue};
+use serde::Deserialize;
 
 /// Returns headers required for Danbooru API requests.
 ///
@@ -104,5 +106,57 @@ impl Client for DanbooruClient {
             .await?;
 
         Ok(response)
+    }
+}
+
+/// Danbooru autocomplete API response item.
+#[derive(Debug, Deserialize)]
+struct DanbooruAutocompleteItem {
+    value: String,
+    label: String,
+    category: Option<u8>,
+    post_count: Option<u32>,
+}
+
+impl Autocomplete for DanbooruClient {
+    /// Returns tag suggestions from Danbooru's autocomplete API.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use booru_rs::danbooru::DanbooruClient;
+    /// use booru_rs::autocomplete::Autocomplete;
+    ///
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
+    /// for tag in suggestions {
+    ///     println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let response = shared_client()
+            .get(format!("{}/autocomplete.json", Self::URL))
+            .headers(get_headers())
+            .query(&[
+                ("search[query]", query),
+                ("search[type]", "tag_query"),
+                ("limit", &limit.to_string()),
+            ])
+            .send()
+            .await?
+            .json::<Vec<DanbooruAutocompleteItem>>()
+            .await?;
+
+        Ok(response
+            .into_iter()
+            .map(|item| TagSuggestion {
+                name: item.value,
+                label: item.label,
+                post_count: item.post_count,
+                category: item.category,
+            })
+            .collect())
     }
 }
