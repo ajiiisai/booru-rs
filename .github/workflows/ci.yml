@@ -161,7 +161,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
       - uses: taiki-e/install-action@cargo-minimal-versions
-      - run: cargo minimal-versions check --workspace
+      - run: cargo minimal-versions check --workspace --direct
 
   # Final status check for branch protection
   ci-success:
