@@ -1,6 +1,6 @@
 //! Safebooru API client implementation.
 
-use super::{shared_client, Client, ClientBuilder};
+use super::{Client, ClientBuilder, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
