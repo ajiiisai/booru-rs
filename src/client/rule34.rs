@@ -1,8 +1,10 @@
 //! Rule34 API client implementation.
 
-use super::{Client, ClientBuilder};
+use super::{Client, ClientBuilder, shared_client};
+use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::rule34::*;
+use serde::Deserialize;
 
 /// Client for interacting with the Rule34 API.
 ///
@@ -169,5 +171,53 @@ impl Client for Rule34Client {
 
         let posts: Vec<Rule34Post> = serde_json::from_str(&text)?;
         Ok(posts)
+    }
+}
+
+/// Internal response type for Rule34 autocomplete.
+#[derive(Debug, Deserialize)]
+struct Rule34AutocompleteItem {
+    /// The tag name.
+    value: String,
+    /// Display label (includes post count).
+    label: String,
+}
+
+impl Autocomplete for Rule34Client {
+    async fn autocomplete(query: &str, _limit: u32) -> Result<Vec<TagSuggestion>> {
+        let client = shared_client();
+        // Rule34 autocomplete is on api.rule34.xxx, not the main URL
+        let url = "https://api.rule34.xxx/autocomplete.php";
+
+        let response = client.get(url).query(&[("q", query)]).send().await?;
+
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(BooruError::Unauthorized(
+                "Rule34 autocomplete request failed".into(),
+            ));
+        }
+
+        let items: Vec<Rule34AutocompleteItem> = response.json().await?;
+
+        Ok(items
+            .into_iter()
+            .map(|item| TagSuggestion {
+                name: item.value,
+                label: item.label.clone(),
+                post_count: parse_post_count_from_label(&item.label),
+                category: None,
+            })
+            .collect())
+    }
+}
+
+/// Parses post count from a label like "tag_name (12345)".
+fn parse_post_count_from_label(label: &str) -> Option<u32> {
+    let start = label.rfind('(')?;
+    let end = label.rfind(')')?;
+    if start < end {
+        label[start + 1..end].parse().ok()
+    } else {
+        None
     }
 }

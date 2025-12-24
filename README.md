@@ -17,6 +17,7 @@ An async Rust client for various booru image board APIs.
 - **Rate limiting** — Protect against API throttling
 - **Response caching** — Reduce redundant API calls
 - **Tag validation** — Catch common mistakes before making requests
+- **Tag autocomplete** — Get tag suggestions as users type
 
 ## Supported Sites
 
@@ -223,6 +224,28 @@ if result.has_warnings() {
 
 // Or get normalized tag directly
 let tag = validate_tag_strict("  cat ears  ")?;  // Returns "cat_ears"
+```
+
+### Tag Autocomplete
+
+Get tag suggestions as the user types:
+
+```rust
+use booru_rs::prelude::*;
+
+// Get tag suggestions for "cat_"
+let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
+
+for tag in suggestions {
+    println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
+    if let Some(category) = tag.category_name() {
+        println!("  Category: {}", category);
+    }
+}
+
+// Works with all booru clients
+let safebooru_tags = SafebooruClient::autocomplete("land", 5).await?;
+let gelbooru_tags = GelbooruClient::autocomplete("blue", 5).await?;
 ```
 
 ### Custom HTTP Client

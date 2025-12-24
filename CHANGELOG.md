@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-12-24
+
+### Added
+- **Tag autocomplete** support for all clients via `Autocomplete` trait
+- `TagSuggestion` struct with tag name, label, post count, and category
+- Category name mapping (general, artist, copyright, character, meta)
+
 ## [0.3.0] - 2025-12-24
 
 ### Added

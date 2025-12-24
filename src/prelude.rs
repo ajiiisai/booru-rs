@@ -30,6 +30,9 @@ pub use crate::client::ClientBuilder;
 pub use crate::client::generic::Sort;
 pub use crate::error::{BooruError, Result};
 
+// Autocomplete
+pub use crate::autocomplete::{Autocomplete, TagSuggestion};
+
 // Stream types for pagination
 pub use crate::stream::{PageStream, PostStream};
 
