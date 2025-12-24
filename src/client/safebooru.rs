@@ -1,8 +1,11 @@
 //! Safebooru API client implementation.
 
-use super::{Client, ClientBuilder};
+use super::{shared_client, Client, ClientBuilder};
+use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
+
+use serde::Deserialize;
 
 /// Client for interacting with the Safebooru API.
 ///
@@ -103,5 +106,67 @@ impl Client for SafebooruClient {
             .await?;
 
         Ok(response)
+    }
+}
+
+/// Safebooru autocomplete API response item.
+#[derive(Debug, Deserialize)]
+struct SafebooruAutocompleteItem {
+    value: String,
+    label: String,
+}
+
+impl Autocomplete for SafebooruClient {
+    /// Returns tag suggestions from Safebooru's autocomplete API.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use booru_rs::safebooru::SafebooruClient;
+    /// use booru_rs::autocomplete::Autocomplete;
+    ///
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let suggestions = SafebooruClient::autocomplete("land", 5).await?;
+    /// for tag in suggestions {
+    ///     println!("{}", tag.name);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let response = shared_client()
+            .get(format!("{}/autocomplete.php", Self::URL))
+            .query(&[("q", query)])
+            .send()
+            .await?
+            .json::<Vec<SafebooruAutocompleteItem>>()
+            .await?;
+
+        // Safebooru includes post count in the label like "cat_ears (177448)"
+        // Parse it out if present
+        Ok(response
+            .into_iter()
+            .take(limit as usize)
+            .map(|item| {
+                let post_count = parse_post_count_from_label(&item.label);
+                TagSuggestion {
+                    name: item.value,
+                    label: item.label,
+                    post_count,
+                    category: None,
+                }
+            })
+            .collect())
+    }
+}
+
+/// Parses post count from a label like "cat_ears (177448)".
+fn parse_post_count_from_label(label: &str) -> Option<u32> {
+    let start = label.rfind('(')?;
+    let end = label.rfind(')')?;
+    if start < end {
+        label[start + 1..end].parse().ok()
+    } else {
+        None
     }
 }
