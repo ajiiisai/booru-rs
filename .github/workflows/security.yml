@@ -1,0 +1,22 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          create-issues: true
