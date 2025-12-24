@@ -25,7 +25,7 @@ opt-level = 3
 [dependencies]
 reqwest = { version = "0.12.4", features = ["json", "rustls-tls", "stream"], default-features = false }
 tokio = { version = "1.48", features = ["rt-multi-thread", "macros", "fs", "sync", "io-util"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.185", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 futures-core = "0.3.31"
