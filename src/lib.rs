@@ -18,6 +18,7 @@
 //! - **Rate limiting**: Protect against API throttling
 //! - **Response caching**: Reduce redundant API calls
 //! - **Tag validation**: Catch common mistakes before making requests
+//! - **Tag autocomplete**: Get tag suggestions as users type
 //!
 //! ## Quick Start
 //!
@@ -88,6 +89,7 @@
 //! }
 //! ```
 
+pub mod autocomplete;
 pub mod cache;
 pub mod client;
 pub mod download;
@@ -100,6 +102,7 @@ pub mod stream;
 pub mod validation;
 
 // Re-export core types at crate root for convenience
+pub use autocomplete::{Autocomplete, TagSuggestion};
 pub use client::Client;
 pub use client::ClientBuilder;
 #[cfg(feature = "danbooru")]
