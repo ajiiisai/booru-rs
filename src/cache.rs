@@ -11,14 +11,14 @@
 //!
 //! # async fn example() {
 //! // Create a cache with 5-minute TTL and 1000 max entries
-//! let cache = Cache::new(CacheConfig {
+//! let cache: Cache<String> = Cache::with_config(CacheConfig {
 //!     ttl: Duration::from_secs(300),
 //!     max_entries: 1000,
 //! });
 //!
 //! // Check cache before making request
-//! let key = "danbooru:cat_ears:limit=10";
-//! if let Some(cached) = cache.get::<Vec<u32>>(key).await {
+//! let key = "danbooru:cat_ears:limit=10".to_string();
+//! if let Some(cached) = cache.get::<Vec<u32>>(&key).await {
 //!     println!("Cache hit!");
 //! } else {
 //!     // Make request and cache result
@@ -108,14 +108,14 @@ impl CacheEntry {
 /// use booru_rs::cache::{Cache, CacheConfig};
 ///
 /// # async fn example() {
-/// let cache = Cache::with_config(CacheConfig::default());
+/// let cache: Cache<String> = Cache::with_config(CacheConfig::default());
 ///
 /// // Cache a search result
-/// let posts = vec!["post1", "post2"];
-/// cache.insert("my_search", &posts).await;
+/// let posts = vec!["post1".to_string(), "post2".to_string()];
+/// cache.insert("my_search".to_string(), &posts).await;
 ///
 /// // Retrieve later
-/// if let Some(cached): Option<Vec<String>> = cache.get("my_search").await {
+/// if let Some(cached) = cache.get::<Vec<String>>(&"my_search".to_string()).await {
 ///     println!("Got {} posts from cache", cached.len());
 /// }
 /// # }
@@ -293,7 +293,7 @@ where
 /// ```
 /// use booru_rs::cache::cache_key;
 ///
-/// let key = cache_key("danbooru", &["cat_ears", "rating:general"], 10, 0);
+/// let key = cache_key("danbooru", &["cat_ears".to_string(), "rating:general".to_string()], 10, 0);
 /// assert!(key.contains("danbooru"));
 /// assert!(key.contains("cat_ears"));
 /// ```

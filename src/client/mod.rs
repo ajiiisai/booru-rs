@@ -49,7 +49,11 @@
 //!     .unwrap();
 //!
 //! let client = GelbooruClient::builder()
-//!     .with_client(custom_client)
+//!     .tag("nature")?
+//!     .build();
+//!
+//! // Or use with_client to create a builder with a custom HTTP client:
+//! let client = <GelbooruClient as Client>::builder()
 //!     .tag("nature")?
 //!     .build();
 //! # Ok(())

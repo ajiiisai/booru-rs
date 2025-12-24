@@ -24,7 +24,7 @@
 //!     let path = downloader
 //!         .download_post(post, Path::new("./downloads"))
 //!         .await?;
-//!     println!("Downloaded: {}", path.display());
+//!     println!("Downloaded: {}", path.path.display());
 //! }
 //! # Ok(())
 //! # }
@@ -287,7 +287,7 @@ impl Downloader {
         use std::pin::Pin;
         use std::task::Context;
 
-        // Manual stream consumption since we can't use futures::StreamExt
+        // Consume stream manually to track progress
         let mut stream = Pin::new(&mut stream);
         loop {
             let chunk =

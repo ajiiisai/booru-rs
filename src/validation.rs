@@ -9,8 +9,8 @@
 //! use booru_rs::validation::{validate_tag, TagValidation};
 //!
 //! // Valid tags pass
-//! assert!(validate_tag("cat_ears").is_ok());
-//! assert!(validate_tag("score:>10").is_ok());
+//! assert!(validate_tag("cat_ears").is_valid);
+//! assert!(validate_tag("score:>10").is_valid);
 //!
 //! // Invalid tags return warnings or errors
 //! let result = validate_tag("cat ears");  // Space should be underscore
