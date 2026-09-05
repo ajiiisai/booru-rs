@@ -162,7 +162,7 @@ struct GelbooruAutocompleteItem {
     #[serde(default)]
     category: Option<String>,
     /// Number of posts with this tag (optional).
-    #[serde(default, deserialize_with="deserialize_post_count")]
+    #[serde(default, deserialize_with = "deserialize_post_count")]
     post_count: Option<u32>,
 }
 
@@ -236,9 +236,8 @@ fn parse_post_count_from_label(label: &str) -> Option<u32> {
 }
 
 /// Deserialize post count from string or numeric value
-fn deserialize_post_count<'de, D>(deserializer: D)
--> std::result::Result<Option<u32>, D::Error>
-where 
+fn deserialize_post_count<'de, D>(deserializer: D) -> std::result::Result<Option<u32>, D::Error>
+where
     D: serde::Deserializer<'de>,
 {
     #[derive(Deserialize)]
@@ -251,7 +250,7 @@ where
     Option::<PostCount>::deserialize(deserializer).map(|count| {
         count.and_then(|count| match count {
             PostCount::Number(value) => Some(value),
-            PostCount::String(value) => value.parse().ok()
+            PostCount::String(value) => value.parse().ok(),
         })
     })
 }
