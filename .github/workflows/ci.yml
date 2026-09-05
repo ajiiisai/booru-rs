@@ -16,8 +16,42 @@ env:
   RUST_BACKTRACE: short
 
 jobs:
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'push'
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            code:
+              - '**/*.rs'
+              - '**/*.toml'
+              - '**/*.lock'
+              - 'rust-toolchain*'
+              - 'src/**'
+              - 'tests/**'
+              - 'examples/**'
+              - 'benches/**'
+              - 'scripts/**'
+              - '.cargo/**'
+              - '.config/**'
+              - '.github/workflows/**'
+
   # Check formatting first (fast fail)
   fmt:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +63,8 @@ jobs:
 
   # Run clippy lints
   clippy:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     name: Clippy
     runs-on: ubuntu-latest
     steps:
@@ -142,6 +178,8 @@ jobs:
 
   # Security audit
   audit:
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
@@ -167,11 +205,19 @@ jobs:
   ci-success:
     name: CI Success
     if: always()
-    needs: [fmt, clippy, test, features, mock-tests, docs, audit, minimal-versions]
+    needs: [changes, fmt, clippy, test, features, mock-tests, docs, audit, minimal-versions]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
         run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection failed"
+            exit 1
+          fi
+          if [[ "${{ needs.changes.outputs.code }}" == "false" ]]; then
+            echo "No code or build configuration changes; Rust checks skipped"
+            exit 0
+          fi
           if [[ "${{ needs.fmt.result }}" != "success" ]] ||
              [[ "${{ needs.clippy.result }}" != "success" ]] ||
              [[ "${{ needs.test.result }}" != "success" ]] ||

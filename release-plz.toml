@@ -1,0 +1,6 @@
+[workspace]
+release_always = false
+git_tag_name = "v{{ version }}"
+# The tag-triggered workflow creates GitHub's generated release notes.
+git_release_enable = false
+features_always_increment_minor = true
