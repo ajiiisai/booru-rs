@@ -138,21 +138,27 @@ mod autocomplete {
             let suggestions = GelbooruClient::autocomplete("cat_", 10).await;
 
             // This might fail due to auth requirements, which is expected
-            if let Ok(suggestions) = suggestions {
-                assert!(
-                    !suggestions.is_empty(),
-                    "Should return at least one suggestion"
-                );
+            if let Err(booru_rs::BooruError::Unauthorized(_)) = suggestions {
+                return;
             }
+
+            let suggestions = suggestions.unwrap();
+            assert!(
+                !suggestions.is_empty(),
+                "Should return at least one suggestion"
+            );
         }
 
         #[tokio::test]
         async fn autocomplete_respects_limit() {
             let suggestions = GelbooruClient::autocomplete("a", 5).await;
 
-            if let Ok(suggestions) = suggestions {
-                assert!(suggestions.len() <= 5, "Should respect limit parameter");
+            if let Err(booru_rs::BooruError::Unauthorized(_)) = suggestions {
+                return;
             }
+
+            let suggestions = suggestions.unwrap();
+            assert!(suggestions.len() <= 5, "Should respect limit parameter");
         }
     }
 
