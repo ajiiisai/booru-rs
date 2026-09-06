@@ -428,3 +428,86 @@ fn common_score_preserves_provider_range() {
         assert_eq!(post.score(), Some(i64::from(score)));
     }
 }
+#[test]
+fn post_normalizes_absent_parent_and_media() {
+    use booru_rs::model::Post;
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for absent in ["sentinel", "null", "missing"] {
+        let mut value = fixture[0].clone();
+        for field in ["parent_id", "file_url", "preview_url", "sample_url"] {
+            match absent {
+                "missing" => {
+                    value.as_object_mut().unwrap().remove(field);
+                }
+                "null" => value[field] = serde_json::Value::Null,
+                _ if field == "parent_id" => value[field] = 0.into(),
+                _ => value[field] = "".into(),
+            }
+        }
+        let post: Rule34Post = serde_json::from_value(value).unwrap();
+        assert_eq!(post.file_url(), None, "{absent}");
+        let normalized = serde_json::to_value(&post).unwrap();
+        for field in ["parent_id", "file_url", "preview_url", "sample_url"] {
+            assert!(normalized[field].is_null(), "{absent}: {field}");
+        }
+        assert_eq!(
+            serde_json::from_value::<Rule34Post>(normalized).unwrap(),
+            post
+        );
+    }
+}
+#[test]
+fn post_normalization_preserves_present_values_and_metadata() {
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for parent_id in [1, u32::MAX] {
+        let mut value = fixture[0].clone();
+        value["parent_id"] = parent_id.into();
+        let post: Rule34Post = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(post.parent_id, Some(parent_id));
+        let normalized = serde_json::to_value(&post).unwrap();
+        for (field, actual) in normalized.as_object().unwrap() {
+            assert_eq!(actual, &value[field], "{field}");
+        }
+        assert_eq!(
+            serde_json::from_value::<Rule34Post>(normalized).unwrap(),
+            post
+        );
+    }
+}
+
+#[test]
+fn post_normalization_rejects_invalid_values() {
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for (field, invalid) in [
+        ("parent_id", serde_json::json!(-1)),
+        ("parent_id", serde_json::json!(u64::from(u32::MAX) + 1)),
+        ("parent_id", serde_json::json!("0")),
+        ("file_url", serde_json::json!(123)),
+        ("preview_url", serde_json::json!(false)),
+        ("sample_url", serde_json::json!([])),
+    ] {
+        let mut value = fixture[0].clone();
+        value[field] = invalid;
+        assert!(
+            serde_json::from_value::<Rule34Post>(value).is_err(),
+            "{field}"
+        );
+    }
+    for field in ["id", "score", "width", "height", "tags", "rating"] {
+        let mut value = fixture[0].clone();
+        value.as_object_mut().unwrap().remove(field);
+        assert!(
+            serde_json::from_value::<Rule34Post>(value).is_err(),
+            "{field}"
+        );
+    }
+}

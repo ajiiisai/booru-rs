@@ -192,7 +192,7 @@ impl Post for rule34::Rule34Post {
     }
 
     fn file_url(&self) -> Option<&str> {
-        Some(&self.file_url)
+        self.file_url.as_deref()
     }
 
     fn tags(&self) -> &str {

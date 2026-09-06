@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// This struct represents a single image post from Rule34.
 /// Rule34 is an NSFW booru site.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(from = "Rule34PostWire")]
 pub struct Rule34Post {
     /// The ID of the post
     pub id: u32,
@@ -21,11 +22,11 @@ pub struct Rule34Post {
     /// Post's image height
     pub height: u32,
     /// Post's image file url
-    pub file_url: String,
+    pub file_url: Option<String>,
     /// Post's preview/thumbnail url
-    pub preview_url: String,
+    pub preview_url: Option<String>,
     /// Post's sample (resized) url  
-    pub sample_url: String,
+    pub sample_url: Option<String>,
     /// Post's tags (space-separated)
     pub tags: String,
     /// Post's rating
@@ -42,9 +43,9 @@ pub struct Rule34Post {
     /// Post owner/uploader
     #[serde(default)]
     pub owner: String,
-    /// Parent post ID (0 if none)
+    /// Parent post ID, if available.
     #[serde(default)]
-    pub parent_id: u32,
+    pub parent_id: Option<u32>,
     /// Post status
     #[serde(default)]
     pub status: String,
@@ -60,6 +61,65 @@ pub struct Rule34Post {
     /// Image hash
     #[serde(default)]
     pub hash: String,
+}
+
+#[derive(Deserialize)]
+struct Rule34PostWire {
+    id: u32,
+    score: i32,
+    width: u32,
+    height: u32,
+    file_url: Option<String>,
+    preview_url: Option<String>,
+    sample_url: Option<String>,
+    tags: String,
+    rating: Rule34Rating,
+    #[serde(default)]
+    source: String,
+    #[serde(default)]
+    has_notes: bool,
+    #[serde(default)]
+    comment_count: u32,
+    #[serde(default)]
+    owner: String,
+    #[serde(default)]
+    parent_id: Option<u32>,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    change: u64,
+    #[serde(default)]
+    directory: u32,
+    #[serde(default)]
+    image: String,
+    #[serde(default)]
+    hash: String,
+}
+
+impl From<Rule34PostWire> for Rule34Post {
+    fn from(wire: Rule34PostWire) -> Self {
+        Self {
+            id: wire.id,
+            score: wire.score,
+            width: wire.width,
+            height: wire.height,
+            file_url: wire.file_url.filter(|url| !url.is_empty()),
+            preview_url: wire.preview_url.filter(|url| !url.is_empty()),
+            sample_url: wire.sample_url.filter(|url| !url.is_empty()),
+            tags: wire.tags,
+            rating: wire.rating,
+            source: wire.source,
+            has_notes: wire.has_notes,
+            comment_count: wire.comment_count,
+            owner: wire.owner,
+            parent_id: wire.parent_id.filter(|id| *id != 0),
+            status: wire.status,
+            change: wire.change,
+            directory: wire.directory,
+            image: wire.image,
+            hash: wire.hash,
+        }
+    }
 }
 
 /// Post rating classification for Rule34.
