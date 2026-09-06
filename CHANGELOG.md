@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.3.2] - 2026-09-05
 ### Fixed
 - Fixed Gelbooru autocomplete failing when `post_count` is returned as a string.
+- Gelbooru autocomplete now enforces the requested result limit when the API returns more results.
 
 ## [0.3.1] - 2025-12-24
 
