@@ -3,6 +3,7 @@
 //! Run with: cargo run --example basic
 
 use booru_rs::prelude::*;
+use booru_rs::safebooru::Client as Safebooru;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,14 +32,15 @@ async fn main() -> Result<()> {
     println!("\n=== Safebooru Example ===\n");
 
     // Safebooru has no tag limit and is SFW-only
-    let posts = SafebooruClient::builder()
-        .tag("landscape")?
-        .tag("scenery")?
-        .tag("sky")?
+    let client = Safebooru::new()?;
+    let posts = client
+        .search()
+        .tag("landscape")
+        .tag("scenery")
+        .tag("sky")
         .sort(Sort::Score)
         .limit(5)
-        .build()
-        .get()
+        .send()
         .await?;
 
     println!("Found {} posts from Safebooru:", posts.len());

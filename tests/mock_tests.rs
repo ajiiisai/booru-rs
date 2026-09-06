@@ -27,190 +27,6 @@ fn danbooru_posts_json() -> &'static str {
     include_str!("fixtures/danbooru/posts.json")
 }
 
-mod mock_safebooru {
-    use super::*;
-    use booru_rs::prelude::*;
-
-    #[tokio::test]
-    async fn test_get_posts_success() {
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Set up the mock response
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("page", "dapi"))
-            .and(query_param("s", "post"))
-            .and(query_param("q", "index"))
-            .and(query_param("json", "1"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(safebooru_posts_json()))
-            .mount(&mock_server)
-            .await;
-
-        // Create client pointing to mock server
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .tag("cat_ears")
-            .unwrap()
-            .limit(10)
-            .build();
-
-        let posts = client.get().await;
-
-        assert!(posts.is_ok());
-        assert!(posts.is_ok());
-        let posts = posts.unwrap();
-        assert_eq!(posts.len(), 2);
-        assert_eq!(posts[0].id, 12345);
-        assert_eq!(posts[0].hash, "abc123def456");
-        assert_eq!(posts[1].id, 12346);
-    }
-
-    #[tokio::test]
-    async fn test_get_post_by_id_success() {
-        let mock_server = MockServer::start().await;
-
-        // Single post wrapped in array for Safebooru
-        let single_post = include_str!("fixtures/safebooru/post.json");
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("id", "12345"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(single_post))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build();
-
-        let post = client.get_by_id(12345).await;
-
-        assert!(post.is_ok());
-        let post = post.unwrap();
-        assert_eq!(post.id, 12345);
-        assert_eq!(post.width, 1920);
-        assert_eq!(post.height, 1080);
-    }
-
-    #[tokio::test]
-    async fn test_get_post_not_found() {
-        let mock_server = MockServer::start().await;
-
-        // Empty array means post not found
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("id", "99999"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build();
-
-        let result = client.get_by_id(99999).await;
-
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            BooruError::PostNotFound(99999)
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_empty_response() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .tag("nonexistent_tag_xyz")
-            .unwrap()
-            .build();
-
-        let posts = client.get().await;
-
-        assert!(posts.is_ok());
-        assert!(posts.unwrap().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_server_error_despite_decodable_body() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .respond_with(ResponseTemplate::new(500).set_body_string(safebooru_posts_json()))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build();
-
-        let result = client.get().await;
-
-        assert!(matches!(
-            result.unwrap_err(),
-            BooruError::HttpStatus { status: 500, .. }
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_server_error_malformed_body() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .respond_with(ResponseTemplate::new(503).set_body_string("<html>bad gateway"))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build();
-
-        let result = client.get().await;
-
-        assert!(matches!(
-            result.unwrap_err(),
-            BooruError::HttpStatus { status: 503, .. }
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_invalid_json_is_parse_error() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("not valid json"))
-            .mount(&mock_server)
-            .await;
-
-        let client = SafebooruClient::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build();
-
-        let result = client.get().await;
-
-        assert!(result.unwrap_err().is_parse_error());
-    }
-}
-
 mod mock_danbooru {
     use super::*;
     use booru_rs::prelude::*;
@@ -392,7 +208,7 @@ mod mock_danbooru {
 mod mock_post_trait {
     use super::*;
     use booru_rs::model::Post;
-    use booru_rs::prelude::*;
+    use booru_rs::safebooru::Client;
 
     #[tokio::test]
     async fn test_post_trait_methods() {
@@ -404,15 +220,15 @@ mod mock_post_trait {
             .mount(&mock_server)
             .await;
 
-        let client = SafebooruClient::builder()
+        let client = Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
-            .build();
+            .build()
+            .unwrap();
 
-        let posts = client.get().await.unwrap();
+        let posts = client.search().send().await.unwrap();
         let post = &posts[0];
 
-        // Test Post trait methods
         assert_eq!(post.id(), 12345);
         assert_eq!(post.width(), 1920);
         assert_eq!(post.height(), 1080);
@@ -436,15 +252,15 @@ mod mock_post_trait {
             .mount(&mock_server)
             .await;
 
-        let client = SafebooruClient::builder()
+        let client = Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
-            .build();
+            .build()
+            .unwrap();
 
-        let posts = client.get().await.unwrap();
+        let posts = client.search().send().await.unwrap();
         let post = &posts[1]; // Second post has empty source
 
-        // Empty source should return None
         assert_eq!(post.source(), None);
     }
 }

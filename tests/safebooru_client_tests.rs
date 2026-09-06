@@ -488,3 +488,60 @@ async fn pages_max_pages_caps_fetching() {
     assert_eq!(ids(&page.expect("page must succeed").posts), vec![1, 2]);
     assert!(pages.next().await.is_none());
 }
+
+#[tokio::test]
+async fn error_status_despite_decodable_body() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(500).set_body_string(posts_fixture()))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let result = client.search().send().await;
+
+    assert!(matches!(
+        result.unwrap_err(),
+        BooruError::HttpStatus { status: 500, .. }
+    ));
+}
+
+#[tokio::test]
+async fn error_status_malformed_body() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(503).set_body_string("<html>bad gateway"))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let result = client.search().send().await;
+
+    assert!(matches!(
+        result.unwrap_err(),
+        BooruError::HttpStatus { status: 503, .. }
+    ));
+}
+
+#[tokio::test]
+async fn invalid_json_is_parse_error() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not valid json"))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let result = client.search().send().await;
+
+    assert!(result.unwrap_err().is_parse_error());
+}

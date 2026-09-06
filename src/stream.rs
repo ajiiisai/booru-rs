@@ -13,22 +13,15 @@ use crate::error::Result;
 /// # Example
 ///
 /// ```no_run
-/// use booru_rs::prelude::*;
-/// use booru_rs::stream::PageStream;
+/// use booru_rs::safebooru::Client;
 ///
-/// # async fn example() -> Result<()> {
-/// let mut stream = SafebooruClient::builder()
-///     .tag("landscape")?
-///     .limit(100)
-///     .into_page_stream();
+/// # async fn example() -> booru_rs::error::Result<()> {
+/// let client = Client::new()?;
+/// let mut stream = client.search().tag("landscape").limit(100).pages();
 ///
-/// // Manually poll pages
 /// while let Some(page_result) = stream.next().await {
-///     let posts = page_result?;
-///     if posts.is_empty() {
-///         break;
-///     }
-///     println!("Got {} posts", posts.len());
+///     let page = page_result?;
+///     println!("Got {} posts", page.posts.len());
 /// }
 /// # Ok(())
 /// # }
@@ -111,14 +104,16 @@ impl<T: Client> PageStream<T> {
 /// # Example
 ///
 /// ```no_run
-/// use booru_rs::prelude::*;
+/// use booru_rs::safebooru::Client;
 ///
-/// # async fn example() -> Result<()> {
-/// let mut stream = SafebooruClient::builder()
-///     .tag("landscape")?
+/// # async fn example() -> booru_rs::error::Result<()> {
+/// let client = Client::new()?;
+/// let mut stream = client
+///     .search()
+///     .tag("landscape")
 ///     .limit(100)
-///     .into_post_stream()
-///     .max_posts(500); // Limit to 500 posts total
+///     .posts()
+///     .max_posts(500);
 ///
 /// let mut count = 0;
 /// while let Some(post_result) = stream.next().await {
@@ -229,18 +224,15 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::prelude::*;
+    /// use booru_rs::safebooru::Client;
     ///
-    /// # async fn example() -> Result<()> {
-    /// let mut stream = SafebooruClient::builder()
-    ///     .tag("landscape")?
-    ///     .limit(100)
-    ///     .into_page_stream();
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let client = Client::new()?;
+    /// let mut stream = client.search().tag("landscape").limit(100).pages();
     ///
     /// while let Some(page_result) = stream.next().await {
-    ///     let posts = page_result?;
-    ///     if posts.is_empty() { break; }
-    ///     println!("Page with {} posts", posts.len());
+    ///     let page = page_result?;
+    ///     println!("Page with {} posts", page.posts.len());
     /// }
     /// # Ok(())
     /// # }
@@ -257,13 +249,15 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::prelude::*;
+    /// use booru_rs::safebooru::Client;
     ///
-    /// # async fn example() -> Result<()> {
-    /// let mut stream = SafebooruClient::builder()
-    ///     .tag("landscape")?
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let client = Client::new()?;
+    /// let mut stream = client
+    ///     .search()
+    ///     .tag("landscape")
     ///     .limit(100)
-    ///     .into_post_stream()
+    ///     .posts()
     ///     .max_posts(250);
     ///
     /// while let Some(post_result) = stream.next().await {

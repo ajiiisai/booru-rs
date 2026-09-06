@@ -40,20 +40,16 @@
 //! By default, all clients share a connection-pooled HTTP client.
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! use booru_rs::safebooru::Client;
 //!
-//! # async fn example() -> Result<()> {
+//! # async fn example() -> booru_rs::error::Result<()> {
 //! let custom_client = reqwest::Client::builder()
 //!     .timeout(std::time::Duration::from_secs(60))
 //!     .build()
 //!     .unwrap();
 //!
-//! // Use ClientBuilder::with_client to create a builder with custom HTTP client
-//! let posts = ClientBuilder::<SafebooruClient>::with_client(custom_client)
-//!     .tag("nature")?
-//!     .build()
-//!     .get()
-//!     .await?;
+//! let client = Client::builder().http_client(custom_client).build()?;
+//! let posts = client.search().tag("nature").send().await?;
 //! # Ok(())
 //! # }
 //! ```

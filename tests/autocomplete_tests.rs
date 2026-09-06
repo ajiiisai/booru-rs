@@ -102,15 +102,14 @@ mod autocomplete {
 
     #[cfg(feature = "safebooru")]
     mod safebooru {
-        use super::*;
-        use booru_rs::client::Client;
-        use booru_rs::safebooru::SafebooruClient;
+        use booru_rs::safebooru::Client;
 
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = SafebooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_", 10)
                 .await;
 
@@ -125,8 +124,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = SafebooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("a", 5)
                 .await;
 
@@ -138,8 +138,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count_from_label() {
-            let suggestions = SafebooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_ears", 5)
                 .await;
 

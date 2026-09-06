@@ -7,16 +7,12 @@
 //!
 //! ```no_run
 //! use booru_rs::download::{Downloader, DownloadOptions};
-//! use booru_rs::prelude::*;
+//! use booru_rs::safebooru::Client;
 //! use std::path::Path;
 //!
 //! # async fn example() -> booru_rs::error::Result<()> {
-//! let posts = SafebooruClient::builder()
-//!     .tag("landscape")?
-//!     .limit(5)
-//!     .build()
-//!     .get()
-//!     .await?;
+//! let client = Client::new()?;
+//! let posts = client.search().tag("landscape").limit(5).send().await?;
 //!
 //! let downloader = Downloader::new();
 //!

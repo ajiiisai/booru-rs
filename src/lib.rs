@@ -60,13 +60,15 @@
 //! Use [`stream::PostStream`] to iterate through all results:
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! use booru_rs::safebooru::Client;
 //!
-//! # async fn example() -> Result<()> {
-//! let mut stream = SafebooruClient::builder()
-//!     .tag("landscape")?
+//! # async fn example() -> booru_rs::error::Result<()> {
+//! let client = Client::new()?;
+//! let mut stream = client
+//!     .search()
+//!     .tag("landscape")
 //!     .limit(100)
-//!     .into_post_stream()
+//!     .posts()
 //!     .max_posts(500);
 //!
 //! while let Some(post) = stream.next().await {

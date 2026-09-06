@@ -3,6 +3,7 @@
 //! Run with: cargo run --example error_handling
 
 use booru_rs::prelude::*;
+use booru_rs::safebooru::Client as Safebooru;
 
 #[tokio::main]
 async fn main() {
@@ -59,17 +60,20 @@ async fn main() {
     println!("\n=== Using Result Combinators ===\n");
 
     // Functional error handling with Result
-    let result = SafebooruClient::builder().tag("flower").map(|b| b.limit(3));
+    let result = Safebooru::builder().endpoint("::::");
 
     match result {
-        Ok(builder) => match builder.build().get().await {
-            Ok(posts) => {
-                println!("Got {} posts", posts.len());
-                println!("First post: #{}", posts[0].id);
-            }
-            Err(e) => eprintln!("Request failed: {}", e),
+        Ok(builder) => match builder.build() {
+            Ok(client) => match client.search().tag("flower").limit(3).send().await {
+                Ok(posts) => {
+                    println!("Got {} posts", posts.len());
+                    println!("First post: #{}", posts[0].id);
+                }
+                Err(e) => eprintln!("Request failed: {}", e),
+            },
+            Err(e) => eprintln!("Builder error: {}", e),
         },
-        Err(e) => eprintln!("Builder error: {}", e),
+        Err(e) => eprintln!("Endpoint error: {}", e),
     }
 
     println!("\nExample completed!");
