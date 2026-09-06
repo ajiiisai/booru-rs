@@ -32,7 +32,7 @@ Add the crate and a Tokio runtime to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-booru-rs = "0.3"
+booru-rs = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -40,14 +40,18 @@ The default feature set includes all four providers. Select only the providers y
 
 ```toml
 [dependencies]
-booru-rs = { version = "0.3", default-features = false, features = ["danbooru"] }
+booru-rs = { version = "1", default-features = false, features = ["danbooru"] }
 ```
 
 Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`, and `live-tests`. Enable `download` when you use `booru_rs::download`:
 
 ```toml
-booru-rs = { version = "0.3", default-features = false, features = ["safebooru", "download"] }
+booru-rs = { version = "1", default-features = false, features = ["safebooru", "download"] }
 ```
+
+## Migrate from 0.x to 1.x
+
+The 1.x release changes the client, query, error, model, and download APIs. Follow the [migration guide](docs/migration.md) before upgrading an application from 0.x.
 
 ## Quick start
 
@@ -76,8 +80,6 @@ async fn main() -> booru_rs::Result<()> {
     Ok(())
 }
 ```
-
-See [Migrate to the current client API](docs/migration.md) for the complete API change list.
 
 ## Common operations
 
@@ -193,7 +195,7 @@ fn print_post(post: &impl Post) {
 Downloads are optional. Enable the `download` feature before importing the module:
 
 ```toml
-booru-rs = { version = "0.3", features = ["safebooru", "download"] }
+booru-rs = { version = "1", features = ["safebooru", "download"] }
 ```
 
 ```rust
