@@ -113,13 +113,8 @@ impl Client for Rule34Client {
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
         // Example: "Missing authentication. Go to api.rule34.xxx for more information"
         let text = response.text().await?;
-        if text.contains("Missing authentication") {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
 
-        let posts: Vec<Rule34Post> = serde_json::from_str(&text)?;
+        let posts = decode_posts(&text)?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
@@ -173,19 +168,28 @@ impl Client for Rule34Client {
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
         // Example: "Missing authentication. Go to api.rule34.xxx for more information"
         let text = response.text().await?;
-        if text.contains("Missing authentication") {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
 
         // Handle empty response (no results)
         if text.is_empty() || text == "[]" {
             return Ok(Vec::new());
         }
 
-        let posts: Vec<Rule34Post> = serde_json::from_str(&text)?;
+        let posts = decode_posts(&text)?;
         Ok(posts)
+    }
+}
+
+fn decode_posts(text: &str) -> Result<Vec<Rule34Post>> {
+    match serde_json::from_str(text) {
+        Ok(posts) => Ok(posts),
+        Err(parse_error) => {
+            if text.contains("Missing authentication") {
+                return Err(BooruError::Unauthorized(
+                    "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
+                ));
+            }
+            Err(parse_error.into())
+        }
     }
 }
 
