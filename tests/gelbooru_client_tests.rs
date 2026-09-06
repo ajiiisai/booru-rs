@@ -403,3 +403,14 @@ fn common_score_preserves_provider_range() {
         assert_eq!(post.score(), Some(i64::from(score)));
     }
 }
+#[test]
+fn post_preserves_unknown_rating() {
+    use booru_rs::gelbooru::{GelbooruPost, GelbooruRating};
+
+    let mut fixture: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    fixture["rating"] = "future_rating".into();
+    let post: GelbooruPost = serde_json::from_value(fixture).unwrap();
+    assert_eq!(post.rating.to_string(), "future_rating");
+    assert!(serde_json::from_value::<GelbooruRating>("future_rating".into()).is_err());
+}

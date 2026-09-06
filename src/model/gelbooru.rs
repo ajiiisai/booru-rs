@@ -32,7 +32,7 @@ pub struct GelbooruPost {
     /// Post's image source
     pub source: String,
     /// Post's rating
-    pub rating: GelbooruRating,
+    pub rating: GelbooruPostRating,
 }
 
 /// Wrapper for Gelbooru's API response containing a list of posts.
@@ -43,7 +43,30 @@ pub struct GelbooruResponse {
     pub posts: Vec<GelbooruPost>,
 }
 
-/// Post rating classification for Gelbooru.
+/// A Gelbooru response rating, including values unknown to this crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum GelbooruPostRating {
+    Known(GelbooruRating),
+    Unknown(String),
+}
+
+impl From<GelbooruRating> for GelbooruPostRating {
+    fn from(rating: GelbooruRating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for GelbooruPostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Gelbooru.
 ///
 /// See the [Gelbooru ratings wiki](https://gelbooru.com/index.php?page=help&topic=rating)
 /// for detailed information.
