@@ -202,16 +202,15 @@ impl Default for Downloader {
 }
 
 impl Downloader {
+    const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
     /// Creates a new downloader with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(300))
-                .build()
-                .expect("Failed to create HTTP client"),
+            client: reqwest::Client::new(),
             options: DownloadOptions::default(),
-            timeout: None,
+            timeout: Some(Self::DEFAULT_TIMEOUT),
         }
     }
 
@@ -549,6 +548,14 @@ mod tests {
 
         assert!(opts.overwrite);
         assert!(opts.filename_template.is_some());
+    }
+
+    #[test]
+    fn default_downloader_applies_default_timeout() {
+        assert_eq!(
+            Downloader::new().timeout,
+            Some(std::time::Duration::from_secs(300))
+        );
     }
 
     #[test]
