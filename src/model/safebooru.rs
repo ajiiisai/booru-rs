@@ -4,13 +4,13 @@
 //! responses from the Safebooru API.
 
 use core::fmt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A post from Safebooru.
 ///
 /// This struct represents a single image post from Safebooru.
 /// Safebooru is a SFW-only booru site.
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SafebooruPost {
     pub id: u32,
     pub score: Option<u32>,
@@ -39,7 +39,7 @@ pub struct SafebooruPost {
 }
 
 /// A Safebooru response rating, including values unknown to this crate.
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum SafebooruPostRating {
     Known(SafebooruRating),
@@ -65,7 +65,7 @@ impl fmt::Display for SafebooruPostRating {
 ///
 /// While Safebooru is primarily a SFW site, the rating field
 /// can contain other values for deleted/hidden content.
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum SafebooruRating {
     Safe,

@@ -657,3 +657,14 @@ fn post_rejects_missing_and_non_string_ratings() {
     fixture[0].as_object_mut().unwrap().remove("rating");
     assert!(serde_json::from_value::<SafebooruPost>(fixture[0].clone()).is_err());
 }
+#[test]
+fn post_serializes_and_round_trips() {
+    use booru_rs::safebooru::SafebooruPost;
+
+    let post: SafebooruPost = serde_json::from_str::<Vec<_>>(single_post_fixture())
+        .unwrap()
+        .remove(0);
+    let json = serde_json::to_string(&post).unwrap();
+    let restored: SafebooruPost = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored, post);
+}
