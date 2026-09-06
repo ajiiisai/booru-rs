@@ -591,3 +591,63 @@ fn post_rejects_invalid_sample_metadata() {
         );
     }
 }
+#[test]
+fn post_preserves_unknown_rating() {
+    use booru_rs::rule34::{Rule34Post, Rule34PostRating, Rule34Rating};
+
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for value in ["future_rating", "Explicit", "", " future rating "] {
+        fixture[0]["rating"] = value.into();
+        let post: Rule34Post = serde_json::from_value(fixture[0].clone()).unwrap();
+        assert_eq!(post.rating, Rule34PostRating::Unknown(value.into()));
+        assert_eq!(post.rating.to_string(), value);
+        let serialized = serde_json::to_value(&post).unwrap();
+        assert_eq!(serialized["rating"], value);
+        assert_eq!(
+            serde_json::from_value::<Rule34Post>(serialized).unwrap(),
+            post
+        );
+        assert!(serde_json::from_value::<Rule34Rating>(value.into()).is_err());
+    }
+}
+
+#[test]
+fn post_recognizes_supported_ratings() {
+    use booru_rs::rule34::{Rule34Post, Rule34PostRating, Rule34Rating};
+
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for (value, rating) in [
+        ("explicit", Rule34Rating::Explicit),
+        ("questionable", Rule34Rating::Questionable),
+        ("safe", Rule34Rating::Safe),
+        ("general", Rule34Rating::General),
+        ("sensitive", Rule34Rating::Sensitive),
+    ] {
+        fixture[0]["rating"] = value.into();
+        let post: Rule34Post = serde_json::from_value(fixture[0].clone()).unwrap();
+        assert_eq!(post.rating, Rule34PostRating::Known(rating));
+        assert_eq!(post.rating, rating.into());
+        assert_eq!(post.rating.to_string(), value);
+        assert_eq!(serde_json::to_value(&post).unwrap()["rating"], value);
+    }
+}
+
+#[test]
+fn post_rejects_non_string_ratings() {
+    use booru_rs::rule34::Rule34Post;
+
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for value in [
+        serde_json::Value::Null,
+        serde_json::json!(1),
+        serde_json::json!(true),
+        serde_json::json!([]),
+        serde_json::json!({}),
+    ] {
+        fixture[0]["rating"] = value;
+        assert!(serde_json::from_value::<Rule34Post>(fixture[0].clone()).is_err());
+    }
+}

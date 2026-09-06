@@ -36,7 +36,7 @@ pub struct Rule34Post {
     /// Post's tags (space-separated)
     pub tags: String,
     /// Post's rating
-    pub rating: Rule34Rating,
+    pub rating: Rule34PostRating,
     /// Post's source
     #[serde(default)]
     pub source: String,
@@ -82,7 +82,7 @@ struct Rule34PostWire {
     sample_height: Option<u32>,
     sample_width: Option<u32>,
     tags: String,
-    rating: Rule34Rating,
+    rating: Rule34PostRating,
     #[serde(default)]
     source: String,
     #[serde(default)]
@@ -134,7 +134,30 @@ impl From<Rule34PostWire> for Rule34Post {
     }
 }
 
-/// Post rating classification for Rule34.
+/// A Rule34 response rating, including values unknown to this crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum Rule34PostRating {
+    Known(Rule34Rating),
+    Unknown(String),
+}
+
+impl From<Rule34Rating> for Rule34PostRating {
+    fn from(rating: Rule34Rating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for Rule34PostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Rule34.
 ///
 /// Rule34 is an NSFW site, so most content is explicit or questionable.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
