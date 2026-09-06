@@ -291,12 +291,15 @@ fn client_shares_safely_across_tasks() {
 }
 
 #[tokio::test]
-async fn blacklist_and_random_append_on_wire() {
+async fn exclude_rating_and_random_append_on_wire() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))
         .and(path("/index.php"))
-        .and(query_param("tags", "1girl -explicit sort:random"))
+        .and(query_param(
+            "tags",
+            "1girl -spoiler -rating:explicit sort:random",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
         .mount(&mock_server)
         .await;
@@ -306,7 +309,8 @@ async fn blacklist_and_random_append_on_wire() {
     let posts = client
         .search()
         .tag("1girl")
-        .blacklist_tag(booru_rs::model::rule34::Rule34Rating::Explicit)
+        .blacklist_tag("spoiler")
+        .exclude_rating(booru_rs::model::rule34::Rule34Rating::Explicit)
         .random()
         .send()
         .await

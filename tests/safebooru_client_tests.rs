@@ -456,12 +456,15 @@ async fn sort_keeps_provider_prefix_on_wire() {
 }
 
 #[tokio::test]
-async fn blacklist_and_random_append_on_wire() {
+async fn exclude_rating_and_random_append_on_wire() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))
         .and(path("/index.php"))
-        .and(query_param("tags", "cat_ears -explicit sort:random"))
+        .and(query_param(
+            "tags",
+            "cat_ears -spoiler -rating:explicit sort:random",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
         .mount(&mock_server)
         .await;
@@ -471,7 +474,8 @@ async fn blacklist_and_random_append_on_wire() {
     let posts = client
         .search()
         .tag("cat_ears")
-        .blacklist_tag(SafebooruRating::Explicit)
+        .blacklist_tag("spoiler")
+        .exclude_rating(SafebooruRating::Explicit)
         .random()
         .send()
         .await

@@ -205,19 +205,24 @@ impl Query {
         self
     }
 
-    pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
-        self.tags.push(format!("-{}", tag.into()));
+    pub fn blacklist_tag(mut self, tag: impl AsRef<str>) -> Self {
+        self.tags.push(format!("-{}", tag.as_ref()));
         self
     }
 
     pub fn blacklist_tags<I, S>(mut self, tags: I) -> Self
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: AsRef<str>,
     {
         for tag in tags {
             self = self.blacklist_tag(tag);
         }
+        self
+    }
+
+    pub fn exclude_rating(mut self, rating: DanbooruRating) -> Self {
+        self.tags.push(format!("-rating:{rating}"));
         self
     }
 
@@ -267,7 +272,7 @@ impl Search {
         self
     }
 
-    pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
+    pub fn blacklist_tag(mut self, tag: impl AsRef<str>) -> Self {
         self.query = self.query.blacklist_tag(tag);
         self
     }
@@ -275,9 +280,14 @@ impl Search {
     pub fn blacklist_tags<I, S>(mut self, tags: I) -> Self
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: AsRef<str>,
     {
         self.query = self.query.blacklist_tags(tags);
+        self
+    }
+
+    pub fn exclude_rating(mut self, rating: DanbooruRating) -> Self {
+        self.query = self.query.exclude_rating(rating);
         self
     }
 

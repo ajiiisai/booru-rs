@@ -73,7 +73,7 @@ query.validate()?;
 let posts = client.search_with(query).send().await?;
 ```
 
-`send()` validates the complete query before it sends a request. Repeated `tag()` and `blacklist_tag()` calls append terms. Repeated `rating()`, `sort()`, and `limit()` calls replace those settings.
+`send()` validates the complete query before it sends a request. Repeated `tag()` and `blacklist_tag()` calls append terms. Use the typed `exclude_rating()` method for rating exclusions. Repeated `rating()`, `sort()`, and `limit()` calls replace those settings.
 
 Use the provider's rating type and the shared `Sort` type:
 

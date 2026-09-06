@@ -370,12 +370,12 @@ async fn sort_keeps_provider_prefix_on_wire() {
 }
 
 #[tokio::test]
-async fn blacklist_appends_on_wire() {
+async fn exclude_rating_appends_on_wire() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))
         .and(path("/posts.json"))
-        .and(query_param("tags", "cat_ears -explicit"))
+        .and(query_param("tags", "-spoiler -rating:explicit"))
         .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[])))
         .mount(&mock_server)
         .await;
@@ -384,8 +384,8 @@ async fn blacklist_appends_on_wire() {
 
     let posts = client
         .search()
-        .tag("cat_ears")
-        .blacklist_tag(booru_rs::model::danbooru::DanbooruRating::Explicit)
+        .blacklist_tag("spoiler")
+        .exclude_rating(booru_rs::model::danbooru::DanbooruRating::Explicit)
         .send()
         .await
         .expect("search must succeed");

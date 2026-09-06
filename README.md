@@ -94,6 +94,9 @@ let first = client.search_with(query.clone()).send().await?;
 let second = client.search_with(query).send().await?;
 ```
 
+Use `blacklist_tag("tag")` for a literal excluded tag and
+`exclude_rating(SafebooruRating::Explicit)` for a typed rating exclusion.
+
 ### Fetch a post
 
 ```rust

@@ -48,11 +48,11 @@ mod safebooru {
 
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
-    async fn get_posts_with_blacklist_tag() {
+    async fn get_posts_with_excluded_rating() {
         let posts = client()
             .search()
             .tag("kafuu_chino")
-            .blacklist_tag(SafebooruRating::Explicit)
+            .exclude_rating(SafebooruRating::Explicit)
             .send()
             .await;
 
