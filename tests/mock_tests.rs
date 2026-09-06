@@ -324,6 +324,56 @@ mod mock_danbooru {
             BooruError::HttpStatus { status: 500, .. }
         ));
     }
+
+    #[tokio::test]
+    async fn test_search_sends_credentials() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/posts.json"))
+            .and(query_param("tags", "cat_ears"))
+            .and(query_param("login", "test_user"))
+            .and(query_param("api_key", "test_key"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(danbooru_posts_json()))
+            .mount(&mock_server)
+            .await;
+
+        let client = DanbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .set_credentials("test_key", "test_user")
+            .tag("cat_ears")
+            .unwrap()
+            .build();
+
+        let posts = client.get().await.expect("search must succeed");
+
+        assert_eq!(posts.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_by_id_sends_credentials() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/posts/7654321.json"))
+            .and(query_param("login", "test_user"))
+            .and(query_param("api_key", "test_key"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(danbooru_post_json()))
+            .mount(&mock_server)
+            .await;
+
+        let client = DanbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .set_credentials("test_key", "test_user")
+            .build();
+
+        let post = client
+            .get_by_id(7654321)
+            .await
+            .expect("lookup must succeed");
+
+        assert_eq!(post.id, 7654321);
+    }
 }
 
 mod mock_post_trait {

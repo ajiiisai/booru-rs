@@ -60,10 +60,17 @@ impl Client for DanbooruClient {
         let builder = &self.0;
         let url = &builder.url;
 
+        let mut query = Vec::new();
+        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
+            query.push(("login", user.clone()));
+            query.push(("api_key", key.clone()));
+        }
+
         let response = builder
             .client
             .get(format!("{url}/posts/{id}.json"))
             .headers(get_headers())
+            .query(&query)
             .send()
             .await?;
 
@@ -83,15 +90,21 @@ impl Client for DanbooruClient {
         let tag_string = builder.tags.join(" ");
         let url = &builder.url;
 
+        let mut query = vec![
+            ("limit", builder.limit.to_string()),
+            ("page", builder.page.to_string()),
+            ("tags", tag_string),
+        ];
+        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
+            query.push(("login", user.clone()));
+            query.push(("api_key", key.clone()));
+        }
+
         let response = builder
             .client
             .get(format!("{url}/posts.json"))
             .headers(get_headers())
-            .query(&[
-                ("limit", builder.limit.to_string()),
-                ("page", builder.page.to_string()),
-                ("tags", tag_string),
-            ])
+            .query(&query)
             .send()
             .await?;
 
