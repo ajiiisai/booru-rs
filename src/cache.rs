@@ -401,6 +401,7 @@ where
 /// Generates a cache key from request parameters.
 ///
 /// This creates a consistent key format for caching booru API responses.
+/// Query terms retain the order provided by the caller.
 ///
 /// # Example
 ///
@@ -413,12 +414,10 @@ where
 /// ```
 #[must_use]
 pub fn cache_key(client: &str, tags: &[String], limit: u32, page: u32) -> String {
-    let mut tags_sorted = tags.to_vec();
-    tags_sorted.sort();
     format!(
         "{}:{}:limit={}:page={}",
         client,
-        tags_sorted.join(","),
+        tags.join(","),
         limit,
         page
     )
@@ -543,6 +542,24 @@ mod tests {
         assert!(key.starts_with("danbooru:"));
         assert!(key.contains("limit=10"));
         assert!(key.contains("page=0"));
+    }
+
+    #[test]
+    fn cache_key_preserves_query_order() {
+        let first = cache_key(
+            "danbooru",
+            &["raw:order:score".to_string(), "raw:order:id".to_string()],
+            10,
+            0,
+        );
+        let second = cache_key(
+            "danbooru",
+            &["raw:order:id".to_string(), "raw:order:score".to_string()],
+            10,
+            0,
+        );
+
+        assert_ne!(first, second);
     }
 
     #[test]
