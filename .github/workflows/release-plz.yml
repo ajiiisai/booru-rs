@@ -73,8 +73,7 @@ jobs:
     needs: [detect-release, release]
     if: >-
       always() && !cancelled() &&
-      needs.detect-release.result == 'success' &&
-      (needs.release.result == 'success' || needs.release.result == 'skipped')
+      needs.detect-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
