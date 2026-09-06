@@ -168,16 +168,15 @@ mod autocomplete {
 
     #[cfg(feature = "gelbooru")]
     mod gelbooru {
-        use super::*;
-        use booru_rs::client::Client;
-        use booru_rs::gelbooru::GelbooruClient;
+        use booru_rs::gelbooru::Client;
 
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             // Gelbooru autocomplete may work without auth
-            let suggestions = GelbooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_", 10)
                 .await;
 
@@ -193,7 +192,11 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = GelbooruClient::builder().build().autocomplete("a", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("a", 5)
+                .await;
 
             if let Ok(suggestions) = suggestions {
                 assert!(suggestions.len() <= 5, "Should respect limit parameter");

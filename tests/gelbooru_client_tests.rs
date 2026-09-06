@@ -364,3 +364,29 @@ async fn sort_keeps_provider_prefix_on_wire() {
 
     assert!(posts.is_empty());
 }
+
+#[tokio::test]
+async fn present_empty_post_list_is_empty() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "zzznonexistenttagzzz"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"@attributes":{"limit":1,"offset":0,"count":0},"post":[]}"#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("zzznonexistenttagzzz")
+        .send()
+        .await
+        .expect("empty search must succeed");
+
+    assert!(posts.is_empty());
+}
