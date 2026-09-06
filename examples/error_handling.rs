@@ -2,6 +2,7 @@
 //!
 //! Run with: cargo run --example error_handling
 
+use booru_rs::danbooru::Client as Danbooru;
 use booru_rs::prelude::*;
 use booru_rs::safebooru::Client as Safebooru;
 
@@ -10,10 +11,14 @@ async fn main() {
     println!("=== Tag Limit Error ===\n");
 
     // Danbooru only allows 2 tags for anonymous users
-    let result = DanbooruClient::builder()
+    let client = Danbooru::new().expect("client must build");
+    let result = client
+        .search()
         .tag("cat_ears")
-        .and_then(|b| b.tag("blue_eyes"))
-        .and_then(|b| b.tag("1girl")); // This will fail!
+        .tag("blue_eyes")
+        .tag("1girl") // This will fail!
+        .send()
+        .await;
 
     match result {
         Ok(_) => println!("Unexpected success"),
@@ -33,10 +38,7 @@ async fn main() {
     println!("\n=== Post Not Found ===\n");
 
     // Try to get a post that doesn't exist
-    let result = DanbooruClient::builder()
-        .build()
-        .get_by_id(999_999_999)
-        .await;
+    let result = client.post(999_999_999).await;
 
     match result {
         Ok(_) => println!("Unexpected success"),

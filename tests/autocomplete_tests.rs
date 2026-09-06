@@ -6,15 +6,14 @@ mod autocomplete {
 
     #[cfg(feature = "danbooru")]
     mod danbooru {
-        use super::*;
-        use booru_rs::client::Client;
-        use booru_rs::danbooru::DanbooruClient;
+        use booru_rs::danbooru::Client;
 
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = DanbooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_", 10)
                 .await;
 
@@ -29,7 +28,11 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = DanbooruClient::builder().build().autocomplete("a", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("a", 5)
+                .await;
 
             assert!(suggestions.is_ok());
             let suggestions = suggestions.unwrap();
@@ -39,8 +42,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_has_tag_names() {
-            let suggestions = DanbooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_ears", 5)
                 .await;
 
@@ -56,8 +60,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_post_counts() {
-            let suggestions = DanbooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_ears", 5)
                 .await;
 
@@ -75,8 +80,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_categories() {
-            let suggestions = DanbooruClient::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_ears", 5)
                 .await;
 
@@ -95,7 +101,7 @@ mod autocomplete {
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_empty_query() {
             // Empty query should still work (returns popular tags or empty)
-            let suggestions = DanbooruClient::builder().build().autocomplete("", 5).await;
+            let suggestions = Client::builder().build().unwrap().autocomplete("", 5).await;
             assert!(suggestions.is_ok());
         }
     }

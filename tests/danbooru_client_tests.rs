@@ -1,6 +1,6 @@
 use booru_rs::danbooru::{Client, Query};
 use booru_rs::error::BooruError;
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn posts_json(ids: &[u32]) -> String {
@@ -73,6 +73,7 @@ async fn search_sends_tags_limit_and_credentials() {
         .and(query_param("tags", "cat_ears"))
         .and(query_param("login", "test_user"))
         .and(query_param("api_key", "test_key"))
+        .and(header("User-Agent", "booru-rs/0.3.0"))
         .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[7654321])))
         .mount(&mock_server)
         .await;

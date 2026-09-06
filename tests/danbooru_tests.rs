@@ -1,19 +1,18 @@
 #[cfg(test)]
 mod danbooru {
     use booru_rs::{
-        client::{Client, danbooru::DanbooruClient, generic::Sort},
-        danbooru::DanbooruRating,
+        client::generic::Sort,
+        danbooru::{Client, DanbooruRating},
     };
+
+    fn client() -> Client {
+        Client::new().expect("default client must build")
+    }
 
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
-        let posts = DanbooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").send().await;
 
         assert!(posts.is_ok());
         assert!(!posts.unwrap().is_empty());
@@ -22,12 +21,11 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
-        let posts = DanbooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .rating(DanbooruRating::General)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -37,12 +35,11 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
-        let posts = DanbooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .sort(Sort::Rating)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -52,12 +49,11 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_blacklist_tag() {
-        let posts = DanbooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .blacklist_tag(DanbooruRating::Explicit)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -67,13 +63,7 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
-        let posts = DanbooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .limit(3)
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").limit(3).send().await;
 
         assert!(posts.is_ok());
         assert!(posts.unwrap().len() == 3);
@@ -82,14 +72,12 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_multiple_tags() {
-        let posts = DanbooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .tag("1girl")
-            .unwrap()
             .limit(3)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -99,13 +87,7 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_random_posts() {
-        let posts = DanbooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .random()
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").random().send().await;
 
         assert!(posts.is_ok());
         assert!(!posts.unwrap().is_empty());
@@ -114,7 +96,7 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
-        let post = DanbooruClient::builder().build().get_by_id(7452417).await;
+        let post = client().post(7452417).await;
 
         assert!(post.is_ok());
         assert_eq!(
@@ -126,9 +108,9 @@ mod danbooru {
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
-        let post_from_first_page = DanbooruClient::builder().build().get().await;
+        let post_from_first_page = client().search().send().await;
 
-        let post_from_specific_page = DanbooruClient::builder().page(7).build().get().await;
+        let post_from_specific_page = client().search().start_page(7).send().await;
 
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());
