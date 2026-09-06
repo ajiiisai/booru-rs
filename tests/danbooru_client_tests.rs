@@ -39,7 +39,8 @@ fn single_post_json(id: u32) -> String {
 }
 
 async fn mock_pages(mock_server: &MockServer, pages: &[Vec<u32>]) {
-    for (page, ids) in pages.iter().enumerate() {
+    for (index, ids) in pages.iter().enumerate() {
+        let page = index + 1;
         Mock::given(method("GET"))
             .and(path("/posts.json"))
             .and(query_param("page", page.to_string()))
@@ -69,7 +70,7 @@ async fn search_sends_tags_limit_and_credentials() {
     Mock::given(method("GET"))
         .and(path("/posts.json"))
         .and(query_param("limit", "10"))
-        .and(query_param("page", "0"))
+        .and(query_param("page", "1"))
         .and(query_param("tags", "cat_ears"))
         .and(query_param("login", "test_user"))
         .and(query_param("api_key", "test_key"))
@@ -339,12 +340,35 @@ async fn random_requests_random_order() {
 #[tokio::test]
 async fn start_page_starts_there() {
     let mock_server = MockServer::start().await;
-    mock_pages(&mock_server, &[vec![], vec![], vec![7]]).await;
+    mock_pages(&mock_server, &[vec![], vec![7]]).await;
     let client = test_client(&mock_server);
 
     let posts = client
         .search()
         .start_page(2)
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert_eq!(ids(&posts), vec![7]);
+}
+
+#[tokio::test]
+async fn start_page_zero_clamps_to_first_page() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[7])))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .start_page(0)
         .send()
         .await
         .expect("search must succeed");

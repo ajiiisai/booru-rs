@@ -75,7 +75,7 @@ impl Client {
         Search {
             client: self.clone(),
             query,
-            page: 0,
+            page: 1,
         }
     }
 
@@ -257,7 +257,7 @@ impl Search {
     }
 
     pub fn start_page(mut self, page: u32) -> Self {
-        self.page = page;
+        self.page = page.max(1);
         self
     }
 
