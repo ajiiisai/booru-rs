@@ -147,6 +147,9 @@ jobs:
       - name: Rule34 only
         run: cargo build --no-default-features --features rule34
 
+      - name: Download only
+        run: cargo build --no-default-features --features download
+
       - name: All features
         run: cargo build --all-features
 
