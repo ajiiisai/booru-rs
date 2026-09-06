@@ -5,165 +5,11 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use serde::Deserialize;
 
-use super::{Client as ClientTrait, ensure_success};
-use crate::autocomplete::{Autocomplete, TagSuggestion};
+use super::ensure_success;
+use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::rule34::*;
-
-/// Client for interacting with the Rule34 API.
-///
-/// Rule34 has no tag limit for queries.
-///
-/// # Authentication
-///
-/// Rule34 **requires API credentials** for API access. You can obtain your
-/// API key and user ID from your [Rule34 account settings](https://rule34.xxx/index.php?page=account&s=options).
-///
-/// ```no_run
-/// use booru_rs::rule34::{Rule34Client, Rule34Rating};
-/// use booru_rs::client::Client;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let posts = Rule34Client::builder()
-///     .set_credentials("your_api_key", "your_user_id")
-///     .tag("cat_ears")?
-///     .rating(Rule34Rating::Safe)
-///     .limit(10)
-///     .build()
-///     .get()
-///     .await?;
-///
-/// println!("Found {} posts", posts.len());
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Without credentials, requests will fail with [`BooruError::Unauthorized`].
-///
-/// # Content Warning
-///
-/// Rule34 is an adult (NSFW) image board. Content is not filtered by default.
-/// Use rating filters appropriately.
-///
-/// [`BooruError::Unauthorized`]: crate::error::BooruError::Unauthorized
-#[derive(Debug)]
-pub struct Rule34Client(super::ClientBuilder<Self>);
-
-impl From<super::ClientBuilder<Self>> for Rule34Client {
-    fn from(value: super::ClientBuilder<Self>) -> Self {
-        Self(value)
-    }
-}
-
-impl ClientTrait for Rule34Client {
-    type Post = Rule34Post;
-    type Rating = Rule34Rating;
-
-    const URL: &'static str = "https://api.rule34.xxx";
-    const SORT: &'static str = "sort:";
-    const MAX_TAGS: Option<usize> = None;
-
-    /// # Errors
-    ///
-    /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
-    /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
-    /// Returns other errors if the request fails or the response cannot be parsed.
-    async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
-        let builder = &self.0;
-        let url = &builder.url;
-
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("id", id.to_string()),
-            ("json", "1".to_string()),
-        ];
-
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/index.php"))
-            .query(&query)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
-
-        // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
-        // Example: "Missing authentication. Go to api.rule34.xxx for more information"
-        let text = response.text().await?;
-
-        let posts = decode_posts(&text)?;
-        posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
-    }
-
-    /// # Errors
-    ///
-    /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
-    /// Returns other errors if the request fails or if the response cannot be parsed.
-    async fn get(&self) -> Result<Vec<Self::Post>> {
-        let builder = &self.0;
-        let url = &builder.url;
-        let tag_string = builder.tags.join(" ");
-
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("pid", builder.page.to_string()),
-            ("limit", builder.limit.to_string()),
-            ("tags", tag_string),
-            ("json", "1".to_string()),
-        ];
-
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/index.php"))
-            .query(&query)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-
-        let response = ensure_success(response).await?;
-
-        // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
-        // Example: "Missing authentication. Go to api.rule34.xxx for more information"
-        let text = response.text().await?;
-
-        if text.is_empty() || text == "[]" {
-            return Ok(Vec::new());
-        }
-
-        let posts = decode_posts(&text)?;
-        Ok(posts)
-    }
-}
 
 fn decode_posts(text: &str) -> Result<Vec<Rule34Post>> {
     match serde_json::from_str(text) {
@@ -185,39 +31,6 @@ struct Rule34AutocompleteItem {
     label: String,
 }
 
-impl Autocomplete for Rule34Client {
-    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let builder = &self.0;
-        let url = format!("{}/autocomplete.php", builder.url);
-
-        let response = builder
-            .client
-            .get(&url)
-            .query(&[("q", query)])
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 autocomplete request failed".into(),
-            ));
-        }
-
-        let items: Vec<Rule34AutocompleteItem> = response.json().await?;
-
-        Ok(items
-            .into_iter()
-            .take(limit as usize)
-            .map(|item| TagSuggestion {
-                name: item.value,
-                label: item.label.clone(),
-                post_count: parse_post_count_from_label(&item.label),
-                category: None,
-            })
-            .collect())
-    }
-}
-
 /// Parses post count from a label like "tag_name (12345)".
 fn parse_post_count_from_label(label: &str) -> Option<u32> {
     let start = label.rfind('(')?;
@@ -229,7 +42,8 @@ fn parse_post_count_from_label(label: &str) -> Option<u32> {
     }
 }
 
-const DEFAULT_ENDPOINT: &str = <Rule34Client as ClientTrait>::URL;
+const DEFAULT_ENDPOINT: &str = "https://api.rule34.xxx";
+const SORT_PREFIX: &str = "sort:";
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -405,8 +219,7 @@ impl Query {
     }
 
     pub fn random(mut self) -> Self {
-        self.tags
-            .push(format!("{}random", <Rule34Client as ClientTrait>::SORT));
+        self.tags.push(format!("{SORT_PREFIX}random"));
         self
     }
 
@@ -513,7 +326,7 @@ impl Search {
             tags.push(format!("rating:{rating}"));
         }
         if let Some(sort) = &self.query.sort {
-            tags.push(format!("{}{sort}", <Rule34Client as ClientTrait>::SORT));
+            tags.push(format!("{SORT_PREFIX}{sort}"));
         }
         let tags = tags.join(" ");
 

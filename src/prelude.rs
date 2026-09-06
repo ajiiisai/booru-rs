@@ -62,8 +62,6 @@ pub use crate::model::gelbooru::{GelbooruPost, GelbooruRating, GelbooruResponse}
 
 // Rule34
 #[cfg(feature = "rule34")]
-pub use crate::client::Rule34Client;
-#[cfg(feature = "rule34")]
 pub use crate::model::rule34::{Rule34Post, Rule34Rating};
 
 // Safebooru

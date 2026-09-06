@@ -5,29 +5,27 @@
 //!
 //! # Available Clients
 //!
-//! - [`Rule34Client`] for api.rule34.xxx, unlimited tags
+//! - `danbooru::Client` for danbooru.donmai.us, 2 tag limit
+//! - `gelbooru::Client` for gelbooru.com, unlimited tags
+//! - `safebooru::Client` for safebooru.org, unlimited tags, SFW only
+//! - `rule34::Client` for api.rule34.xxx, unlimited tags
 //!
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
-//! use booru_rs::rule34::Rule34Client;
+//! use booru_rs::danbooru::Client;
 //!
-//! # async fn example() -> Result<()> {
-//! // Using the builder pattern
-//! let posts = Rule34Client::builder()
-//!     .set_credentials("your_api_key", "your_user_id")
-//!     .tag("cat_ears")?
-//!     .rating(Rule34Rating::Safe)
-//!     .sort(Sort::Score)
+//! # async fn example() -> booru_rs::error::Result<()> {
+//! let client = Client::new()?;
+//! let posts = client
+//!     .search()
+//!     .tag("cat_ears")
 //!     .limit(10)
-//!     .build()
-//!     .get()
+//!     .send()
 //!     .await?;
 //!
 //! // Get a specific post by ID
-//! let danbooru = booru_rs::danbooru::Client::new()?;
-//! let post = danbooru.post(12345).await?;
+//! let post = client.post(12345).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -265,12 +263,12 @@ impl<T: Client> ClientBuilder<T> {
     ///
     /// # Example
     ///
-    /// ```no_run
-    /// use booru_rs::rule34::Rule34Client;
+    /// ```ignore
+    /// use booru_rs::gelbooru::GelbooruClient;
     /// use booru_rs::client::Client;
     ///
     /// # fn example() -> booru_rs::error::Result<()> {
-    /// let client = Rule34Client::builder()
+    /// let client = GelbooruClient::builder()
     ///     .tag("cat_ears")?
     ///     .tag("blue_eyes")?
     ///     .build();
@@ -296,12 +294,12 @@ impl<T: Client> ClientBuilder<T> {
 
     /// # Example
     ///
-    /// ```no_run
-    /// use booru_rs::rule34::{Rule34Client, Rule34Rating};
+    /// ```ignore
+    /// use booru_rs::gelbooru::{GelbooruClient, GelbooruRating};
     /// use booru_rs::client::Client;
     ///
-    /// let client = Rule34Client::builder()
-    ///     .rating(Rule34Rating::Safe)
+    /// let client = GelbooruClient::builder()
+    ///     .rating(GelbooruRating::General)
     ///     .build();
     /// ```
     #[must_use]
@@ -352,12 +350,11 @@ impl<T: Client> ClientBuilder<T> {
     ///
     /// # Example
     ///
-    /// ```no_run
-    /// use booru_rs::prelude::*;
-    /// use booru_rs::rule34::Rule34Client;
+    /// ```ignore
+    /// use booru_rs::gelbooru::GelbooruClient;
     ///
     /// # fn example() -> Result<()> {
-    /// let client = Rule34Client::builder()
+    /// let client = GelbooruClient::builder()
     ///     .tags(["cat_ears", "blue_eyes", "1girl"])?
     ///     .build();
     /// # Ok(())
@@ -376,12 +373,11 @@ impl<T: Client> ClientBuilder<T> {
 
     /// # Example
     ///
-    /// ```no_run
-    /// use booru_rs::prelude::*;
-    /// use booru_rs::rule34::Rule34Client;
+    /// ```ignore
+    /// use booru_rs::gelbooru::GelbooruClient;
     ///
     /// # fn example() -> Result<()> {
-    /// let client = Rule34Client::builder()
+    /// let client = GelbooruClient::builder()
     ///     .tag("cat_ears")?
     ///     .blacklist_tags(["ugly", "low_quality"])
     ///     .build();
@@ -421,6 +417,3 @@ impl<T: Client> Default for ClientBuilder<T> {
         Self::new()
     }
 }
-
-#[cfg(feature = "rule34")]
-pub use rule34::Rule34Client;

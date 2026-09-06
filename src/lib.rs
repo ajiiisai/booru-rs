@@ -52,7 +52,7 @@
 //! | [Danbooru](https://danbooru.donmai.us) | `danbooru::Client` | 2 | No |
 //! | [Gelbooru](https://gelbooru.com) | `gelbooru::Client` | Unlimited | Yes |
 //! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
-//! | [Rule34](https://rule34.xxx) | [`Rule34Client`] | Unlimited | Yes |
+//! | [Rule34](https://rule34.xxx) | `rule34::Client` | Unlimited | Yes |
 //!
 //! ## Pagination with Async Streams
 //!
@@ -106,8 +106,6 @@ pub mod validation;
 pub use autocomplete::{Autocomplete, TagSuggestion};
 pub use client::Client;
 pub use client::ClientBuilder;
-#[cfg(feature = "rule34")]
-pub use client::Rule34Client;
 pub use client::generic::Sort;
 pub use error::{BooruError, Result};
 pub use model::Post;
