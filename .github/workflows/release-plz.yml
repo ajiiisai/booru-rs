@@ -26,6 +26,9 @@ jobs:
     outputs:
       release: ${{ steps.detect.outputs.release }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - id: detect
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,6 +36,20 @@ jobs:
         run: |
           release=$(gh api "repos/$GH_REPO/commits/$GITHUB_SHA/pulls" \
             --jq 'any(.[]; .merged_at != null and .base.ref == "main" and (.head.ref | startswith("release-plz-")))')
+
+          version=$(sed -n '/^version = /{s/.*"\([^"]*\)".*/\1/p;q;}' Cargo.toml)
+          if gh api "repos/$GH_REPO/git/ref/tags/v$version" >/dev/null 2>&1; then
+            tag_exists=true
+          else
+            tag_exists=false
+          fi
+
+          # A merged release PR can fail before publishing. Retry the release
+          # while the version in Cargo.toml still has no matching tag.
+          if [[ "$tag_exists" == "false" ]]; then
+            release=true
+          fi
+
           echo "release=$release" >> "$GITHUB_OUTPUT"
 
   release:
@@ -73,8 +90,7 @@ jobs:
     needs: [detect-release, release]
     if: >-
       always() && !cancelled() &&
-      needs.detect-release.result == 'success' &&
-      (needs.release.result == 'success' || needs.release.result == 'skipped')
+      needs.detect-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
