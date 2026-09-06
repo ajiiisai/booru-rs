@@ -220,4 +220,23 @@ mod tests {
         assert!(matches!(result, Err(BooruError::InvalidRetryConfig(_))));
         assert_eq!(calls, 0);
     }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_retry_backoff() {
+        let config = RetryConfig::new(1)
+            .with_initial_delay(Duration::from_secs(60))
+            .with_max_delay(Duration::from_secs(60));
+        let task = tokio::spawn(with_retry(config, || async {
+            Err::<(), _>(BooruError::RateLimited)
+        }));
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        task.abort();
+
+        assert!(
+            task.await
+                .expect_err("retry task must be cancelled")
+                .is_cancelled()
+        );
+    }
 }
