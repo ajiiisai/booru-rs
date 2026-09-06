@@ -39,6 +39,7 @@ pub struct GelbooruPost {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GelbooruResponse {
     #[serde(rename = "post")]
+    #[serde(default)]
     pub posts: Vec<GelbooruPost>,
 }
 
