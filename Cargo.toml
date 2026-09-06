@@ -15,6 +15,7 @@ danbooru = []
 gelbooru = []
 safebooru = []
 rule34 = []
+live-tests = []
 download = [
     "dep:tempfile",
     "reqwest/stream",
@@ -78,6 +79,10 @@ required-features = ["safebooru"]
 [[test]]
 name = "mock_tests"
 required-features = ["danbooru", "gelbooru", "rule34", "safebooru"]
+
+[[test]]
+name = "live_contract_tests"
+required-features = ["live-tests", "danbooru", "gelbooru", "rule34", "safebooru"]
 
 [profile.dev]
 opt-level = 1
