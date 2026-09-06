@@ -141,12 +141,12 @@ mod mock_safebooru {
     }
 
     #[tokio::test]
-    async fn test_server_error() {
+    async fn test_server_error_despite_decodable_body() {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
-            .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+            .respond_with(ResponseTemplate::new(500).set_body_string(safebooru_posts_json()))
             .mount(&mock_server)
             .await;
 
@@ -156,7 +156,32 @@ mod mock_safebooru {
 
         let result = client.get().await;
 
-        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            BooruError::HttpStatus { status: 500, .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_server_error_malformed_body() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/index.php"))
+            .respond_with(ResponseTemplate::new(503).set_body_string("<html>bad gateway"))
+            .mount(&mock_server)
+            .await;
+
+        let client = SafebooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .build();
+
+        let result = client.get().await;
+
+        assert!(matches!(
+            result.unwrap_err(),
+            BooruError::HttpStatus { status: 503, .. }
+        ));
     }
 
     #[tokio::test]
@@ -273,7 +298,32 @@ mod mock_danbooru {
 
         let result = client.get_by_id(99999).await;
 
-        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            BooruError::PostNotFound(99999)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_search_error_despite_valid_json_body() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/posts.json"))
+            .respond_with(ResponseTemplate::new(500).set_body_string(danbooru_posts_json()))
+            .mount(&mock_server)
+            .await;
+
+        let client = DanbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .build();
+
+        let result = client.get().await;
+
+        assert!(matches!(
+            result.unwrap_err(),
+            BooruError::HttpStatus { status: 500, .. }
+        ));
     }
 }
 
@@ -435,6 +485,30 @@ mod mock_gelbooru {
 
         assert!(posts.is_ok());
         assert!(posts.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_post_not_found_404() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/index.php"))
+            .and(query_param("id", "99999"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("Not Found"))
+            .mount(&mock_server)
+            .await;
+
+        let client = GelbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .set_credentials("test_key", "test_user")
+            .build();
+
+        let result = client.get_by_id(99999).await;
+
+        assert!(matches!(
+            result.unwrap_err(),
+            BooruError::PostNotFound(99999)
+        ));
     }
 }
 

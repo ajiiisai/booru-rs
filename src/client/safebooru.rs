@@ -68,14 +68,20 @@ impl Client for SafebooruClient {
                 ("json", "1"),
             ])
             .send()
-            .await?
-            .json::<Vec<SafebooruPost>>()
             .await?;
 
-        response
-            .into_iter()
-            .next()
-            .ok_or(BooruError::PostNotFound(id))
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(BooruError::PostNotFound(id));
+        }
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
+        let posts = response.json::<Vec<SafebooruPost>>().await?;
+
+        posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
     /// Retrieves posts matching the configured query.
@@ -101,11 +107,17 @@ impl Client for SafebooruClient {
                 ("json", "1"),
             ])
             .send()
-            .await?
-            .json::<Vec<SafebooruPost>>()
             .await?;
 
-        Ok(response)
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
+        let posts = response.json::<Vec<SafebooruPost>>().await?;
+
+        Ok(posts)
     }
 }
 

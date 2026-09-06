@@ -49,6 +49,12 @@ pub enum BooruError {
     #[error("Authentication required: {0}")]
     Unauthorized(String),
 
+    /// The API answered with an unsuccessful HTTP status code.
+    ///
+    /// The body excerpt is capped at 300 characters on one line.
+    #[error("Request failed with HTTP status {status}: {message}")]
+    HttpStatus { status: u16, message: String },
+
     /// Tag validation failed.
     ///
     /// The tag is invalid or contains problematic characters.
@@ -70,6 +76,20 @@ pub enum BooruError {
 }
 
 impl BooruError {
+    pub(crate) fn http_status(status: reqwest::StatusCode, body: &str) -> Self {
+        const LIMIT: usize = 300;
+        let single_line = body.split_whitespace().collect::<Vec<_>>().join(" ");
+        let clipped = single_line.chars().count() > LIMIT;
+        let mut message: String = single_line.chars().take(LIMIT).collect();
+        if clipped {
+            message.push('…');
+        }
+        Self::HttpStatus {
+            status: status.as_u16(),
+            message,
+        }
+    }
+
     /// Returns `true` if this error is a network-related error.
     #[must_use]
     pub fn is_network_error(&self) -> bool {

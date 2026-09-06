@@ -2,7 +2,7 @@
 
 use super::{Client, ClientBuilder, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
-use crate::error::Result;
+use crate::error::{BooruError, Result};
 use crate::model::danbooru::*;
 
 use reqwest::header::{self, HeaderMap, HeaderValue};
@@ -74,11 +74,20 @@ impl Client for DanbooruClient {
             .get(format!("{url}/posts/{id}.json"))
             .headers(get_headers())
             .send()
-            .await?
-            .json::<DanbooruPost>()
             .await?;
 
-        Ok(response)
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(BooruError::PostNotFound(id));
+        }
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
+        let post = response.json::<DanbooruPost>().await?;
+
+        Ok(post)
     }
 
     /// Retrieves posts matching the configured query.
@@ -101,11 +110,17 @@ impl Client for DanbooruClient {
                 ("tags", tag_string),
             ])
             .send()
-            .await?
-            .json::<Vec<DanbooruPost>>()
             .await?;
 
-        Ok(response)
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
+        let posts = response.json::<Vec<DanbooruPost>>().await?;
+
+        Ok(posts)
     }
 }
 

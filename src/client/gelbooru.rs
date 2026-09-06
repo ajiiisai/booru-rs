@@ -96,6 +96,15 @@ impl Client for GelbooruClient {
             ));
         }
 
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(BooruError::PostNotFound(id));
+        }
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
         let data = response.json::<GelbooruResponse>().await?;
 
         data.posts
@@ -143,6 +152,12 @@ impl Client for GelbooruClient {
             return Err(BooruError::Unauthorized(
                 "Gelbooru requires API credentials. Use set_credentials(api_key, user_id)".into(),
             ));
+        }
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
         }
 
         let data = response.json::<GelbooruResponse>().await?;

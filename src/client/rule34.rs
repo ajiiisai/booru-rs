@@ -101,6 +101,15 @@ impl Client for Rule34Client {
             ));
         }
 
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(BooruError::PostNotFound(id));
+        }
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
+        }
+
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
         // Example: "Missing authentication. Go to api.rule34.xxx for more information"
         let text = response.text().await?;
@@ -153,6 +162,12 @@ impl Client for Rule34Client {
             return Err(BooruError::Unauthorized(
                 "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
             ));
+        }
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(BooruError::http_status(status, &body));
         }
 
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
