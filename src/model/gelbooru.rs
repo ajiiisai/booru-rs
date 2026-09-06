@@ -33,6 +33,60 @@ pub struct GelbooruPost {
     pub source: String,
     /// Post's rating
     pub rating: GelbooruPostRating,
+    /// Directory number, if supplied.
+    #[serde(default)]
+    pub directory: Option<u32>,
+    /// Change timestamp, if supplied.
+    #[serde(default)]
+    pub change: Option<u64>,
+    /// Post owner, if supplied.
+    #[serde(default)]
+    pub owner: Option<String>,
+    /// Creator ID, if supplied.
+    #[serde(default)]
+    pub creator_id: Option<u32>,
+    /// Parent post ID, if supplied.
+    #[serde(default)]
+    pub parent_id: Option<u32>,
+    /// Whether the post has a sample, if supplied.
+    #[serde(default)]
+    pub sample: Option<bool>,
+    /// Preview height in pixels, if supplied.
+    #[serde(default)]
+    pub preview_height: Option<u32>,
+    /// Preview width in pixels, if supplied.
+    #[serde(default)]
+    pub preview_width: Option<u32>,
+    /// Post title, if supplied.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Whether the post has notes, if supplied.
+    #[serde(default)]
+    pub has_notes: Option<bool>,
+    /// Whether the post has comments, if supplied.
+    #[serde(default)]
+    pub has_comments: Option<bool>,
+    /// Preview URL, if supplied.
+    #[serde(default)]
+    pub preview_url: Option<String>,
+    /// Sample URL, if supplied.
+    #[serde(default)]
+    pub sample_url: Option<String>,
+    /// Sample height in pixels, if supplied.
+    #[serde(default)]
+    pub sample_height: Option<u32>,
+    /// Sample width in pixels, if supplied.
+    #[serde(default)]
+    pub sample_width: Option<u32>,
+    /// Post status, if supplied.
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Whether the post is locked, if supplied.
+    #[serde(default)]
+    pub post_locked: Option<bool>,
+    /// Whether the post has children, if supplied.
+    #[serde(default)]
+    pub has_children: Option<bool>,
 }
 
 /// Wrapper for Gelbooru's API response containing a list of posts.

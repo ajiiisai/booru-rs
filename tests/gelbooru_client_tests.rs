@@ -416,3 +416,111 @@ fn post_preserves_unknown_rating() {
     assert_eq!(post.rating.to_string(), "future_rating");
     assert!(serde_json::from_value::<GelbooruRating>("future_rating".into()).is_err());
 }
+#[test]
+fn post_preserves_optional_metadata() {
+    use booru_rs::gelbooru::GelbooruPost;
+
+    let mut value: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    value["directory"] = 42.into();
+    value["change"] = 1700000000u64.into();
+    value["owner"] = "owner".into();
+    value["creator_id"] = 7.into();
+    value["parent_id"] = 8.into();
+    value["sample"] = true.into();
+    value["preview_height"] = 90.into();
+    value["preview_width"] = 120.into();
+    value["title"] = "title".into();
+    value["has_notes"] = false.into();
+    value["has_comments"] = true.into();
+    value["preview_url"] = "https://example.com/preview.jpg".into();
+    value["sample_url"] = "https://example.com/sample.jpg".into();
+    value["sample_height"] = 600.into();
+    value["sample_width"] = 450.into();
+    value["status"] = "active".into();
+    value["post_locked"] = false.into();
+    value["has_children"] = true.into();
+
+    let post: GelbooruPost = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(post.directory, Some(42));
+    assert_eq!(post.change, Some(1700000000));
+    assert_eq!(post.owner.as_deref(), Some("owner"));
+    assert_eq!(post.creator_id, Some(7));
+    assert_eq!(post.parent_id, Some(8));
+    assert_eq!(post.sample, Some(true));
+    assert_eq!(post.preview_height, Some(90));
+    assert_eq!(post.preview_width, Some(120));
+    assert_eq!(post.title.as_deref(), Some("title"));
+    assert_eq!(post.has_notes, Some(false));
+    assert_eq!(post.has_comments, Some(true));
+    assert_eq!(
+        post.preview_url.as_deref(),
+        Some("https://example.com/preview.jpg")
+    );
+    assert_eq!(
+        post.sample_url.as_deref(),
+        Some("https://example.com/sample.jpg")
+    );
+    assert_eq!(post.sample_height, Some(600));
+    assert_eq!(post.sample_width, Some(450));
+    assert_eq!(post.status.as_deref(), Some("active"));
+    assert_eq!(post.post_locked, Some(false));
+    assert_eq!(post.has_children, Some(true));
+    assert_eq!(serde_json::to_value(&post).unwrap(), value);
+}
+
+#[test]
+fn post_allows_missing_and_null_optional_metadata() {
+    use booru_rs::gelbooru::GelbooruPost;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    for null_value in [false, true] {
+        let mut value = fixture.clone();
+        for field in [
+            "directory",
+            "change",
+            "owner",
+            "creator_id",
+            "parent_id",
+            "sample",
+            "preview_height",
+            "preview_width",
+            "title",
+            "has_notes",
+            "has_comments",
+            "preview_url",
+            "sample_url",
+            "sample_height",
+            "sample_width",
+            "status",
+            "post_locked",
+            "has_children",
+        ] {
+            if null_value {
+                value[field] = serde_json::Value::Null;
+            } else {
+                value.as_object_mut().unwrap().remove(field);
+            }
+        }
+        let post: GelbooruPost = serde_json::from_value(value).unwrap();
+        assert_eq!(post.directory, None);
+        assert_eq!(post.change, None);
+        assert_eq!(post.owner, None);
+        assert_eq!(post.creator_id, None);
+        assert_eq!(post.parent_id, None);
+        assert_eq!(post.sample, None);
+        assert_eq!(post.preview_height, None);
+        assert_eq!(post.preview_width, None);
+        assert_eq!(post.title, None);
+        assert_eq!(post.has_notes, None);
+        assert_eq!(post.has_comments, None);
+        assert_eq!(post.preview_url, None);
+        assert_eq!(post.sample_url, None);
+        assert_eq!(post.sample_height, None);
+        assert_eq!(post.sample_width, None);
+        assert_eq!(post.status, None);
+        assert_eq!(post.post_locked, None);
+        assert_eq!(post.has_children, None);
+    }
+}
