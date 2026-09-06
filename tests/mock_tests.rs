@@ -355,6 +355,11 @@ mod mock_gelbooru {
             .and(query_param("s", "post"))
             .and(query_param("q", "index"))
             .and(query_param("json", "1"))
+            .and(query_param("pid", "0"))
+            .and(query_param("limit", "10"))
+            .and(query_param("tags", "cat_ears"))
+            .and(query_param("api_key", "test_key"))
+            .and(query_param("user_id", "test_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string(gelbooru_response_json()))
             .mount(&mock_server)
             .await;
@@ -383,6 +388,8 @@ mod mock_gelbooru {
         // Gelbooru returns empty response for unauthorized
         Mock::given(method("GET"))
             .and(path("/index.php"))
+            .and(query_param("api_key", "bad_key"))
+            .and(query_param("user_id", "bad_user"))
             .respond_with(ResponseTemplate::new(401))
             .mount(&mock_server)
             .await;
@@ -410,6 +417,9 @@ mod mock_gelbooru {
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
+            .and(query_param("tags", "nonexistent_tag_xyz"))
+            .and(query_param("api_key", "test_key"))
+            .and(query_param("user_id", "test_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string(empty_response))
             .mount(&mock_server)
             .await;
@@ -448,6 +458,11 @@ mod mock_rule34 {
             .and(query_param("s", "post"))
             .and(query_param("q", "index"))
             .and(query_param("json", "1"))
+            .and(query_param("pid", "0"))
+            .and(query_param("limit", "10"))
+            .and(query_param("tags", "1girl"))
+            .and(query_param("api_key", "test_key"))
+            .and(query_param("user_id", "test_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string(rule34_posts_json()))
             .mount(&mock_server)
             .await;
@@ -478,6 +493,8 @@ mod mock_rule34 {
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
+            .and(query_param("api_key", "bad_key"))
+            .and(query_param("user_id", "bad_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string(error_response))
             .mount(&mock_server)
             .await;
@@ -502,6 +519,9 @@ mod mock_rule34 {
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
+            .and(query_param("tags", "nonexistent_tag_xyz"))
+            .and(query_param("api_key", "test_key"))
+            .and(query_param("user_id", "test_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
             .mount(&mock_server)
             .await;
@@ -525,6 +545,8 @@ mod mock_rule34 {
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
+            .and(query_param("api_key", "test_key"))
+            .and(query_param("user_id", "test_user"))
             .respond_with(ResponseTemplate::new(200).set_body_string(rule34_posts_json()))
             .mount(&mock_server)
             .await;
