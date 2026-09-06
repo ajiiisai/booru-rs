@@ -396,9 +396,10 @@ impl Downloader {
         }
 
         let semaphore = Arc::new(Semaphore::new(concurrency));
-        let mut handles = Vec::with_capacity(posts.len());
+        let mut tasks: tokio::task::JoinSet<Result<(usize, DownloadResult)>> =
+            tokio::task::JoinSet::new();
 
-        for post in posts {
+        for (index, post) in posts.iter().enumerate() {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let url = post.file_url().map(|s| s.to_string());
             let id = post.id();
@@ -408,7 +409,7 @@ impl Downloader {
             let options = self.options.clone();
             let timeout = self.timeout;
 
-            handles.push(tokio::spawn(async move {
+            tasks.spawn(async move {
                 let _permit = permit;
 
                 let url = url.ok_or_else(|| BooruError::MissingMediaUrl(id))?;
@@ -418,11 +419,14 @@ impl Downloader {
 
                 if dest_path.exists() && !options.overwrite {
                     let metadata = tokio::fs::metadata(&dest_path).await?;
-                    return Ok(DownloadResult {
-                        path: dest_path,
-                        size: metadata.len(),
-                        skipped: true,
-                    });
+                    return Ok((
+                        index,
+                        DownloadResult {
+                            path: dest_path,
+                            size: metadata.len(),
+                            skipped: true,
+                        },
+                    ));
                 }
 
                 tokio::fs::create_dir_all(&dest).await?;
@@ -440,23 +444,40 @@ impl Downloader {
 
                 let size = stream_response_to_file(response, &dest_path, None, None).await?;
 
-                Ok(DownloadResult {
-                    path: dest_path,
-                    size,
-                    skipped: false,
-                })
-            }));
+                Ok((
+                    index,
+                    DownloadResult {
+                        path: dest_path,
+                        size,
+                        skipped: false,
+                    },
+                ))
+            });
         }
 
-        let mut results = Vec::with_capacity(handles.len());
-        for handle in handles {
-            results.push(
-                handle
-                    .await
-                    .unwrap_or_else(|e| Err(BooruError::DownloadTaskFailed(e.to_string()))),
-            );
+        let mut results: Vec<Option<Result<DownloadResult>>> =
+            (0..posts.len()).map(|_| None).collect();
+        while let Some(result) = tasks.join_next().await {
+            match result {
+                Ok(Ok((index, result))) => results[index] = Some(Ok(result)),
+                Ok(Err(error)) => {
+                    if let Some(index) = results.iter().position(Option::is_none) {
+                        results[index] =
+                            Some(Err(BooruError::DownloadTaskFailed(error.to_string())));
+                    }
+                }
+                Err(error) => {
+                    if let Some(index) = results.iter().position(Option::is_none) {
+                        results[index] =
+                            Some(Err(BooruError::DownloadTaskFailed(error.to_string())));
+                    }
+                }
+            }
         }
         results
+            .into_iter()
+            .map(|result| result.expect("every download task must return a result"))
+            .collect()
     }
 
     fn generate_filename(&self, post: &impl Post, url: &str) -> String {
@@ -649,5 +670,66 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(error, BooruError::MissingMediaUrl(42)));
+    }
+
+    #[tokio::test]
+    async fn cancelling_batch_aborts_in_flight_downloads() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct TestPost(String);
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                1
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.0)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![1, 2, 3])
+                    .set_delay(std::time::Duration::from_millis(200)),
+            )
+            .mount(&server)
+            .await;
+
+        let dest =
+            std::env::temp_dir().join(format!("booru-rs-download-cancel-{}", std::process::id()));
+        let _ = tokio::fs::remove_dir_all(&dest).await;
+        let post = TestPost(format!("{}/image.jpg", server.uri()));
+        let downloader = Downloader::new();
+        let task_dest = dest.clone();
+        let task =
+            tokio::spawn(async move { downloader.download_posts(&[post], &task_dest, 1).await });
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        task.abort();
+        let _ = task.await;
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        assert!(!dest.join("1.jpg").exists());
+        let _ = tokio::fs::remove_dir_all(dest).await;
     }
 }
