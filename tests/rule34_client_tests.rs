@@ -232,6 +232,26 @@ async fn page_returns_continuation_until_empty() {
 }
 
 #[tokio::test]
+async fn last_page_has_no_wrapping_continuation() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("pid", u32::MAX.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1])))
+        .mount(&mock_server)
+        .await;
+
+    let page = test_client(&mock_server)
+        .search()
+        .start_page(u32::MAX)
+        .page()
+        .await
+        .unwrap();
+
+    assert!(page.next.is_none());
+}
+
+#[tokio::test]
 async fn posts_stream_preserves_order() {
     let mock_server = MockServer::start().await;
     mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;

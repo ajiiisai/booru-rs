@@ -325,13 +325,15 @@ impl Search {
 
     pub async fn page(self) -> Result<Page> {
         let posts = self.fetch().await?;
-        let next = if posts.is_empty() {
-            None
-        } else {
-            let mut next = self.clone();
-            next.page = self.page.saturating_add(1);
-            Some(next)
-        };
+        let next = self
+            .page
+            .checked_add(1)
+            .filter(|_| !posts.is_empty())
+            .map(|page| {
+                let mut next = self.clone();
+                next.page = page;
+                next
+            });
         Ok(Page { posts, next })
     }
 
