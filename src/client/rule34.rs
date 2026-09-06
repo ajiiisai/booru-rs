@@ -5,11 +5,13 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use serde::Deserialize;
 
-use super::ensure_success;
+use super::{RequestPolicy, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::rule34::*;
+use crate::ratelimit::RateLimiter;
+use crate::retry::RetryConfig;
 
 fn decode_posts(text: &str) -> Result<Vec<Rule34Post>> {
     match serde_json::from_str(text) {
@@ -51,6 +53,7 @@ pub struct Client {
     endpoint: String,
     key: Option<String>,
     user: Option<String>,
+    policy: RequestPolicy,
 }
 
 impl Client {
@@ -73,6 +76,7 @@ impl Client {
             endpoint: DEFAULT_ENDPOINT.to_string(),
             key: None,
             user: None,
+            policy: RequestPolicy::default(),
         })
     }
 
@@ -93,27 +97,30 @@ impl Client {
     }
 
     pub async fn post(&self, id: u32) -> Result<Rule34Post> {
-        let response = self
-            .http
-            .get(super::dapi_url(&self.endpoint))
-            .query(&super::dapi_query(
-                &[("id", id.to_string())],
-                super::dapi_credentials(&self.key, &self.user),
-            ))
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
+        let response = match execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(super::dapi_url(&self.endpoint))
+                .query(&super::dapi_query(
+                    &[("id", id.to_string())],
+                    super::dapi_credentials(&self.key, &self.user),
+                ))
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(BooruError::HttpStatus { status: 401, .. }) => {
+                return Err(BooruError::Unauthorized(
+                    "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
+                ));
+            }
+            Err(BooruError::HttpStatus { status: 404, .. }) => {
+                return Err(BooruError::PostNotFound(id));
+            }
+            Err(error) => return Err(error),
+        };
 
         let text = response.text().await?;
         let posts = decode_posts(&text)?;
@@ -121,18 +128,24 @@ impl Client {
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let response = self
-            .http
-            .get(format!("{}/autocomplete.php", self.endpoint))
-            .query(&[("q", query)])
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 autocomplete request failed".into(),
-            ));
-        }
+        let response = match execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/autocomplete.php", self.endpoint))
+                .query(&[("q", query)])
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(BooruError::HttpStatus { status: 401, .. }) => {
+                return Err(BooruError::Unauthorized(
+                    "Rule34 autocomplete request failed".into(),
+                ));
+            }
+            Err(error) => return Err(error),
+        };
 
         let items: Vec<Rule34AutocompleteItem> = response.json().await?;
 
@@ -332,20 +345,25 @@ impl Search {
             super::dapi_credentials(&self.client.key, &self.client.user),
         );
 
-        let response = self
-            .client
-            .http
-            .get(super::dapi_url(&self.client.endpoint))
-            .query(&query)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-        let response = ensure_success(response).await?;
+        let response = match execute_with_policy(&self.client.policy, || async {
+            Ok(self
+                .client
+                .http
+                .get(super::dapi_url(&self.client.endpoint))
+                .query(&query)
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(BooruError::HttpStatus { status: 401, .. }) => {
+                return Err(BooruError::Unauthorized(
+                    "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
+                ));
+            }
+            Err(error) => return Err(error),
+        };
 
         let text = response.text().await?;
         if text.is_empty() || text == "[]" {
@@ -484,6 +502,7 @@ pub struct ClientBuilder {
     endpoint: Option<String>,
     key: Option<String>,
     user: Option<String>,
+    policy: Option<RequestPolicy>,
 }
 
 impl ClientBuilder {
@@ -506,6 +525,28 @@ impl ClientBuilder {
         self
     }
 
+    /// Sets the request retry and rate-limit policy.
+    #[must_use]
+    pub fn request_policy(mut self, policy: RequestPolicy) -> Self {
+        self.policy = Some(policy);
+        self
+    }
+
+    /// Sets the retry configuration for requests made by this client.
+    pub fn retry_config(mut self, config: RetryConfig) -> Result<Self> {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_retry_config(config)?);
+        Ok(self)
+    }
+
+    /// Sets the rate limiter for requests made by this client.
+    #[must_use]
+    pub fn rate_limiter(mut self, limiter: RateLimiter) -> Self {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_rate_limiter(limiter));
+        self
+    }
+
     pub fn build(self) -> Result<Client> {
         Ok(Client {
             http: self.http.unwrap_or_else(|| super::shared_client().clone()),
@@ -514,6 +555,7 @@ impl ClientBuilder {
                 .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
             key: self.key,
             user: self.user,
+            policy: self.policy.unwrap_or_default(),
         })
     }
 }
