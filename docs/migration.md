@@ -120,6 +120,21 @@ async fn first_page<C: ProviderClient>(client: &C, query: C::Query) -> booru_rs:
 External adapters can implement this trait with their own configuration; they
 do not need access to provider client internals.
 
+## Handle cache errors
+
+Cache writes and reads now return a `Result`. Propagate `CacheError::Serialize`
+when a value cannot be encoded and `CacheError::Deserialize` when stored bytes
+cannot be decoded as the requested type. A missing or expired entry remains a
+successful `Ok(None)` result:
+
+```rust
+use booru_rs::cache::{Cache, CacheConfig};
+
+let cache: Cache<String> = Cache::with_config(CacheConfig::default());
+cache.insert("search".to_string(), &vec![1, 2, 3]).await?;
+let cached: Option<Vec<i32>> = cache.get(&"search".to_string()).await?;
+```
+
 ## Fetch posts, autocomplete, and pages
 
 Use `post(id)` instead of the old `get_by_id` operation:

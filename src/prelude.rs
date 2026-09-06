@@ -44,7 +44,7 @@ pub use crate::retry::RetryConfig;
 pub use crate::ratelimit::RateLimiter;
 
 // Caching
-pub use crate::cache::{Cache, CacheConfig, CacheKey, CacheOperation};
+pub use crate::cache::{Cache, CacheConfig, CacheError, CacheKey, CacheOperation};
 
 // Tag validation
 pub use crate::validation::{TagValidation, TagWarning, validate_tag};

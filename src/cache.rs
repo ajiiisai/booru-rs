@@ -9,7 +9,7 @@
 //! use booru_rs::cache::{Cache, CacheConfig};
 //! use std::time::Duration;
 //!
-//! # async fn example() {
+//! # async fn example() -> Result<(), booru_rs::cache::CacheError> {
 //! // Create a cache with 5-minute TTL and 1000 max entries
 //! let cache: Cache<String> = Cache::with_config(CacheConfig {
 //!     ttl: Duration::from_secs(300),
@@ -18,13 +18,14 @@
 //!
 //! // Check cache before making request
 //! let key = "danbooru:cat_ears:limit=10".to_string();
-//! if let Some(cached) = cache.get::<Vec<u32>>(&key).await {
+//! if let Some(cached) = cache.get::<Vec<u32>>(&key).await? {
 //!     println!("Cache hit!");
 //! } else {
 //!     // Make request and cache result
 //!     let result = vec![1, 2, 3];
-//!     cache.insert(key, &result).await;
+//!     cache.insert(key, &result).await?;
 //! }
+//! # Ok(())
 //! # }
 //! ```
 
@@ -44,6 +45,18 @@ pub struct CacheConfig {
     pub ttl: Duration,
     /// Maximum number of entries in the cache.
     pub max_entries: usize,
+}
+
+/// Errors returned while serializing or decoding cached values.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum CacheError {
+    /// A value could not be serialized for storage.
+    #[error("failed to serialize cache value: {0}")]
+    Serialize(#[source] serde_json::Error),
+    /// Stored bytes could not be decoded as the requested type.
+    #[error("failed to deserialize cache value: {0}")]
+    Deserialize(#[source] serde_json::Error),
 }
 
 /// The operation represented by a cache entry.
@@ -203,17 +216,18 @@ impl CacheEntry {
 /// ```no_run
 /// use booru_rs::cache::{Cache, CacheConfig};
 ///
-/// # async fn example() {
+/// # async fn example() -> Result<(), booru_rs::cache::CacheError> {
 /// let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
 ///
 /// // Cache a search result
 /// let posts = vec!["post1".to_string(), "post2".to_string()];
-/// cache.insert("my_search".to_string(), &posts).await;
+/// cache.insert("my_search".to_string(), &posts).await?;
 ///
 /// // Retrieve later
-/// if let Some(cached) = cache.get::<Vec<String>>(&"my_search".to_string()).await {
+/// if let Some(cached) = cache.get::<Vec<String>>(&"my_search".to_string()).await? {
 ///     println!("Got {} posts from cache", cached.len());
 /// }
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Clone)]
@@ -246,20 +260,18 @@ where
 
     /// Inserts a value into the cache.
     ///
-    /// The value must be serializable. If the cache is full, the least
-    /// recently accessed entry will be evicted.
-    pub async fn insert<V>(&self, key: K, value: &V)
+    /// The value must be serializable. Serialization failures are returned as
+    /// [`CacheError::Serialize`]. If the cache is full, the least recently
+    /// accessed entry will be evicted.
+    pub async fn insert<V>(&self, key: K, value: &V) -> Result<(), CacheError>
     where
         V: Serialize,
     {
         if self.config.max_entries == 0 {
-            return;
+            return Ok(());
         }
 
-        let data = match serde_json::to_vec(value) {
-            Ok(d) => d,
-            Err(_) => return,
-        };
+        let data = serde_json::to_vec(value).map_err(CacheError::Serialize)?;
 
         let entry = CacheEntry {
             data,
@@ -275,30 +287,35 @@ where
         }
 
         entries.insert(key, entry);
+        Ok(())
     }
 
     /// Retrieves a value from the cache.
     ///
-    /// Returns `None` if the key doesn't exist or the entry has expired.
-    pub async fn get<V>(&self, key: &K) -> Option<V>
+    /// Returns `Ok(None)` if the key doesn't exist or the entry has expired.
+    /// A value that cannot be decoded as `V` is returned as
+    /// [`CacheError::Deserialize`].
+    pub async fn get<V>(&self, key: &K) -> Result<Option<V>, CacheError>
     where
         V: for<'de> Deserialize<'de>,
     {
         let data = {
             let entries = self.entries.read().await;
-            let entry = entries.get(key)?;
+            let Some(entry) = entries.get(key) else {
+                return Ok(None);
+            };
             if entry.is_expired() {
                 drop(entries);
                 let mut entries = self.entries.write().await;
                 if entries.get(key).is_some_and(CacheEntry::is_expired) {
                     entries.remove(key);
                 }
-                return None;
+                return Ok(None);
             }
             entry.data.clone()
         };
 
-        let value = serde_json::from_slice(&data).ok()?;
+        let value = serde_json::from_slice(&data).map_err(CacheError::Deserialize)?;
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key)
             && !entry.is_expired()
@@ -306,7 +323,7 @@ where
         {
             entry.last_accessed = Instant::now();
         }
-        Some(value)
+        Ok(Some(value))
     }
 
     /// Removes an entry from the cache.
@@ -416,10 +433,39 @@ mod tests {
         let cache = Cache::<String>::with_config(CacheConfig::long_lived());
         let value = vec![1, 2, 3];
 
-        cache.insert("test".to_string(), &value).await;
+        cache.insert("test".to_string(), &value).await.unwrap();
 
-        let retrieved: Option<Vec<i32>> = cache.get(&"test".to_string()).await;
+        let retrieved: Option<Vec<i32>> = cache.get(&"test".to_string()).await.unwrap();
         assert_eq!(retrieved, Some(value));
+    }
+
+    struct FailsSerialize;
+
+    impl Serialize for FailsSerialize {
+        fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            Err(serde::ser::Error::custom(
+                "intentional serialization failure",
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn cache_reports_serialization_and_type_errors() {
+        let cache = Cache::<String>::with_config(CacheConfig::long_lived());
+
+        assert!(matches!(
+            cache.insert("bad".to_string(), &FailsSerialize).await,
+            Err(CacheError::Serialize(_))
+        ));
+
+        cache.insert("value".to_string(), &"text").await.unwrap();
+        assert!(matches!(
+            cache.get::<u32>(&"value".to_string()).await,
+            Err(CacheError::Deserialize(_))
+        ));
     }
 
     #[tokio::test]
@@ -429,7 +475,7 @@ mod tests {
             max_entries: 100,
         });
 
-        cache.insert("test".to_string(), &"value").await;
+        cache.insert("test".to_string(), &"value").await.unwrap();
 
         // Should exist immediately
         assert!(cache.contains_key(&"test".to_string()).await);
@@ -438,7 +484,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         // Should be expired
-        let result: Option<String> = cache.get(&"test".to_string()).await;
+        let result: Option<String> = cache.get(&"test".to_string()).await.unwrap();
         assert!(result.is_none());
     }
 
@@ -449,14 +495,14 @@ mod tests {
             max_entries: 2,
         });
 
-        cache.insert("a".to_string(), &1).await;
-        cache.insert("b".to_string(), &2).await;
+        cache.insert("a".to_string(), &1).await.unwrap();
+        cache.insert("b".to_string(), &2).await.unwrap();
 
         // Access "a" to make it more recently used
-        let _: Option<i32> = cache.get(&"a".to_string()).await;
+        let _: Option<i32> = cache.get(&"a".to_string()).await.unwrap();
 
         // Insert "c", which should evict "b" (LRU)
-        cache.insert("c".to_string(), &3).await;
+        cache.insert("c".to_string(), &3).await.unwrap();
 
         assert!(cache.contains_key(&"a".to_string()).await);
         assert!(!cache.contains_key(&"b".to_string()).await);
@@ -470,10 +516,10 @@ mod tests {
             max_entries: 0,
         });
 
-        cache.insert("key".to_string(), &"value").await;
+        cache.insert("key".to_string(), &"value").await.unwrap();
 
         assert!(cache.is_empty().await);
-        let value: Option<String> = cache.get(&"key".to_string()).await;
+        let value: Option<String> = cache.get(&"key".to_string()).await.unwrap();
         assert_eq!(value, None);
     }
 
@@ -481,7 +527,7 @@ mod tests {
     async fn default_cache_is_disabled() {
         let cache = Cache::<String>::new();
 
-        cache.insert("key".to_string(), &"value").await;
+        cache.insert("key".to_string(), &"value").await.unwrap();
 
         assert!(cache.is_empty().await);
     }
