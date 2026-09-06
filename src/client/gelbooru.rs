@@ -5,153 +5,11 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use serde::Deserialize;
 
-use super::{Client as ClientTrait, ensure_success};
-use crate::autocomplete::{Autocomplete, TagSuggestion};
+use super::ensure_success;
+use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::gelbooru::*;
-
-/// Client for interacting with the Gelbooru API.
-///
-/// Gelbooru has no tag limit for queries.
-///
-/// # Authentication
-///
-/// Gelbooru **requires API credentials** for API access. You can obtain your
-/// API key and user ID from your [Gelbooru account settings](https://gelbooru.com/index.php?page=account&s=options).
-///
-/// ```no_run
-/// use booru_rs::gelbooru::{GelbooruClient, GelbooruRating};
-/// use booru_rs::client::Client;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let posts = GelbooruClient::builder()
-///     .set_credentials("your_api_key", "your_user_id")
-///     .tag("cat_ears")?
-///     .rating(GelbooruRating::General)
-///     .limit(10)
-///     .build()
-///     .get()
-///     .await?;
-///
-/// println!("Found {} posts", posts.len());
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Without credentials, requests will fail with [`BooruError::Unauthorized`].
-///
-/// [`BooruError::Unauthorized`]: crate::error::BooruError::Unauthorized
-#[derive(Debug)]
-pub struct GelbooruClient(super::ClientBuilder<Self>);
-
-impl From<super::ClientBuilder<Self>> for GelbooruClient {
-    fn from(value: super::ClientBuilder<Self>) -> Self {
-        Self(value)
-    }
-}
-
-impl ClientTrait for GelbooruClient {
-    type Post = GelbooruPost;
-    type Rating = GelbooruRating;
-
-    const URL: &'static str = "https://gelbooru.com";
-    const SORT: &'static str = "sort:";
-    const MAX_TAGS: Option<usize> = None;
-
-    /// # Errors
-    ///
-    /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
-    /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
-    /// Returns other errors if the request fails or the response cannot be parsed.
-    async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
-        let builder = &self.0;
-        let url = &builder.url;
-
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("id", id.to_string()),
-            ("json", "1".to_string()),
-        ];
-
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/index.php"))
-            .query(&query)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Gelbooru requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
-
-        let data = response.json::<GelbooruResponse>().await?;
-
-        data.posts
-            .into_iter()
-            .next()
-            .ok_or(BooruError::PostNotFound(id))
-    }
-
-    /// # Errors
-    ///
-    /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
-    /// Returns other errors if the request fails or if the response cannot be parsed.
-    async fn get(&self) -> Result<Vec<Self::Post>> {
-        let builder = &self.0;
-        let url = &builder.url;
-        let tag_string = builder.tags.join(" ");
-
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("pid", builder.page.to_string()),
-            ("limit", builder.limit.to_string()),
-            ("tags", tag_string),
-            ("json", "1".to_string()),
-        ];
-
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/index.php"))
-            .query(&query)
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Gelbooru requires API credentials. Use set_credentials(api_key, user_id)".into(),
-            ));
-        }
-
-        let response = ensure_success(response).await?;
-
-        let data = response.json::<GelbooruResponse>().await?;
-
-        Ok(data.posts)
-    }
-}
 
 #[derive(Debug, Deserialize)]
 struct GelbooruAutocompleteItem {
@@ -162,59 +20,6 @@ struct GelbooruAutocompleteItem {
     /// The API sends this as a string or a number.
     #[serde(default)]
     post_count: Option<serde_json::Value>,
-}
-
-impl Autocomplete for GelbooruClient {
-    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let builder = &self.0;
-        let url = format!("{}/index.php", builder.url);
-
-        let response = builder
-            .client
-            .get(&url)
-            .query(&[
-                ("page", "autocomplete2"),
-                ("term", query),
-                ("type", "tag_query"),
-                ("limit", &limit.to_string()),
-            ])
-            .send()
-            .await?;
-
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(BooruError::Unauthorized(
-                "Gelbooru requires API credentials for some endpoints".into(),
-            ));
-        }
-
-        let items: Vec<GelbooruAutocompleteItem> = response.json().await?;
-
-        Ok(items
-            .into_iter()
-            .take(limit as usize)
-            .map(|item| {
-                let post_count = item
-                    .post_count
-                    .and_then(|count| match count {
-                        serde_json::Value::Number(number) => {
-                            number.as_u64().and_then(|n| u32::try_from(n).ok())
-                        }
-                        serde_json::Value::String(text) => text.parse().ok(),
-                        _ => None,
-                    })
-                    .or_else(|| parse_post_count_from_label(&item.label));
-
-                let category = item.category.as_deref().and_then(parse_category);
-
-                TagSuggestion {
-                    name: item.value,
-                    label: item.label,
-                    post_count,
-                    category,
-                }
-            })
-            .collect())
-    }
 }
 
 fn parse_category(cat: &str) -> Option<u8> {
@@ -239,7 +44,8 @@ fn parse_post_count_from_label(label: &str) -> Option<u32> {
     }
 }
 
-const DEFAULT_ENDPOINT: &str = <GelbooruClient as ClientTrait>::URL;
+const DEFAULT_ENDPOINT: &str = "https://gelbooru.com";
+const SORT_PREFIX: &str = "sort:";
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -436,8 +242,7 @@ impl Query {
     }
 
     pub fn random(mut self) -> Self {
-        self.tags
-            .push(format!("{}random", <GelbooruClient as ClientTrait>::SORT));
+        self.tags.push(format!("{SORT_PREFIX}random"));
         self
     }
 
@@ -544,7 +349,7 @@ impl Search {
             tags.push(format!("rating:{rating}"));
         }
         if let Some(sort) = &self.query.sort {
-            tags.push(format!("{}{sort}", <GelbooruClient as ClientTrait>::SORT));
+            tags.push(format!("{SORT_PREFIX}{sort}"));
         }
         let tags = tags.join(" ");
 

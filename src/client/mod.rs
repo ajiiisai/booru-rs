@@ -5,19 +5,20 @@
 //!
 //! # Available Clients
 //!
-//! - [`GelbooruClient`] for gelbooru.com, unlimited tags
 //! - [`Rule34Client`] for api.rule34.xxx, unlimited tags
 //!
 //! # Example
 //!
 //! ```no_run
 //! use booru_rs::prelude::*;
+//! use booru_rs::rule34::Rule34Client;
 //!
 //! # async fn example() -> Result<()> {
 //! // Using the builder pattern
-//! let posts = GelbooruClient::builder()
-//!     .tags(["cat_ears", "blue_eyes"])?
-//!     .rating(GelbooruRating::General)
+//! let posts = Rule34Client::builder()
+//!     .set_credentials("your_api_key", "your_user_id")
+//!     .tag("cat_ears")?
+//!     .rating(Rule34Rating::Safe)
 //!     .sort(Sort::Score)
 //!     .limit(10)
 //!     .build()
@@ -265,11 +266,11 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::gelbooru::GelbooruClient;
+    /// use booru_rs::rule34::Rule34Client;
     /// use booru_rs::client::Client;
     ///
     /// # fn example() -> booru_rs::error::Result<()> {
-    /// let client = GelbooruClient::builder()
+    /// let client = Rule34Client::builder()
     ///     .tag("cat_ears")?
     ///     .tag("blue_eyes")?
     ///     .build();
@@ -296,11 +297,11 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::gelbooru::{GelbooruClient, GelbooruRating};
+    /// use booru_rs::rule34::{Rule34Client, Rule34Rating};
     /// use booru_rs::client::Client;
     ///
-    /// let client = GelbooruClient::builder()
-    ///     .rating(GelbooruRating::General)
+    /// let client = Rule34Client::builder()
+    ///     .rating(Rule34Rating::Safe)
     ///     .build();
     /// ```
     #[must_use]
@@ -353,9 +354,10 @@ impl<T: Client> ClientBuilder<T> {
     ///
     /// ```no_run
     /// use booru_rs::prelude::*;
+    /// use booru_rs::rule34::Rule34Client;
     ///
     /// # fn example() -> Result<()> {
-    /// let client = GelbooruClient::builder()
+    /// let client = Rule34Client::builder()
     ///     .tags(["cat_ears", "blue_eyes", "1girl"])?
     ///     .build();
     /// # Ok(())
@@ -376,9 +378,10 @@ impl<T: Client> ClientBuilder<T> {
     ///
     /// ```no_run
     /// use booru_rs::prelude::*;
+    /// use booru_rs::rule34::Rule34Client;
     ///
     /// # fn example() -> Result<()> {
-    /// let client = GelbooruClient::builder()
+    /// let client = Rule34Client::builder()
     ///     .tag("cat_ears")?
     ///     .blacklist_tags(["ugly", "low_quality"])
     ///     .build();
@@ -419,7 +422,5 @@ impl<T: Client> Default for ClientBuilder<T> {
     }
 }
 
-#[cfg(feature = "gelbooru")]
-pub use gelbooru::GelbooruClient;
 #[cfg(feature = "rule34")]
 pub use rule34::Rule34Client;

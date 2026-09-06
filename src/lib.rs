@@ -50,7 +50,7 @@
 //! | Site | Client | Tag Limit | Auth Required |
 //! |------|--------|-----------|---------------|
 //! | [Danbooru](https://danbooru.donmai.us) | `danbooru::Client` | 2 | No |
-//! | [Gelbooru](https://gelbooru.com) | [`GelbooruClient`] | Unlimited | Yes |
+//! | [Gelbooru](https://gelbooru.com) | `gelbooru::Client` | Unlimited | Yes |
 //! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
 //! | [Rule34](https://rule34.xxx) | [`Rule34Client`] | Unlimited | Yes |
 //!
@@ -106,8 +106,6 @@ pub mod validation;
 pub use autocomplete::{Autocomplete, TagSuggestion};
 pub use client::Client;
 pub use client::ClientBuilder;
-#[cfg(feature = "gelbooru")]
-pub use client::GelbooruClient;
 #[cfg(feature = "rule34")]
 pub use client::Rule34Client;
 pub use client::generic::Sort;

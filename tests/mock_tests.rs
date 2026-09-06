@@ -324,11 +324,12 @@ mod mock_autocomplete {
             .mount(&mock_server)
             .await;
 
-        let client = GelbooruClient::builder()
+        let client = booru_rs::gelbooru::Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
             .set_credentials("test_key", "test_user")
-            .build();
+            .build()
+            .unwrap();
 
         let suggestions = client
             .autocomplete("cat_", 2)
