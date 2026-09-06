@@ -7,7 +7,6 @@
 //! - Running fast, reliable tests in CI
 //! - Testing without API credentials
 
-use booru_rs::client::Client;
 use booru_rs::error::BooruError;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -77,205 +76,8 @@ mod mock_post_trait {
     }
 }
 
-#[cfg(feature = "rule34")]
-mod mock_rule34 {
-    use super::*;
-    use booru_rs::prelude::*;
-
-    /// Test fixture for Rule34 posts (same format as Safebooru)
-    fn rule34_posts_json() -> &'static str {
-        include_str!("fixtures/rule34/posts.json")
-    }
-
-    #[tokio::test]
-    async fn test_get_posts_success() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("page", "dapi"))
-            .and(query_param("s", "post"))
-            .and(query_param("q", "index"))
-            .and(query_param("json", "1"))
-            .and(query_param("pid", "0"))
-            .and(query_param("limit", "10"))
-            .and(query_param("tags", "1girl"))
-            .and(query_param("api_key", "test_key"))
-            .and(query_param("user_id", "test_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(rule34_posts_json()))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("test_key", "test_user")
-            .tag("1girl")
-            .unwrap()
-            .limit(10)
-            .build();
-
-        let posts = client.get().await;
-
-        assert!(posts.is_ok());
-        let posts = posts.unwrap();
-        assert_eq!(posts.len(), 1);
-        assert_eq!(posts[0].id, 15000000);
-        assert_eq!(posts[0].hash, "rule34hash123");
-    }
-
-    #[tokio::test]
-    async fn test_unauthorized_error() {
-        let mock_server = MockServer::start().await;
-
-        // Rule34 returns "Missing authentication" text for unauthorized
-        let error_response =
-            r#""Missing authentication. Go to api.rule34.xxx for more information""#;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("api_key", "bad_key"))
-            .and(query_param("user_id", "bad_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(error_response))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("bad_key", "bad_user")
-            .build();
-
-        let result = client.get().await;
-
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            BooruError::Unauthorized { .. }
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_empty_response() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("tags", "nonexistent_tag_xyz"))
-            .and(query_param("api_key", "test_key"))
-            .and(query_param("user_id", "test_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("test_key", "test_user")
-            .tag("nonexistent_tag_xyz")
-            .unwrap()
-            .build();
-
-        let posts = client.get().await;
-
-        assert!(posts.is_ok());
-        assert!(posts.unwrap().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_post_trait_methods() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("api_key", "test_key"))
-            .and(query_param("user_id", "test_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(rule34_posts_json()))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("test_key", "test_user")
-            .build();
-
-        let posts = client.get().await.unwrap();
-        let post = &posts[0];
-
-        use booru_rs::model::Post;
-        assert_eq!(post.id(), 15000000);
-        assert_eq!(post.width(), 900);
-        assert_eq!(post.height(), 1200);
-        assert_eq!(
-            post.file_url(),
-            Some("https://example.com/images/3900/rule34hash123.png")
-        );
-        assert_eq!(post.tags(), "1girl blue_hair");
-        assert_eq!(post.score(), Some(75));
-        assert_eq!(post.md5(), Some("rule34hash123"));
-        assert_eq!(post.source(), Some("https://pixiv.net/artworks/789"));
-    }
-
-    #[tokio::test]
-    async fn test_posts_containing_auth_text_decode() {
-        let mock_server = MockServer::start().await;
-
-        let body = r#"[{"id":15000001,"score":1,"width":100,"height":100,"file_url":"https://example.com/a.png","preview_url":"https://example.com/p.png","sample_url":"https://example.com/s.png","tags":"1girl","rating":"safe","source":"artwork about Missing authentication","hash":"abc"}]"#;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("tags", "1girl"))
-            .and(query_param("api_key", "test_key"))
-            .and(query_param("user_id", "test_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(body))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("test_key", "test_user")
-            .tag("1girl")
-            .unwrap()
-            .build();
-
-        let posts = client.get().await.expect("valid posts must decode");
-
-        assert_eq!(posts.len(), 1);
-        assert_eq!(posts[0].id, 15000001);
-    }
-
-    #[tokio::test]
-    async fn test_malformed_body_reports_parse_error() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/index.php"))
-            .and(query_param("api_key", "test_key"))
-            .and(query_param("user_id", "test_user"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("not valid json"))
-            .mount(&mock_server)
-            .await;
-
-        let client = Rule34Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .set_credentials("test_key", "test_user")
-            .build();
-
-        let result = client.get().await;
-
-        let error = result.unwrap_err();
-        assert!(matches!(error, BooruError::Parse(_)));
-        assert!(error.is_parse_error());
-    }
-}
-
 mod mock_autocomplete {
     use super::*;
-    use booru_rs::autocomplete::Autocomplete;
-    use booru_rs::prelude::*;
 
     #[tokio::test]
     async fn test_danbooru_uses_instance_endpoint() {
@@ -386,11 +188,12 @@ mod mock_autocomplete {
             .mount(&mock_server)
             .await;
 
-        let client = Rule34Client::builder()
+        let client = booru_rs::rule34::Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
             .set_credentials("test_key", "test_user")
-            .build();
+            .build()
+            .unwrap();
 
         let suggestions = client
             .autocomplete("cat_", 2)

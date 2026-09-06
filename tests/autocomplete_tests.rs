@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod autocomplete {
-    use booru_rs::autocomplete::{Autocomplete, TagSuggestion};
+    use booru_rs::autocomplete::TagSuggestion;
 
     #[cfg(feature = "danbooru")]
     mod danbooru {
@@ -206,15 +206,14 @@ mod autocomplete {
 
     #[cfg(feature = "rule34")]
     mod rule34 {
-        use super::*;
-        use booru_rs::client::Client;
-        use booru_rs::rule34::Rule34Client;
+        use booru_rs::rule34::Client;
 
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = Rule34Client::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_", 10)
                 .await;
 
@@ -229,8 +228,9 @@ mod autocomplete {
         #[tokio::test]
         #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count() {
-            let suggestions = Rule34Client::builder()
+            let suggestions = Client::builder()
                 .build()
+                .unwrap()
                 .autocomplete("cat_ears", 5)
                 .await;
 

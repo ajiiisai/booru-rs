@@ -22,6 +22,10 @@ fn posts_json(ids: &[u32]) -> String {
     format!("[{}]", items.join(","))
 }
 
+fn posts_fixture() -> &'static str {
+    include_str!("fixtures/rule34/posts.json")
+}
+
 async fn mock_pages(mock_server: &MockServer, pages: &[Vec<u32>]) {
     for (pid, ids) in pages.iter().enumerate() {
         Mock::given(method("GET"))
@@ -327,4 +331,87 @@ async fn sort_keeps_provider_prefix_on_wire() {
         .expect("search must succeed");
 
     assert!(posts.is_empty());
+}
+
+#[tokio::test]
+async fn posts_containing_auth_text_decode() {
+    let mock_server = MockServer::start().await;
+
+    let body = r#"[{"id":15000001,"score":1,"width":100,"height":100,"file_url":"https://example.com/a.png","preview_url":"https://example.com/p.png","sample_url":"https://example.com/s.png","tags":"1girl","rating":"safe","source":"artwork about Missing authentication","hash":"abc"}]"#;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "1girl"))
+        .and(query_param("api_key", "test_key"))
+        .and(query_param("user_id", "test_user"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("1girl")
+        .send()
+        .await
+        .expect("valid posts must decode");
+
+    assert_eq!(posts.len(), 1);
+    assert_eq!(posts[0].id, 15000001);
+}
+
+#[tokio::test]
+async fn malformed_body_reports_parse_error() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("api_key", "test_key"))
+        .and(query_param("user_id", "test_user"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not valid json"))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let result = client.search().send().await;
+
+    let error = result.unwrap_err();
+    assert!(matches!(error, BooruError::Parse(_)));
+    assert!(error.is_parse_error());
+}
+
+#[tokio::test]
+async fn post_trait_methods() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_fixture()))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .set_credentials("test_key", "test_user")
+        .build()
+        .unwrap();
+
+    let posts = client.search().send().await.unwrap();
+    let post = &posts[0];
+
+    use booru_rs::model::Post;
+    assert_eq!(post.id(), 15000000);
+    assert_eq!(post.width(), 900);
+    assert_eq!(post.height(), 1200);
+    assert_eq!(
+        post.file_url(),
+        Some("https://example.com/images/3900/rule34hash123.png")
+    );
+    assert_eq!(post.tags(), "1girl blue_hair");
+    assert_eq!(post.score(), Some(75));
+    assert_eq!(post.md5(), Some("rule34hash123"));
+    assert_eq!(post.source(), Some("https://pixiv.net/artworks/789"));
 }
