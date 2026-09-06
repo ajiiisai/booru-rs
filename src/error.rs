@@ -110,6 +110,12 @@ impl From<reqwest::Error> for BooruError {
 }
 
 impl BooruError {
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "safebooru"
+    ))]
     pub(crate) fn http_status(status: reqwest::StatusCode, body: &str) -> Self {
         const LIMIT: usize = 300;
         let single_line = body.split_whitespace().collect::<Vec<_>>().join(" ");

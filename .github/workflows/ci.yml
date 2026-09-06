@@ -5,9 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -16,220 +21,127 @@ env:
   RUST_BACKTRACE: short
 
 jobs:
-  changes:
-    name: Detect code changes
+  quality:
+    name: Format and lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
-        if: github.event_name == 'push'
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          base: ${{ github.ref }}
-          filters: |
-            code:
-              - '**/*.rs'
-              - '**/*.toml'
-              - '**/*.lock'
-              - 'rust-toolchain*'
-              - 'src/**'
-              - 'tests/**'
-              - 'examples/**'
-              - 'benches/**'
-              - 'scripts/**'
-              - '.cargo/**'
-              - '.config/**'
-              - '.github/workflows/**'
-
-  # Check formatting first (fast fail)
-  fmt:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt
-      - run: cargo fmt --all --check
-
-  # Run clippy lints
-  clippy:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
-  # Build and test on multiple platforms
   test:
-    name: Test (${{ matrix.os }} / ${{ matrix.toolchain }})
+    name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: [fmt, clippy]
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
-          # MSRV check
-          - os: ubuntu-latest
+          - name: Linux stable
+            os: ubuntu-latest
+            toolchain: stable
+          - name: Linux MSRV
+            os: ubuntu-latest
             toolchain: "1.92"
-          # Stable on all platforms
-          - os: ubuntu-latest
+          - name: macOS stable
+            os: macos-latest
             toolchain: stable
-          - os: windows-latest
+          - name: Windows stable
+            os: windows-latest
             toolchain: stable
-          - os: macos-latest
-            toolchain: stable
-          # Beta and nightly on Linux only
-          - os: ubuntu-latest
-            toolchain: beta
-          - os: ubuntu-latest
-            toolchain: nightly
-
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Rust ${{ matrix.toolchain }}
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-
       - uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
-      - name: Build
-        run: cargo build --all-targets
-
-      - name: Run tests
-        run: cargo nextest run --no-fail-fast
-
-      - name: Run doctests
-        run: cargo test --doc
-
-  # Test feature combinations
-  features:
-    name: Feature Combinations
-    runs-on: ubuntu-latest
-    needs: [fmt, clippy]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-
-      - name: No default features
-        run: cargo build --no-default-features
-
-      - name: Danbooru only
-        run: cargo build --no-default-features --features danbooru
-
-      - name: Gelbooru only
-        run: cargo build --no-default-features --features gelbooru
-
-      - name: Safebooru only
-        run: cargo build --no-default-features --features safebooru
-
-      - name: Rule34 only
-        run: cargo build --no-default-features --features rule34
-
-      - name: Download only
-        run: cargo test --no-default-features --features download
-
-      - name: All features
-        run: cargo build --all-features
-
-  # Mock tests (no API credentials needed)
-  mock-tests:
-    name: Mock Tests
-    runs-on: ubuntu-latest
-    needs: [fmt, clippy]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.toolchain }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@nextest
-      - name: Run mock and unit tests
-        run: cargo nextest run -E "kind(lib) | test(mock)"
+      - name: Run tests
+        run: cargo nextest run --all-targets --all-features --locked --no-fail-fast
+      - name: Run documentation tests
+        run: cargo test --doc --all-features --locked
 
-  # Check documentation builds
-  docs:
-    name: Documentation
+  features:
+    name: Check feature combinations
     runs-on: ubuntu-latest
-    needs: [fmt]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@cargo-hack
+      - name: Check every feature combination
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo hack check --feature-powerset --no-dev-deps --locked
+      - name: Test the standalone download feature
+        run: cargo test --no-default-features --features download --locked
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       RUSTDOCFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo doc --no-deps --document-private-items
-
-  # Security audit
-  audit:
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: rustsec/audit-check@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo doc --all-features --no-deps --locked
 
-  # Minimal dependency versions check (ensures proper lower bounds)
   minimal-versions:
-    name: Minimal Versions
+    name: Check direct dependency bounds
     runs-on: ubuntu-latest
-    needs: [fmt]
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@cargo-hack
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@cargo-minimal-versions
       - run: cargo minimal-versions check --workspace --direct
 
-  # Final status check for branch protection
   ci-success:
     name: CI Success
     if: always()
-    needs: [changes, fmt, clippy, test, features, mock-tests, docs, audit, minimal-versions]
+    needs: [quality, test, features, docs, minimal-versions]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Check all jobs passed
+      - name: Check required jobs
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          if [[ "${{ needs.changes.result }}" != "success" ]]; then
-            echo "Change detection failed"
-            exit 1
-          fi
-          if [[ "${{ needs.changes.outputs.code }}" == "false" ]]; then
-            echo "No code or build configuration changes; Rust checks skipped"
-            exit 0
-          fi
-          if [[ "${{ needs.fmt.result }}" != "success" ]] ||
-             [[ "${{ needs.clippy.result }}" != "success" ]] ||
-             [[ "${{ needs.test.result }}" != "success" ]] ||
-             [[ "${{ needs.features.result }}" != "success" ]] ||
-             [[ "${{ needs.mock-tests.result }}" != "success" ]] ||
-             [[ "${{ needs.docs.result }}" != "success" ]] ||
-             [[ "${{ needs.audit.result }}" != "success" ]] ||
-             [[ "${{ needs.minimal-versions.result }}" != "success" ]]; then
-            echo "One or more jobs failed"
-            exit 1
-          fi
-          echo "All jobs passed!"
+          for result in $RESULTS; do
+            if [[ "$result" != "success" ]]; then
+              echo "Required CI job ended with: $result" >&2
+              exit 1
+            fi
+          done

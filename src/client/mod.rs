@@ -56,14 +56,36 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-use crate::error::{BooruError, Result};
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+use crate::error::BooruError;
+use crate::error::Result;
 use crate::ratelimit::RateLimiter;
-use crate::retry::{RetryConfig, is_retryable};
+use crate::retry::RetryConfig;
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+use crate::retry::is_retryable;
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 use reqwest::header::HeaderMap;
 
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 #[derive(Clone, Default)]
 pub(crate) struct Secret(String);
 
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 impl Secret {
     pub(crate) fn new(value: impl Into<String>) -> Self {
         Self(value.into())
@@ -74,6 +96,7 @@ impl Secret {
     }
 }
 
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 impl std::fmt::Debug for Secret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("[REDACTED]")
@@ -107,6 +130,12 @@ pub fn shared_client() -> &'static reqwest::Client {
     &SHARED_CLIENT
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
     let trimmed = url.trim_end_matches('/');
     let parsed =
@@ -117,10 +146,12 @@ pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
     Ok(trimmed.to_string())
 }
 
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
 pub(crate) fn dapi_url(endpoint: &str) -> String {
     format!("{endpoint}/index.php")
 }
 
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
 pub(crate) fn dapi_credentials<'a>(
     key: &'a Option<Secret>,
     user: &'a Option<Secret>,
@@ -131,6 +162,7 @@ pub(crate) fn dapi_credentials<'a>(
     }
 }
 
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
 pub(crate) fn dapi_query(
     params: &[(&'static str, String)],
     credentials: Option<(&Secret, &Secret)>,
@@ -151,6 +183,12 @@ pub(crate) fn dapi_query(
     query
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     for tag in tags {
         if tag.is_empty() {
@@ -173,6 +211,12 @@ pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.
 /// Callers map endpoint-specific statuses such as missing posts first.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwest::Response> {
     let status = response.status();
     if status.is_success() {
@@ -221,6 +265,12 @@ impl RequestPolicy {
 }
 
 /// Executes a request under the configured limiter and retry policy.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 pub(crate) async fn execute_with_policy<F, Fut>(
     policy: &RequestPolicy,
     mut operation: F,
@@ -261,6 +311,12 @@ where
     }
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
     let seconds = value.trim().parse::<u64>().ok()?;
@@ -268,6 +324,12 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
 }
 
 #[cfg(test)]
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
 mod tests {
     use super::parse_retry_after;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
