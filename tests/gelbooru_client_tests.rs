@@ -1,5 +1,7 @@
 use booru_rs::error::BooruError;
 use booru_rs::gelbooru::{Client, Query};
+use booru_rs::retry::RetryConfig;
+use std::time::Duration;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -105,6 +107,37 @@ async fn missing_credentials_report_unauthorized() {
     let result = client.search().send().await;
 
     assert!(matches!(result.unwrap_err(), BooruError::Unauthorized(_)));
+}
+
+#[tokio::test]
+async fn request_policy_retries_transient_statuses() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(503).set_body_string("temporary outage"))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .retry_config(
+            RetryConfig::new(1)
+                .with_initial_delay(Duration::ZERO)
+                .with_max_delay(Duration::ZERO),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let result = client.search().send().await;
+
+    assert!(matches!(
+        result,
+        Err(BooruError::HttpStatus { status: 503, .. })
+    ));
+    assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
 
 #[tokio::test]
