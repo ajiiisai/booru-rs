@@ -190,9 +190,12 @@ async fn autocomplete_uses_instance_endpoint() {
         .and(path("/index.php"))
         .and(query_param("page", "autocomplete2"))
         .and(query_param("term", "cat_"))
-        .and(query_param("limit", "3"))
+        .and(query_param("limit", "1"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
-            r#"[{"value":"cat_ears","label":"cat ears","post_count":"430787","category":"tag","tag":"cat_ears","type":"tag"}]"#,
+            r#"[
+                {"value":"cat_ears","label":"cat ears","post_count":"430787","category":"tag","tag":"cat_ears","type":"tag"},
+                {"value":"cat_girl","label":"cat girl","post_count":"167612","category":"tag","tag":"cat_girl","type":"tag"}
+            ]"#,
         ))
         .mount(&mock_server)
         .await;
@@ -200,7 +203,7 @@ async fn autocomplete_uses_instance_endpoint() {
     let client = test_client(&mock_server);
 
     let suggestions = client
-        .autocomplete("cat_", 3)
+        .autocomplete("cat_", 1)
         .await
         .expect("complete must succeed");
 

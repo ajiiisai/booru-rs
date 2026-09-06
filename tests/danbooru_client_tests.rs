@@ -242,6 +242,30 @@ async fn autocomplete_uses_instance_endpoint() {
 }
 
 #[tokio::test]
+async fn autocomplete_caps_server_results_to_requested_limit() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/autocomplete.json"))
+        .and(query_param("limit", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"[
+                {"value":"cat_ears","label":"Cat ears (123)"},
+                {"value":"cat_girl","label":"Cat girl (456)"}
+            ]"#,
+        ))
+        .mount(&mock_server)
+        .await;
+
+    let suggestions = test_client(&mock_server)
+        .autocomplete("cat_", 1)
+        .await
+        .unwrap();
+
+    assert_eq!(suggestions.len(), 1);
+    assert_eq!(suggestions[0].name, "cat_ears");
+}
+
+#[tokio::test]
 async fn page_returns_continuation_until_empty() {
     let mock_server = MockServer::start().await;
     mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;

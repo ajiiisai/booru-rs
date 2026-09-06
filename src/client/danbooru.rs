@@ -136,6 +136,7 @@ impl Client {
 
         Ok(response
             .into_iter()
+            .take(limit as usize)
             .map(|item| TagSuggestion {
                 name: item.value,
                 label: item.label,
