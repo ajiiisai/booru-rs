@@ -45,11 +45,11 @@ pub struct CacheConfig {
 }
 
 impl Default for CacheConfig {
-    /// Default configuration: 5 minute TTL, 500 max entries.
+    /// Default configuration: caching disabled.
     fn default() -> Self {
         Self {
             ttl: Duration::from_secs(300),
-            max_entries: 500,
+            max_entries: 0,
         }
     }
 }
@@ -108,7 +108,7 @@ impl CacheEntry {
 /// use booru_rs::cache::{Cache, CacheConfig};
 ///
 /// # async fn example() {
-/// let cache: Cache<String> = Cache::with_config(CacheConfig::default());
+/// let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
 ///
 /// // Cache a search result
 /// let posts = vec!["post1".to_string(), "post2".to_string()];
@@ -317,7 +317,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_get() {
-        let cache = Cache::<String>::new();
+        let cache = Cache::<String>::with_config(CacheConfig::long_lived());
         let value = vec![1, 2, 3];
 
         cache.insert("test".to_string(), &value).await;
@@ -379,6 +379,15 @@ mod tests {
         assert!(cache.is_empty().await);
         let value: Option<String> = cache.get(&"key".to_string()).await;
         assert_eq!(value, None);
+    }
+
+    #[tokio::test]
+    async fn default_cache_is_disabled() {
+        let cache = Cache::<String>::new();
+
+        cache.insert("key".to_string(), &"value").await;
+
+        assert!(cache.is_empty().await);
     }
 
     #[test]
