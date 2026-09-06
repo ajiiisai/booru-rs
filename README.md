@@ -2,386 +2,230 @@
 
 # booru-rs
 
-An async Rust client for various booru image board APIs.
+An async Rust client for Danbooru, Gelbooru, Safebooru, and Rule34.
 
 ## Features
 
-- **Type-safe API** — Compile-time checks ensure you use the correct rating types for each booru
-- **Async/await** — Built on tokio and reqwest for efficient async I/O
-- **Connection pooling** — Shared HTTP client with automatic connection reuse
-- **Proper error handling** — No panics, all errors are returned as `Result` types
-- **Common `Post` trait** — Write generic code that works with any booru site
-- **Async streams** — Paginate through results with async iterators
-- **Image downloads** — Download images with progress tracking and concurrent downloads
-- **Automatic retries** — Transient failures are retried with exponential backoff
-- **Rate limiting** — Protect against API throttling
-- **Response caching** — Reduce redundant API calls
-- **Tag validation** — Catch common mistakes before making requests
-- **Tag autocomplete** — Get tag suggestions as users type
+- Provider clients with typed ratings and provider-specific models
+- Fluent searches with preflight validation
+- Owned queries that you can save and run again
+- Single-post requests, autocomplete, page streams, and post streams
+- Shared HTTP clients with configurable retries and rate limits
+- Typed in-memory caching with expiration
+- Optional image downloads with bounded concurrency and progress callbacks
+- A common `Post` trait for code that handles more than one provider
 
-## Supported Sites
+## Supported sites
 
-| Site | Client | Tag Limit | Auth Required |
-|------|--------|-----------|---------------|
-| [Danbooru](https://danbooru.donmai.us) | `DanbooruClient` | 2 | No |
-| [Gelbooru](https://gelbooru.com) | `GelbooruClient` | Unlimited | **Yes** |
-| [Safebooru](https://safebooru.org) | `SafebooruClient` | Unlimited | No |
-| [Rule34](https://rule34.xxx) | `Rule34Client` | Unlimited | **Yes** |
+| Site | Client | Tag limit | Credentials |
+|------|--------|-----------|-------------|
+| [Danbooru](https://danbooru.donmai.us) | `booru_rs::danbooru::Client` | 2 | No |
+| [Gelbooru](https://gelbooru.com) | `booru_rs::gelbooru::Client` | Unlimited | Yes |
+| [Safebooru](https://safebooru.org) | `booru_rs::safebooru::Client` | Unlimited | No |
+| [Rule34](https://rule34.xxx) | `booru_rs::rule34::Client` | Unlimited | Yes |
 
-> **Note:** Gelbooru and Rule34 require API credentials. See [Authentication](#gelbooru-authentication) below.
-
-**Planned:**
-- [ ] Konachan
-- [ ] 3DBooru
+Gelbooru and Rule34 require API credentials for requests. See the [authentication section](#authentication).
 
 ## Installation
 
-Add to your `Cargo.toml`:
+Add the crate and a Tokio runtime to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 booru-rs = "0.3"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-### Selective Features
-
-By default, all booru clients are included. You can enable only the ones you need:
+The default feature set includes all four providers. Select only the providers you use when you want a smaller dependency tree:
 
 ```toml
 [dependencies]
-# Only Danbooru support
 booru-rs = { version = "0.3", default-features = false, features = ["danbooru"] }
-
-# Danbooru + Safebooru
-booru-rs = { version = "0.3", default-features = false, features = ["danbooru", "safebooru"] }
 ```
 
-Available features: `danbooru`, `gelbooru`, `safebooru`, `rule34`
+Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, and `download`. Enable `download` when you use `booru_rs::download`:
 
-## Quick Start
+```toml
+booru-rs = { version = "0.3", default-features = false, features = ["safebooru", "download"] }
+```
 
-Use the `prelude` for convenient imports:
+## Quick start
+
+Each provider has its own client and model types. A search keeps its filters separate from the reusable client:
 
 ```rust
-use booru_rs::prelude::*;
+use booru_rs::danbooru::{Client, DanbooruRating};
+use booru_rs::client::generic::Sort;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let posts = GelbooruClient::builder()
-        .tag("kafuu_chino")?
-        .tag("2girls")?
-        .rating(GelbooruRating::General)
-        .sort(Sort::Random)  // Or use .random() shorthand
-        .limit(5)
-        .blacklist_tag(GelbooruRating::Explicit)
-        .build()
-        .get()
+async fn main() -> booru_rs::Result<()> {
+    let client = Client::new()?;
+    let posts = client
+        .search()
+        .tag("cat_ears")
+        .rating(DanbooruRating::General)
+        .sort(Sort::Score)
+        .limit(20)
+        .send()
         .await?;
 
-    for post in &posts {
-        println!("Post #{}: {}", post.id, post.file_url);
+    for post in posts {
+        println!("Post {}: {:?}", post.id, post.file_url);
     }
 
     Ok(())
 }
 ```
 
-## API Examples
+See [Migrate to the current client API](docs/migration.md) for the complete API change list.
 
-### Basic Usage
+## Common operations
+
+### Reuse a query
+
+`Query` is an owned value. Build it once when an application runs the same search more than once:
 
 ```rust
-use booru_rs::prelude::*;
+use booru_rs::safebooru::{Client, Query};
 
-// Danbooru (limited to 2 tags)
-let posts = DanbooruClient::builder()
-    .tag("cat_ears")?
-    .rating(DanbooruRating::General)
-    .limit(10)
-    .build()
-    .get()
-    .await?;
-
-// Get a specific post by ID
-let post = DanbooruClient::builder()
-    .build()
-    .get_by_id(12345)
-    .await?;
+let client = Client::new()?;
+let query = Query::new().tag("landscape").limit(100);
+let first = client.search_with(query.clone()).send().await?;
+let second = client.search_with(query).send().await?;
 ```
 
-### Multiple Tags at Once
+### Fetch a post
 
 ```rust
-use booru_rs::prelude::*;
-
-// Gelbooru has no tag limit
-let posts = GelbooruClient::builder()
-    .tags(["cat_ears", "blue_eyes", "1girl"])?
-    .blacklist_tags(["ugly", "low_quality"])
-    .sort(Sort::Score)
-    .build()
-    .get()
-    .await?;
+let post = client.post(12345).await?;
 ```
 
-### Generic Code with the `Post` Trait
+A missing post returns `BooruError::PostNotFound`.
+
+### Autocomplete
+
+Autocomplete uses the client endpoint and takes an explicit maximum result count:
 
 ```rust
-use booru_rs::prelude::*;
-use booru_rs::Post;
+let suggestions = client.autocomplete("cat_", 10).await?;
+for suggestion in suggestions {
+    println!("{}", suggestion.name);
+}
+```
 
-fn print_post_info(post: &impl Post) {
-    println!("#{}: {}x{}", post.id(), post.width(), post.height());
-    if let Some(url) = post.file_url() {
-        println!("  URL: {}", url);
+### Paginate
+
+Use `page()` when you need continuation metadata:
+
+```rust
+let page = client.search().tag("landscape").limit(100).page().await?;
+println!("{} posts", page.posts.len());
+if let Some(next_search) = page.next {
+    let next_page = next_search.page().await?;
+    println!("{} posts on the next page", next_page.posts.len());
+}
+```
+
+Use `pages()` or `posts()` when you want a stream. Both streams stop at an empty page and can enforce a bound:
+
+```rust
+let mut posts = client.search().tag("landscape").posts().max_posts(500);
+while let Some(post) = posts.next().await {
+    println!("{}", post?.id);
+}
+```
+
+### Handle errors
+
+`BooruError` is non-exhaustive. Match the cases you need and keep a fallback arm:
+
+```rust
+use booru_rs::{BooruError, danbooru::Client};
+
+let result = Client::new()?
+    .search()
+    .tag("a")
+    .tag("b")
+    .tag("c")
+    .send()
+    .await;
+
+match result {
+    Err(BooruError::TagLimitExceeded { max, actual, .. }) => {
+        eprintln!("the query has {actual} tags, but the provider allows {max}");
+    }
+    Err(error) if error.is_not_found() => eprintln!("post not found"),
+    Err(error) => eprintln!("request failed: {error}"),
+    Ok(_) => unreachable!(),
+}
+```
+
+### Use common post accessors
+
+Provider models keep their provider-specific fields. Implementations of `booru_rs::model::Post` expose the shared fields:
+
+```rust
+use booru_rs::model::Post;
+
+fn print_post(post: &impl Post) {
+    println!("#{}: {}x{}", post.id(), post.width(), post.height().unwrap_or(0));
+    for tag in post.tags_iter() {
+        println!("{tag}");
     }
 }
 ```
 
-### Pagination
+### Download images
 
-```rust
-use booru_rs::prelude::*;
+Downloads are optional. Enable the `download` feature before importing the module:
 
-// Get page 5 of results
-let posts = SafebooruClient::builder()
-    .tag("landscape")?
-    .page(5)
-    .limit(100)
-    .build()
-    .get()
-    .await?;
+```toml
+booru-rs = { version = "0.3", features = ["safebooru", "download"] }
 ```
 
-### Async Pagination Stream
-
 ```rust
-use booru_rs::prelude::*;
-
-// Stream through all results automatically
-let mut stream = SafebooruClient::builder()
-    .tag("landscape")?
-    .limit(100)
-    .into_post_stream()
-    .max_posts(500);  // Stop after 500 posts
-
-while let Some(post) = stream.next().await {
-    println!("Post #{}", post?.id);
-}
-```
-
-### Rate Limiting
-
-```rust
-use booru_rs::prelude::*;
-use std::time::Duration;
-
-// 2 requests per second
-let limiter = RateLimiter::new(2, Duration::from_secs(1));
-
-for tag in ["cat", "dog", "bird"] {
-    limiter.acquire().await;  // Waits if needed
-    let posts = SafebooruClient::builder()
-        .tag(tag)?
-        .build()
-        .get()
-        .await?;
-}
-```
-
-### Response Caching
-
-```rust
-use booru_rs::prelude::*;
-
-let cache = Cache::new();
-
-// First call hits the API
-let posts = SafebooruClient::builder()
-    .tag("nature")?
-    .build()
-    .get()
-    .await?;
-cache.insert("nature_search".to_string(), &posts).await;
-
-// Later, check cache first
-if let Some(cached) = cache.get::<Vec<SafebooruPost>>(&"nature_search".to_string()).await {
-    println!("Cache hit! {} posts", cached.len());
-}
-```
-
-### Tag Validation
-
-```rust
-use booru_rs::validation::{validate_tag, validate_tag_strict};
-
-// Get warnings about potential issues
-let result = validate_tag("cat ears");  // Space instead of underscore
-if result.has_warnings() {
-    println!("Suggested: {}", result.tag());  // "cat_ears"
-}
-
-// Or get normalized tag directly
-let tag = validate_tag_strict("  cat ears  ")?;  // Returns "cat_ears"
-```
-
-### Tag Autocomplete
-
-Get tag suggestions as the user types:
-
-```rust
-use booru_rs::prelude::*;
-
-// Get tag suggestions for "cat_"
-let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
-
-for tag in suggestions {
-    println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
-    if let Some(category) = tag.category_name() {
-        println!("  Category: {}", category);
-    }
-}
-
-// Works with all booru clients
-let safebooru_tags = SafebooruClient::autocomplete("land", 5).await?;
-let gelbooru_tags = GelbooruClient::autocomplete("blue", 5).await?;
-```
-
-### Custom HTTP Client
-
-```rust
-use booru_rs::prelude::*;
-use booru_rs::client::ClientBuilder;
-
-let custom_client = reqwest::Client::builder()
-    .timeout(std::time::Duration::from_secs(60))
-    .build()?;
-
-// Use with_client to create a builder with custom HTTP client
-let posts = ClientBuilder::<SafebooruClient>::with_client(custom_client)
-    .tag("nature")?
-    .build()
-    .get()
-    .await?;
-```
-
-> **Note:** Most users won't need a custom HTTP client. The default shared client
-> provides connection pooling and sensible timeouts.
-
-### Downloading Images
-
-```rust
-use booru_rs::prelude::*;
+use booru_rs::download::Downloader;
 use std::path::Path;
 
-let posts = SafebooruClient::builder()
-    .tag("landscape")?
-    .limit(10)
-    .build()
-    .get()
-    .await?;
-
-// Download posts directly
 let downloader = Downloader::new();
-for post in &posts {
-    let result = downloader.download_post(post, Path::new("./downloads")).await?;
-    println!("Downloaded: {}", result.path.display());
-}
-
-// Download with progress tracking
-for post in &posts {
-    let result = downloader
-        .download_post_with_progress(post, Path::new("./downloads"), |progress| {
-            println!("{}/{} bytes (post #{})", 
-                progress.downloaded, 
-                progress.total.unwrap_or(0),
-                progress.post_id);
-        })
-        .await?;
-}
-
-// Concurrent downloads (4 at a time)
-let results = downloader.download_posts(&posts, Path::new("./downloads"), 4).await;
-
-// Custom options
-let downloader = Downloader::new()
-    .options(DownloadOptions::default().overwrite().filename("{id}_{md5}.{ext}"));
+let result = downloader.download_post(&post, Path::new("./downloads")).await?;
+println!("saved {} bytes to {}", result.size, result.path.display());
 ```
 
-### Gelbooru Authentication
+`download_posts` accepts a concurrency limit and returns one result per input post in input order. Dropping the future or stream cancels in-flight work.
 
-Gelbooru requires API credentials for all API requests. To get your credentials:
+## Authentication
 
-1. Create an account at [gelbooru.com](https://gelbooru.com)
-2. Go to **My Account** → **Options** → **API Access Credentials**
-3. Copy your **API Key** and **User ID**
+Pass credentials to a provider builder. The builder validates the endpoint and returns a client from `build()`:
 
 ```rust
-use booru_rs::prelude::*;
+use booru_rs::gelbooru::Client;
 
-let posts = GelbooruClient::builder()
+let client = Client::builder()
     .set_credentials("your_api_key", "your_user_id")
-    .tag("landscape")?
-    .build()
-    .get()
-    .await?;
+    .build()?;
 ```
 
-You can also load credentials from environment variables:
+Use `Rule34` in the same way. Keep credentials in application configuration and do not print the client or its errors with secret values.
+
+## Configure requests
+
+All provider builders accept a `reqwest::Client`, a `RequestPolicy`, a `RetryConfig`, and a `RateLimiter`:
 
 ```rust
-use booru_rs::prelude::*;
+use booru_rs::safebooru::Client;
 
-let api_key = std::env::var("GELBOORU_API_KEY").expect("GELBOORU_API_KEY not set");
-let user_id = std::env::var("GELBOORU_USER_ID").expect("GELBOORU_USER_ID not set");
-
-let posts = GelbooruClient::builder()
-    .set_credentials(api_key, user_id)
-    .tag("cat_ears")?
-    .build()
-    .get()
-    .await?;
+let http = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(60))
+    .build()?;
+let client = Client::builder().http_client(http).build()?;
 ```
 
-### Rule34 Authentication
+The library does not create a Tokio runtime. Start a runtime in the application that owns the client.
 
-Rule34 also requires API credentials:
+## Minimum supported Rust version
 
-1. Create an account at [rule34.xxx](https://rule34.xxx)
-2. Go to **My Account** → **Options** → **API Access Credentials**
-3. Copy your **API Key** and **User ID**
-
-```rust
-use booru_rs::prelude::*;
-
-let posts = Rule34Client::builder()
-    .set_credentials("your_api_key", "your_user_id")
-    .tag("landscape")?
-    .build()
-    .get()
-    .await?;
-```
-
-## Error Handling
-
-All fallible operations return `Result<T, BooruError>`:
-
-```rust
-use booru_rs::prelude::*;
-
-match DanbooruClient::builder().tag("a")?.tag("b")?.tag("c") {
-    Ok(_) => unreachable!(),
-    Err(BooruError::TagLimitExceeded { client, max, actual }) => {
-        println!("{} only allows {} tags, tried to add {}", client, max, actual);
-    }
-    Err(e) => println!("Other error: {}", e),
-}
-```
-
-## Minimum Supported Rust Version
-
-This crate requires Rust 1.92 or later (2024 edition).
+This crate requires Rust 1.92 or later and uses the 2024 edition.
 
 ## License
 
