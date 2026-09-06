@@ -6,22 +6,19 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::download::{Downloader, DownloadOptions};
-//! use booru_rs::safebooru::Client;
+//! use booru_rs::download::Downloader;
 //! use std::path::Path;
 //!
 //! # async fn example() -> booru_rs::error::Result<()> {
-//! let client = Client::new()?;
-//! let posts = client.search().tag("landscape").limit(5).send().await?;
-//!
 //! let downloader = Downloader::new();
-//!
-//! for post in &posts {
-//!     let path = downloader
-//!         .download_post(post, Path::new("./downloads"))
-//!         .await?;
-//!     println!("Downloaded: {}", path.path.display());
-//! }
+//! let result = downloader
+//!     .download_url(
+//!         "https://example.com/image.jpg",
+//!         Path::new("./downloads"),
+//!         None,
+//!     )
+//!     .await?;
+//! println!("Downloaded: {}", result.path.display());
 //! # Ok(())
 //! # }
 //! ```
