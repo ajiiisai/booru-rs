@@ -7,7 +7,6 @@
 //!
 //! - [`DanbooruClient`] for danbooru.donmai.us, 2 tag limit
 //! - [`GelbooruClient`] for gelbooru.com, unlimited tags
-//! - [`SafebooruClient`] for safebooru.org, unlimited tags, SFW only
 //! - [`Rule34Client`] for api.rule34.xxx, unlimited tags
 //!
 //! # Example
@@ -429,5 +428,3 @@ pub use danbooru::DanbooruClient;
 pub use gelbooru::GelbooruClient;
 #[cfg(feature = "rule34")]
 pub use rule34::Rule34Client;
-#[cfg(feature = "safebooru")]
-pub use safebooru::SafebooruClient;

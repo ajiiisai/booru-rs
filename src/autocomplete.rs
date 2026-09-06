@@ -77,11 +77,10 @@ impl TagSuggestion {
 /// # Example
 ///
 /// ```no_run
-/// use booru_rs::prelude::*;
-/// use booru_rs::autocomplete::Autocomplete;
+/// use booru_rs::safebooru::Client;
 ///
 /// # async fn example() -> booru_rs::error::Result<()> {
-/// let client = SafebooruClient::builder().build();
+/// let client = Client::builder().build()?;
 /// let suggestions = client.autocomplete("land", 5).await?;
 /// for tag in suggestions {
 ///     println!("{}", tag.name);

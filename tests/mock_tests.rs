@@ -673,10 +673,11 @@ mod mock_autocomplete {
             .mount(&mock_server)
             .await;
 
-        let client = SafebooruClient::builder()
+        let client = booru_rs::safebooru::Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
-            .build();
+            .build()
+            .unwrap();
 
         let suggestions = client
             .autocomplete("land", 5)
@@ -721,7 +722,7 @@ mod mock_autocomplete {
 
 mod endpoint_config {
     use super::*;
-    use booru_rs::prelude::*;
+    use booru_rs::safebooru::Client;
 
     #[tokio::test]
     async fn test_trailing_slash_still_routes() {
@@ -737,11 +738,12 @@ mod endpoint_config {
             .mount(&mock_server)
             .await;
 
-        let post = SafebooruClient::builder()
+        let post = Client::builder()
             .endpoint(format!("{}/", mock_server.uri()))
             .unwrap()
             .build()
-            .get_by_id(12345)
+            .unwrap()
+            .post(12345)
             .await
             .expect("lookup must succeed");
 
@@ -750,21 +752,21 @@ mod endpoint_config {
 
     #[test]
     fn test_blank_endpoint_is_invalid() {
-        let result = SafebooruClient::builder().endpoint("   ");
+        let result = Client::builder().endpoint("   ");
 
         assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
     }
 
     #[test]
     fn test_unparsable_endpoint_is_invalid() {
-        let result = SafebooruClient::builder().endpoint("not a url");
+        let result = Client::builder().endpoint("not a url");
 
         assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
     }
 
     #[test]
     fn test_non_http_endpoint_is_invalid() {
-        let result = SafebooruClient::builder().endpoint("ftp://example.com/x");
+        let result = Client::builder().endpoint("ftp://example.com/x");
 
         assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
     }

@@ -52,7 +52,7 @@
 //! |------|--------|-----------|---------------|
 //! | [Danbooru](https://danbooru.donmai.us) | [`DanbooruClient`] | 2 | No |
 //! | [Gelbooru](https://gelbooru.com) | [`GelbooruClient`] | Unlimited | Yes |
-//! | [Safebooru](https://safebooru.org) | [`SafebooruClient`] | Unlimited | No |
+//! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
 //! | [Rule34](https://rule34.xxx) | [`Rule34Client`] | Unlimited | Yes |
 //!
 //! ## Pagination with Async Streams
@@ -113,8 +113,6 @@ pub use client::DanbooruClient;
 pub use client::GelbooruClient;
 #[cfg(feature = "rule34")]
 pub use client::Rule34Client;
-#[cfg(feature = "safebooru")]
-pub use client::SafebooruClient;
 pub use client::generic::Sort;
 pub use error::{BooruError, Result};
 pub use model::Post;

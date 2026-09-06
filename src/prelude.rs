@@ -71,6 +71,4 @@ pub use crate::model::rule34::{Rule34Post, Rule34Rating};
 
 // Safebooru
 #[cfg(feature = "safebooru")]
-pub use crate::client::SafebooruClient;
-#[cfg(feature = "safebooru")]
 pub use crate::model::safebooru::{SafebooruPost, SafebooruRating};
