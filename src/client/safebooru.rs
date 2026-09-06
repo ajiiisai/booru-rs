@@ -1,10 +1,15 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use futures_core::Stream;
+use serde::Deserialize;
+
 use super::{Client as ClientTrait, ensure_success};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
-
-use serde::Deserialize;
 
 /// Client for interacting with the Safebooru API.
 ///
@@ -208,6 +213,7 @@ impl Client {
             rating: None,
             sort: None,
             limit: 100,
+            page: 0,
         }
     }
 
@@ -264,6 +270,7 @@ pub struct Search {
     rating: Option<String>,
     sort: Option<String>,
     limit: u32,
+    page: u32,
 }
 
 impl Search {
@@ -289,12 +296,42 @@ impl Search {
 
     /// Fetches the first page of results.
     pub async fn send(self) -> Result<Vec<SafebooruPost>> {
-        let mut tags = self.tags;
-        if let Some(rating) = self.rating {
+        self.fetch().await
+    }
+
+    pub async fn page(self) -> Result<Page> {
+        let posts = self.fetch().await?;
+        let next = if posts.is_empty() {
+            None
+        } else {
+            let mut next = self.clone();
+            next.page = self.page.saturating_add(1);
+            Some(next)
+        };
+        Ok(Page { posts, next })
+    }
+
+    pub fn pages(self) -> PageStream {
+        PageStream {
+            search: Some(self),
+            pending: None,
+        }
+    }
+
+    pub fn posts(self) -> PostStream {
+        PostStream {
+            pages: self.pages(),
+            buffer: Vec::new().into_iter(),
+        }
+    }
+
+    async fn fetch(&self) -> Result<Vec<SafebooruPost>> {
+        let mut tags = self.tags.clone();
+        if let Some(rating) = &self.rating {
             tags.push(format!("rating:{rating}"));
         }
-        if let Some(sort) = self.sort {
-            tags.push(sort);
+        if let Some(sort) = &self.sort {
+            tags.push(sort.clone());
         }
         let tags = tags.join(" ");
 
@@ -306,7 +343,7 @@ impl Search {
                 ("page", "dapi"),
                 ("s", "post"),
                 ("q", "index"),
-                ("pid", "0"),
+                ("pid", &self.page.to_string()),
                 ("limit", &self.limit.to_string()),
                 ("tags", &tags),
                 ("json", "1"),
@@ -348,5 +385,99 @@ impl ClientBuilder {
                 .endpoint
                 .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Page {
+    pub posts: Vec<SafebooruPost>,
+    pub next: Option<Search>,
+}
+
+pub struct PageStream {
+    search: Option<Search>,
+    pending: Option<Pin<Box<dyn Future<Output = Result<Page>> + Send>>>,
+}
+
+impl PageStream {
+    pub async fn next(&mut self) -> Option<Result<Page>> {
+        std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
+    }
+}
+
+impl Stream for PageStream {
+    type Item = Result<Page>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.as_mut().get_mut();
+        loop {
+            if let Some(mut pending) = this.pending.take() {
+                match pending.as_mut().poll(cx) {
+                    Poll::Ready(result) => match result {
+                        Ok(page) => {
+                            if page.posts.is_empty() {
+                                this.search = None;
+                                return Poll::Ready(None);
+                            }
+                            this.search = page.next.clone();
+                            return Poll::Ready(Some(Ok(page)));
+                        }
+                        Err(error) => {
+                            this.search = None;
+                            return Poll::Ready(Some(Err(error)));
+                        }
+                    },
+                    Poll::Pending => {
+                        this.pending = Some(pending);
+                        return Poll::Pending;
+                    }
+                }
+            }
+
+            let Some(search) = this.search.take() else {
+                return Poll::Ready(None);
+            };
+            this.pending = Some(Box::pin(async move { search.page().await }));
+        }
+    }
+}
+
+pub struct PostStream {
+    pages: PageStream,
+    buffer: std::vec::IntoIter<SafebooruPost>,
+}
+
+impl PostStream {
+    pub async fn next(&mut self) -> Option<Result<SafebooruPost>> {
+        std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
+    }
+
+    pub async fn collect(mut self) -> Result<Vec<SafebooruPost>> {
+        let mut posts = Vec::new();
+        while let Some(result) = self.next().await {
+            posts.push(result?);
+        }
+        Ok(posts)
+    }
+}
+
+impl Stream for PostStream {
+    type Item = Result<SafebooruPost>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.as_mut().get_mut();
+        loop {
+            if let Some(post) = this.buffer.next() {
+                return Poll::Ready(Some(Ok(post)));
+            }
+            match Pin::new(&mut this.pages).poll_next(cx) {
+                Poll::Ready(Some(Ok(page))) => {
+                    this.buffer = page.posts.into_iter();
+                }
+                Poll::Ready(Some(Err(error))) => return Poll::Ready(Some(Err(error))),
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
     }
 }

@@ -178,3 +178,122 @@ fn client_shares_safely_across_tasks() {
     assert_send_sync_clone::<Client>();
     assert_send_sync_clone::<booru_rs::safebooru::Search>();
 }
+
+fn posts_json(ids: &[u32]) -> String {
+    let items: Vec<String> = ids
+        .iter()
+        .map(|id| {
+            format!(
+                concat!(
+                    "{{\"id\":{id},\"score\":10,\"height\":100,\"width\":100,",
+                    "\"hash\":\"hash{id}\",\"tags\":\"tag{id}\",\"image\":\"{id}.jpg\",",
+                    "\"directory\":1,\"file_url\":\"https://example.com/{id}.jpg\",",
+                    "\"preview_url\":\"https://example.com/p{id}.jpg\",",
+                    "\"sample_url\":\"https://example.com/s{id}.jpg\",",
+                    "\"source\":\"\",\"change\":1700000000,\"rating\":\"general\"}}"
+                ),
+                id = id
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(","))
+}
+
+async fn mock_pages(mock_server: &MockServer, pages: &[Vec<u32>]) {
+    for (pid, ids) in pages.iter().enumerate() {
+        Mock::given(method("GET"))
+            .and(path("/index.php"))
+            .and(query_param("pid", pid.to_string()))
+            .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(ids)))
+            .mount(mock_server)
+            .await;
+    }
+}
+
+fn test_client(mock_server: &MockServer) -> Client {
+    Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .build()
+        .unwrap()
+}
+
+fn ids(posts: &[booru_rs::model::safebooru::SafebooruPost]) -> Vec<u32> {
+    posts.iter().map(|post| post.id).collect()
+}
+
+#[tokio::test]
+async fn page_returns_continuation_until_empty() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let page = client.search().page().await.expect("page must succeed");
+    assert_eq!(ids(&page.posts), vec![1, 2]);
+
+    let page = page
+        .next
+        .expect("second page must follow")
+        .page()
+        .await
+        .expect("page must succeed");
+    assert_eq!(ids(&page.posts), vec![3, 4]);
+
+    let page = page
+        .next
+        .expect("terminal fetch must follow")
+        .page()
+        .await
+        .expect("page must succeed");
+    assert!(page.posts.is_empty());
+    assert!(page.next.is_none());
+}
+
+#[tokio::test]
+async fn posts_stream_preserves_order() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .posts()
+        .collect()
+        .await
+        .expect("stream must succeed");
+
+    assert_eq!(ids(&posts), vec![1, 2, 3, 4]);
+}
+
+#[tokio::test]
+async fn posts_stream_runs_inside_spawned_task() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![1, 2], vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let posts = tokio::spawn(async move { client.search().posts().collect().await })
+        .await
+        .expect("task must finish")
+        .expect("stream must succeed");
+
+    assert_eq!(ids(&posts), vec![1, 2]);
+}
+
+#[tokio::test]
+async fn empty_first_page_ends_streams() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let page = client.search().page().await.expect("page must succeed");
+    assert!(page.posts.is_empty());
+    assert!(page.next.is_none());
+
+    let posts = client
+        .search()
+        .posts()
+        .collect()
+        .await
+        .expect("stream must succeed");
+    assert!(posts.is_empty());
+}
