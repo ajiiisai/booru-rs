@@ -136,6 +136,7 @@ pub type ProgressCallback = Box<dyn Fn(DownloadProgress) + Send + Sync>;
 pub struct Downloader {
     client: reqwest::Client,
     options: DownloadOptions,
+    timeout: Option<std::time::Duration>,
 }
 
 impl std::fmt::Debug for Downloader {
@@ -162,6 +163,7 @@ impl Downloader {
                 .build()
                 .expect("Failed to create HTTP client"),
             options: DownloadOptions::default(),
+            timeout: None,
         }
     }
 
@@ -171,6 +173,7 @@ impl Downloader {
         Self {
             client,
             options: DownloadOptions::default(),
+            timeout: None,
         }
     }
 
@@ -185,11 +188,16 @@ impl Downloader {
     #[must_use]
     pub fn with_timeout(self, timeout: std::time::Duration) -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .timeout(timeout)
-                .build()
-                .expect("Failed to create HTTP client"),
+            client: self.client,
             options: self.options,
+            timeout: Some(timeout),
+        }
+    }
+
+    fn apply_timeout(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match self.timeout {
+            Some(timeout) => request.timeout(timeout),
+            None => request,
         }
     }
 
@@ -232,8 +240,7 @@ impl Downloader {
 
         // Download the file
         let response = self
-            .client
-            .get(url)
+            .apply_timeout(self.client.get(url))
             .send()
             .await?
             .error_for_status()
@@ -290,8 +297,7 @@ impl Downloader {
         tokio::fs::create_dir_all(dest_dir).await?;
 
         let response = self
-            .client
-            .get(url)
+            .apply_timeout(self.client.get(url))
             .send()
             .await?
             .error_for_status()
@@ -402,6 +408,7 @@ impl Downloader {
             let dest = dest_dir.to_path_buf();
             let client = self.client.clone();
             let options = self.options.clone();
+            let timeout = self.timeout;
 
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
@@ -424,8 +431,12 @@ impl Downloader {
 
                 tokio::fs::create_dir_all(&dest).await?;
 
-                let response = client
-                    .get(&url)
+                let request = client.get(&url);
+                let request = match timeout {
+                    Some(timeout) => request.timeout(timeout),
+                    None => request,
+                };
+                let response = request
                     .send()
                     .await?
                     .error_for_status()
@@ -533,6 +544,38 @@ mod tests {
             ));
         }
         assert!(validate_filename("image.jpg").is_ok());
+    }
+
+    #[tokio::test]
+    async fn timeout_preserves_injected_client_configuration() {
+        use wiremock::matchers::{header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("x-test", reqwest::header::HeaderValue::from_static("kept"));
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+        let downloader =
+            Downloader::with_client(client).with_timeout(std::time::Duration::from_secs(7));
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .and(header("x-test", "kept"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+
+        let dest =
+            std::env::temp_dir().join(format!("booru-rs-download-test-{}", std::process::id()));
+        let result = downloader
+            .download_url(&format!("{}/image.jpg", server.uri()), &dest, None)
+            .await
+            .unwrap();
+        assert_eq!(result.size, 3);
+        assert_eq!(tokio::fs::read(&result.path).await.unwrap(), vec![1, 2, 3]);
+        tokio::fs::remove_dir_all(dest).await.unwrap();
     }
 
     #[tokio::test]
