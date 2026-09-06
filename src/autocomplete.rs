@@ -33,6 +33,11 @@ pub struct TagSuggestion {
     pub post_count: Option<u32>,
     /// Tag category (0=general, 1=artist, 3=copyright, 4=character, 5=meta).
     pub category: Option<u8>,
+    /// Provider-supplied tag value, if available.
+    pub tag: Option<String>,
+    /// Provider-supplied suggestion type, if available.
+    #[serde(rename = "type")]
+    pub suggestion_type: Option<String>,
 }
 
 impl TagSuggestion {
@@ -43,6 +48,8 @@ impl TagSuggestion {
             label: label.into(),
             post_count: None,
             category: None,
+            tag: None,
+            suggestion_type: None,
         }
     }
 
@@ -53,6 +60,8 @@ impl TagSuggestion {
             label: label.into(),
             post_count: Some(post_count),
             category: None,
+            tag: None,
+            suggestion_type: None,
         }
     }
 
@@ -81,6 +90,8 @@ mod tests {
         assert_eq!(tag.label, "cat ears");
         assert_eq!(tag.post_count, None);
         assert_eq!(tag.category, None);
+        assert_eq!(tag.tag, None);
+        assert_eq!(tag.suggestion_type, None);
     }
 
     #[test]
@@ -90,6 +101,8 @@ mod tests {
         assert_eq!(tag.label, "cat ears (12345)");
         assert_eq!(tag.post_count, Some(12345));
         assert_eq!(tag.category, None);
+        assert_eq!(tag.tag, None);
+        assert_eq!(tag.suggestion_type, None);
     }
 
     #[test]

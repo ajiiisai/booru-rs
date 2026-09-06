@@ -188,7 +188,7 @@ async fn autocomplete_uses_instance_endpoint() {
         .and(query_param("search[query]", "cat_"))
         .and(query_param("limit", "3"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
-            r#"[{"value":"cat_ears","label":"Cat ears (123)","category":0,"post_count":123}]"#,
+            r#"[{"value":"cat_ears","label":"Cat ears (123)","category":0,"post_count":123,"tag":"cat_ears","type":"tag"}]"#,
         ))
         .mount(&mock_server)
         .await;
@@ -204,6 +204,8 @@ async fn autocomplete_uses_instance_endpoint() {
     assert_eq!(suggestions[0].name, "cat_ears");
     assert_eq!(suggestions[0].post_count, Some(123));
     assert_eq!(suggestions[0].category, Some(0));
+    assert_eq!(suggestions[0].tag.as_deref(), Some("cat_ears"));
+    assert_eq!(suggestions[0].suggestion_type.as_deref(), Some("tag"));
 }
 
 #[tokio::test]

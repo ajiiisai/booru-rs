@@ -20,6 +20,10 @@ struct GelbooruAutocompleteItem {
     /// The API sends this as a string or a number.
     #[serde(default)]
     post_count: Option<serde_json::Value>,
+    #[serde(default)]
+    tag: Option<String>,
+    #[serde(rename = "type", default)]
+    suggestion_type: Option<String>,
 }
 
 fn parse_category(cat: &str) -> Option<u8> {
@@ -166,6 +170,8 @@ impl Client {
                     label: item.label,
                     post_count,
                     category,
+                    tag: item.tag,
+                    suggestion_type: item.suggestion_type,
                 }
             })
             .collect())

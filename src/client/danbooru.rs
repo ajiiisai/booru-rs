@@ -28,6 +28,10 @@ struct DanbooruAutocompleteItem {
     label: String,
     category: Option<u8>,
     post_count: Option<u32>,
+    #[serde(default)]
+    tag: Option<String>,
+    #[serde(rename = "type", default)]
+    suggestion_type: Option<String>,
 }
 
 const DEFAULT_ENDPOINT: &str = "https://danbooru.donmai.us";
@@ -126,6 +130,8 @@ impl Client {
                 label: item.label,
                 post_count: item.post_count,
                 category: item.category,
+                tag: item.tag,
+                suggestion_type: item.suggestion_type,
             })
             .collect())
     }

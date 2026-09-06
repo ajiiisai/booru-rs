@@ -144,6 +144,8 @@ impl Client {
                 label: item.label.clone(),
                 post_count: parse_post_count_from_label(&item.label),
                 category: None,
+                tag: None,
+                suggestion_type: None,
             })
             .collect())
     }
