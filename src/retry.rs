@@ -122,6 +122,8 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::Io(_) => false, // I/O errors are generally not retryable
         BooruError::InvalidConcurrency => false,
         BooruError::InvalidFilename(_) => false,
+        BooruError::MissingMediaUrl(_) => false,
+        BooruError::DownloadTaskFailed(_) => false,
     }
 }
 

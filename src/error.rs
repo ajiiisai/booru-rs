@@ -47,6 +47,14 @@ pub enum BooruError {
     #[error("Invalid destination filename: {0}")]
     InvalidFilename(String),
 
+    /// A post does not provide a downloadable media URL.
+    #[error("Post {0} has no media URL")]
+    MissingMediaUrl(u32),
+
+    /// A spawned download task failed before returning its result.
+    #[error("Download task failed: {0}")]
+    DownloadTaskFailed(String),
+
     /// Authentication required or failed.
     ///
     /// Some booru sites (like Gelbooru) require API credentials.

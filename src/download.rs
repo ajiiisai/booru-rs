@@ -352,7 +352,7 @@ impl Downloader {
     pub async fn download_post(&self, post: &impl Post, dest_dir: &Path) -> Result<DownloadResult> {
         let url = post
             .file_url()
-            .ok_or_else(|| BooruError::InvalidUrl("Post has no file URL".to_string()))?;
+            .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
         self.download_url(url, dest_dir, Some(&filename)).await
@@ -370,7 +370,7 @@ impl Downloader {
     {
         let url = post
             .file_url()
-            .ok_or_else(|| BooruError::InvalidUrl("Post has no file URL".to_string()))?;
+            .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
         self.download_url_with_progress(url, dest_dir, Some(&filename), post.id(), on_progress)
@@ -411,9 +411,7 @@ impl Downloader {
             handles.push(tokio::spawn(async move {
                 let _permit = permit;
 
-                let url = url.ok_or_else(|| {
-                    BooruError::InvalidUrl(format!("Post {} has no file URL", id))
-                })?;
+                let url = url.ok_or_else(|| BooruError::MissingMediaUrl(id))?;
 
                 let filename = filename.unwrap();
                 let dest_path = dest.join(&filename);
@@ -453,9 +451,9 @@ impl Downloader {
         let mut results = Vec::with_capacity(handles.len());
         for handle in handles {
             results.push(
-                handle.await.unwrap_or_else(|e| {
-                    Err(BooruError::InvalidUrl(format!("Task panicked: {}", e)))
-                }),
+                handle
+                    .await
+                    .unwrap_or_else(|e| Err(BooruError::DownloadTaskFailed(e.to_string()))),
             );
         }
         results
@@ -613,5 +611,43 @@ mod tests {
                 .iter()
                 .all(|result| matches!(result, Err(BooruError::InvalidConcurrency)))
         );
+    }
+
+    #[tokio::test]
+    async fn missing_media_url_has_download_error() {
+        struct NoMediaPost;
+
+        impl Post for NoMediaPost {
+            fn id(&self) -> u32 {
+                42
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                None
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let error = Downloader::new()
+            .download_post(&NoMediaPost, Path::new("unused"))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, BooruError::MissingMediaUrl(42)));
     }
 }
