@@ -97,9 +97,27 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Detect code changes
+        id: changes
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - "src/**"
+              - "tests/**"
+              - "examples/**"
+              - "Cargo.toml"
+              - "Cargo.lock"
+      - name: Should update the release PR
+        id: gate
+        run: echo "run=${{ github.event_name != 'push' || steps.changes.outputs.code == 'true' }}" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.gate.outputs.run == 'true'
       - uses: Swatinem/rust-cache@v2
+        if: steps.gate.outputs.run == 'true'
       - name: Update versions and changelog
+        if: steps.gate.outputs.run == 'true'
         uses: release-plz/action@v0.5
         with:
           command: release-pr
