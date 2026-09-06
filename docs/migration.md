@@ -224,6 +224,14 @@ fn describe(post: &impl Post) {
 
 `tags_iter()` borrows the existing tag string. It does not allocate a second tag list.
 
+Gelbooru now exposes `GelbooruPost::directory` as `Option<String>`. Gelbooru sends current directory values as paths such as `"49/c6"`; older numeric values decode to their decimal string form. Treat the value as a path component instead of a number:
+
+```rust
+if let Some(directory) = post.directory.as_deref() {
+    println!("stored in {directory}");
+}
+```
+
 ## Move downloads behind a feature
 
 Add the feature to the dependency declaration:
