@@ -6,8 +6,10 @@
 //! # Example
 //!
 //! ```no_run
+//! # #[cfg(feature = "danbooru")]
 //! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! // Get tag suggestions starting with "cat_"
 //! let client = Client::builder().build()?;

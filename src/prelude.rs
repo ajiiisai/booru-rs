@@ -6,8 +6,10 @@
 //! # Example
 //!
 //! ```no_run
+//! # #[cfg(feature = "danbooru")]
 //! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
 //! async fn main() -> booru_rs::error::Result<()> {
 //!     let client = Client::new()?;
@@ -23,6 +25,8 @@
 //!     println!("Found {} posts", posts.len());
 //!     Ok(())
 //! }
+//! # #[cfg(not(feature = "danbooru"))]
+//! # fn main() {}
 //! ```
 
 // Core traits and types
@@ -46,6 +50,7 @@ pub use crate::cache::{Cache, CacheConfig, CacheKey, CacheOperation};
 pub use crate::validation::{TagValidation, TagWarning, validate_tag};
 
 // Download utilities
+#[cfg(feature = "download")]
 pub use crate::download::{DownloadOptions, DownloadProgress, DownloadResult, Downloader};
 
 // Danbooru

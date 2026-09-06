@@ -13,8 +13,10 @@
 //! # Example
 //!
 //! ```no_run
+//! # #[cfg(feature = "danbooru")]
 //! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! let client = Client::new()?;
 //! let posts = client
@@ -35,8 +37,10 @@
 //! By default, all clients share a connection-pooled HTTP client.
 //!
 //! ```no_run
+//! # #[cfg(feature = "safebooru")]
 //! use booru_rs::safebooru::Client;
 //!
+//! # #[cfg(feature = "safebooru")]
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! let custom_client = reqwest::Client::builder()
 //!     .timeout(std::time::Duration::from_secs(60))

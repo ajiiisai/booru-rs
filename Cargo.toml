@@ -15,6 +15,69 @@ danbooru = []
 gelbooru = []
 safebooru = []
 rule34 = []
+download = [
+    "dep:tempfile",
+    "reqwest/stream",
+    "tokio/fs",
+    "tokio/io-util",
+    "tokio/rt",
+]
+
+[[example]]
+name = "basic"
+required-features = ["danbooru", "safebooru"]
+
+[[example]]
+name = "download"
+required-features = ["download", "safebooru"]
+
+[[example]]
+name = "error_handling"
+required-features = ["danbooru", "safebooru"]
+
+[[example]]
+name = "gelbooru"
+required-features = ["gelbooru"]
+
+[[example]]
+name = "pagination"
+required-features = ["safebooru"]
+
+[[test]]
+name = "danbooru_client_tests"
+required-features = ["danbooru"]
+
+[[test]]
+name = "danbooru_tests"
+required-features = ["danbooru"]
+
+[[test]]
+name = "gelbooru_client_tests"
+required-features = ["gelbooru"]
+
+[[test]]
+name = "gelbooru_tests"
+required-features = ["gelbooru"]
+
+[[test]]
+name = "rule34_client_tests"
+required-features = ["rule34"]
+
+[[test]]
+name = "rule34_tests"
+required-features = ["rule34"]
+
+[[test]]
+name = "safebooru_client_tests"
+required-features = ["safebooru"]
+
+[[test]]
+name = "safebooru_tests"
+required-features = ["safebooru"]
+
+[[test]]
+name = "mock_tests"
+required-features = ["danbooru", "gelbooru", "rule34", "safebooru"]
 
 [profile.dev]
 opt-level = 1
@@ -23,13 +86,13 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-reqwest = { version = "0.12.4", features = ["json", "rustls-tls", "stream"], default-features = false }
-tokio = { version = "1.48", features = ["rt-multi-thread", "macros", "fs", "sync", "io-util"] }
+reqwest = { version = "0.12.4", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1.48", features = ["sync", "time"] }
 serde = { version = "1.0.185", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 futures-core = "0.3.31"
-tempfile = "3"
+tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.48", features = ["rt-multi-thread", "macros", "time"] }

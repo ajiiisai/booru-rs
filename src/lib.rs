@@ -25,8 +25,10 @@
 //! The easiest way to get started is with the [`prelude`]:
 //!
 //! ```no_run
+//! # #[cfg(feature = "danbooru")]
 //! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
 //! async fn main() -> booru_rs::error::Result<()> {
 //!     let client = Client::new()?;
@@ -43,6 +45,8 @@
 //!
 //!     Ok(())
 //! }
+//! # #[cfg(not(feature = "danbooru"))]
+//! # fn main() {}
 //! ```
 //!
 //! ## Supported Sites
@@ -59,8 +63,10 @@
 //! Iterate through all results with `posts()`:
 //!
 //! ```no_run
+//! # #[cfg(feature = "safebooru")]
 //! use booru_rs::safebooru::Client;
 //!
+//! # #[cfg(feature = "safebooru")]
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! let client = Client::new()?;
 //! let mut stream = client
@@ -96,6 +102,7 @@
 pub mod autocomplete;
 pub mod cache;
 pub mod client;
+#[cfg(feature = "download")]
 pub mod download;
 pub mod error;
 pub mod model;
