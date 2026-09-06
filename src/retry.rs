@@ -136,6 +136,7 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::DownloadTaskFailed(_) => false,
         BooruError::DestinationConflict(_) => false,
         BooruError::InvalidRetryConfig(_) => false,
+        BooruError::InvalidRateLimitConfig(_) => false,
     }
 }
 

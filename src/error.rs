@@ -90,6 +90,10 @@ pub enum BooruError {
     #[error("Invalid retry configuration: {0}")]
     InvalidRetryConfig(String),
 
+    /// Rate limiter configuration is invalid.
+    #[error("Invalid rate limiter configuration: {0}")]
+    InvalidRateLimitConfig(String),
+
     /// I/O error occurred.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
