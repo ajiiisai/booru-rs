@@ -106,6 +106,7 @@ pub mod validation;
 
 // Re-export core types at crate root for convenience
 pub use autocomplete::TagSuggestion;
+pub use client::RequestPolicy;
 pub use client::generic::Sort;
 pub use error::{BooruError, Result};
 pub use model::Post;

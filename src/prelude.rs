@@ -26,6 +26,7 @@
 //! ```
 
 // Core traits and types
+pub use crate::client::RequestPolicy;
 pub use crate::client::generic::Sort;
 pub use crate::error::{BooruError, Result};
 

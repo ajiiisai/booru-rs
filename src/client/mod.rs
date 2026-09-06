@@ -53,6 +53,8 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 use crate::error::{BooruError, Result};
+use crate::ratelimit::RateLimiter;
+use crate::retry::{RetryConfig, is_retryable};
 
 #[cfg(feature = "danbooru")]
 pub mod danbooru;
@@ -154,4 +156,77 @@ pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwes
     }
     let body = response.text().await.unwrap_or_default();
     Err(BooruError::http_status(status, &body))
+}
+
+/// Request policies shared by provider clients.
+#[derive(Debug, Clone)]
+pub struct RequestPolicy {
+    retry: RetryConfig,
+    rate_limiter: Option<RateLimiter>,
+}
+
+impl Default for RequestPolicy {
+    fn default() -> Self {
+        Self {
+            retry: RetryConfig::no_retry(),
+            rate_limiter: None,
+        }
+    }
+}
+
+impl RequestPolicy {
+    /// Creates a policy with retries disabled and no rate limiter.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the retry configuration after validating it.
+    pub fn with_retry_config(mut self, config: RetryConfig) -> Result<Self> {
+        config.validate()?;
+        self.retry = config;
+        Ok(self)
+    }
+
+    /// Sets a shared rate limiter for outbound requests.
+    #[must_use]
+    pub fn with_rate_limiter(mut self, limiter: RateLimiter) -> Self {
+        self.rate_limiter = Some(limiter);
+        self
+    }
+}
+
+/// Executes a request under the configured limiter and retry policy.
+pub(crate) async fn execute_with_policy<F, Fut>(
+    policy: &RequestPolicy,
+    mut operation: F,
+) -> Result<reqwest::Response>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<reqwest::Response>>,
+{
+    policy.retry.validate()?;
+    let mut attempt = 0;
+
+    loop {
+        if let Some(limiter) = &policy.rate_limiter {
+            limiter.acquire().await;
+        }
+
+        let result = match operation().await {
+            Ok(response) => ensure_success(response).await,
+            Err(error) => Err(error),
+        };
+
+        match result {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                if attempt >= policy.retry.max_retries || !is_retryable(&error) {
+                    return Err(error);
+                }
+                attempt += 1;
+                tokio::time::sleep(policy.retry.delay_for_attempt(attempt)).await;
+            }
+        }
+    }
 }

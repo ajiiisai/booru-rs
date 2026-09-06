@@ -1,6 +1,8 @@
 use booru_rs::error::BooruError;
 use booru_rs::model::safebooru::SafebooruRating;
+use booru_rs::retry::RetryConfig;
 use booru_rs::safebooru::{Client, Query};
+use std::time::Duration;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -507,6 +509,38 @@ async fn error_status_despite_decodable_body() {
         result.unwrap_err(),
         BooruError::HttpStatus { status: 500, .. }
     ));
+    assert_eq!(mock_server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn request_policy_retries_transient_statuses() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(503).set_body_string("temporary outage"))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .retry_config(
+            RetryConfig::new(1)
+                .with_initial_delay(Duration::ZERO)
+                .with_max_delay(Duration::ZERO),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let result = client.search().send().await;
+
+    assert!(matches!(
+        result,
+        Err(BooruError::HttpStatus { status: 503, .. })
+    ));
+    assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
 
 #[tokio::test]

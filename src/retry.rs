@@ -88,7 +88,7 @@ impl RetryConfig {
     }
 
     /// Calculates the delay for a given attempt number.
-    fn delay_for_attempt(&self, attempt: u32) -> Duration {
+    pub(crate) fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::ZERO;
         }

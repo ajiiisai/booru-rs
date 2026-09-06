@@ -5,11 +5,13 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use serde::Deserialize;
 
-use super::ensure_success;
+use super::{RequestPolicy, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
+use crate::ratelimit::RateLimiter;
+use crate::retry::RetryConfig;
 
 #[derive(Debug, Deserialize)]
 struct SafebooruAutocompleteItem {
@@ -34,6 +36,7 @@ const DEFAULT_ENDPOINT: &str = "https://safebooru.org";
 pub struct Client {
     http: reqwest::Client,
     endpoint: String,
+    policy: RequestPolicy,
 }
 
 impl Client {
@@ -52,6 +55,7 @@ impl Client {
         Ok(Self {
             http: super::shared_client().clone(),
             endpoint: DEFAULT_ENDPOINT.to_string(),
+            policy: RequestPolicy::default(),
         })
     }
 
@@ -72,36 +76,43 @@ impl Client {
     }
 
     pub async fn post(&self, id: u32) -> Result<SafebooruPost> {
-        let response = self
-            .http
-            .get(format!("{}/index.php", self.endpoint))
-            .query(&[
-                ("page", "dapi"),
-                ("s", "post"),
-                ("q", "index"),
-                ("id", &id.to_string()),
-                ("json", "1"),
-            ])
-            .send()
-            .await?;
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
+        let response = match execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/index.php", self.endpoint))
+                .query(&[
+                    ("page", "dapi"),
+                    ("s", "post"),
+                    ("q", "index"),
+                    ("id", &id.to_string()),
+                    ("json", "1"),
+                ])
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(BooruError::HttpStatus { status: 404, .. }) => {
+                return Err(BooruError::PostNotFound(id));
+            }
+            Err(error) => return Err(error),
+        };
 
         let posts = response.json::<Vec<SafebooruPost>>().await?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let response = self
-            .http
-            .get(format!("{}/autocomplete.php", self.endpoint))
-            .query(&[("q", query)])
-            .send()
-            .await?;
+        let response = execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/autocomplete.php", self.endpoint))
+                .query(&[("q", query)])
+                .send()
+                .await?)
+        })
+        .await?;
 
         let suggestions = response.json::<Vec<SafebooruAutocompleteItem>>().await?;
         Ok(suggestions
@@ -291,23 +302,24 @@ impl Search {
         }
         let tags = tags.join(" ");
 
-        let response = self
-            .client
-            .http
-            .get(format!("{}/index.php", self.client.endpoint))
-            .query(&[
-                ("page", "dapi"),
-                ("s", "post"),
-                ("q", "index"),
-                ("pid", &self.page.to_string()),
-                ("limit", &self.query.limit.to_string()),
-                ("tags", &tags),
-                ("json", "1"),
-            ])
-            .send()
-            .await?;
-
-        let response = ensure_success(response).await?;
+        let response = execute_with_policy(&self.client.policy, || async {
+            Ok(self
+                .client
+                .http
+                .get(format!("{}/index.php", self.client.endpoint))
+                .query(&[
+                    ("page", "dapi"),
+                    ("s", "post"),
+                    ("q", "index"),
+                    ("pid", &self.page.to_string()),
+                    ("limit", &self.query.limit.to_string()),
+                    ("tags", &tags),
+                    ("json", "1"),
+                ])
+                .send()
+                .await?)
+        })
+        .await?;
 
         let posts = response.json::<Vec<SafebooruPost>>().await?;
         Ok(posts)
@@ -318,6 +330,7 @@ impl Search {
 pub struct ClientBuilder {
     http: Option<reqwest::Client>,
     endpoint: Option<String>,
+    policy: Option<RequestPolicy>,
 }
 
 impl ClientBuilder {
@@ -334,12 +347,35 @@ impl ClientBuilder {
         self
     }
 
+    /// Sets the request retry and rate-limit policy.
+    #[must_use]
+    pub fn request_policy(mut self, policy: RequestPolicy) -> Self {
+        self.policy = Some(policy);
+        self
+    }
+
+    /// Sets the retry configuration for requests made by this client.
+    pub fn retry_config(mut self, config: RetryConfig) -> Result<Self> {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_retry_config(config)?);
+        Ok(self)
+    }
+
+    /// Sets the rate limiter for requests made by this client.
+    #[must_use]
+    pub fn rate_limiter(mut self, limiter: RateLimiter) -> Self {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_rate_limiter(limiter));
+        self
+    }
+
     pub fn build(self) -> Result<Client> {
         Ok(Client {
             http: self.http.unwrap_or_else(|| super::shared_client().clone()),
             endpoint: self
                 .endpoint
                 .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
+            policy: self.policy.unwrap_or_default(),
         })
     }
 }
