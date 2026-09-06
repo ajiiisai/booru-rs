@@ -130,10 +130,13 @@ impl BooruError {
         }
     }
 
-    /// Returns `true` if this error is a network-related error.
+    /// Returns `true` if this error occurred while sending an HTTP request.
+    ///
+    /// Response decoding failures are parse errors, even though reqwest reports
+    /// them through its general error type.
     #[must_use]
     pub fn is_network_error(&self) -> bool {
-        matches!(self, Self::Request(_))
+        matches!(self, Self::Request(error) if !error.is_decode())
     }
 
     /// Returns `true` if this error is a parse/deserialization error.

@@ -601,7 +601,9 @@ async fn invalid_json_is_parse_error() {
 
     let result = client.search().send().await;
 
-    assert!(result.unwrap_err().is_parse_error());
+    let error = result.unwrap_err();
+    assert!(error.is_parse_error());
+    assert!(!error.is_network_error());
 }
 #[test]
 fn common_score_preserves_provider_range() {
