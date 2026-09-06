@@ -274,7 +274,7 @@ impl Downloader {
         let dest_path = dest_dir.join(&filename);
 
         // Check if file exists
-        if dest_path.exists() && !self.options.overwrite {
+        if tokio::fs::try_exists(&dest_path).await? && !self.options.overwrite {
             let metadata = tokio::fs::metadata(&dest_path).await?;
             return Ok(DownloadResult {
                 path: dest_path,
@@ -321,7 +321,7 @@ impl Downloader {
 
         let dest_path = dest_dir.join(&filename);
 
-        if dest_path.exists() && !self.options.overwrite {
+        if tokio::fs::try_exists(&dest_path).await? && !self.options.overwrite {
             let metadata = tokio::fs::metadata(&dest_path).await?;
             return Ok(DownloadResult {
                 path: dest_path,
@@ -455,7 +455,7 @@ impl Downloader {
                 let result = async {
                     let dest_path = dest.join(&filename);
 
-                    if dest_path.exists() && !options.overwrite {
+                    if tokio::fs::try_exists(&dest_path).await? && !options.overwrite {
                         let metadata = tokio::fs::metadata(&dest_path).await?;
                         return Ok(DownloadResult {
                             path: dest_path,
