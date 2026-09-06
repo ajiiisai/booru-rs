@@ -416,3 +416,14 @@ fn common_score_preserves_provider_range() {
         assert_eq!(post.score(), Some(i64::from(score)));
     }
 }
+#[test]
+fn post_preserves_unknown_rating() {
+    use booru_rs::danbooru::{DanbooruPost, DanbooruPostRating, DanbooruRating};
+
+    let mut value: serde_json::Value = serde_json::from_str(&single_post_json(1)).unwrap();
+    value["rating"] = "x".into();
+    let post: DanbooruPost = serde_json::from_value(value).unwrap();
+    assert_eq!(post.rating, Some(DanbooruPostRating::Unknown("x".into())));
+    assert_eq!(post.rating.as_ref().unwrap().to_string(), "x");
+    assert!(serde_json::from_value::<DanbooruRating>("x".into()).is_err());
+}

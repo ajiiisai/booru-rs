@@ -49,7 +49,7 @@ pub use crate::download::{DownloadOptions, DownloadProgress, DownloadResult, Dow
 
 // Danbooru
 #[cfg(feature = "danbooru")]
-pub use crate::model::danbooru::{DanbooruPost, DanbooruRating};
+pub use crate::model::danbooru::{DanbooruPost, DanbooruPostRating, DanbooruRating};
 
 // Gelbooru
 #[cfg(feature = "gelbooru")]

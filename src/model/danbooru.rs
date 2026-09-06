@@ -23,7 +23,7 @@ pub struct DanbooruPost {
     pub tag_string_copyright: String,
     pub tag_string_character: String,
     pub tag_string_meta: String,
-    pub rating: Option<DanbooruRating>,
+    pub rating: Option<DanbooruPostRating>,
     pub parent_id: Option<u32>,
     pub pixiv_id: Option<u32>,
     pub source: String,
@@ -57,7 +57,30 @@ pub struct DanbooruPost {
     pub bit_flags: u32,
 }
 
-/// Post rating classification.
+/// A Danbooru response rating, including values unknown to this crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum DanbooruPostRating {
+    Known(DanbooruRating),
+    Unknown(String),
+}
+
+impl From<DanbooruRating> for DanbooruPostRating {
+    fn from(rating: DanbooruRating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for DanbooruPostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Danbooru.
 ///
 /// Danbooru uses a four-tier rating system. See the
 /// [Danbooru ratings wiki](https://danbooru.donmai.us/wiki_pages/howto:rate)
