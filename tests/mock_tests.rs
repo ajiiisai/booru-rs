@@ -25,7 +25,6 @@ fn danbooru_post_json() -> &'static str {
 /// Test fixture for Danbooru posts array
 fn danbooru_posts_json() -> &'static str {
     include_str!("fixtures/danbooru/posts.json")
-    prin
 }
 
 mod mock_safebooru {
