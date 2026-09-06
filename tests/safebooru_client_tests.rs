@@ -606,3 +606,54 @@ fn post_rejects_invalid_heights_and_missing_identity() {
     value.as_object_mut().unwrap().remove("id");
     assert!(serde_json::from_value::<booru_rs::safebooru::SafebooruPost>(value).is_err());
 }
+#[test]
+fn post_preserves_unknown_rating() {
+    use booru_rs::safebooru::{SafebooruPost, SafebooruPostRating, SafebooruRating};
+
+    let mut fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for value in ["future_rating", "Safe", "", " future rating "] {
+        fixture[0]["rating"] = value.into();
+        let post: SafebooruPost = serde_json::from_value(fixture[0].clone()).unwrap();
+        assert_eq!(post.rating, SafebooruPostRating::Unknown(value.into()));
+        assert_eq!(post.rating.to_string(), value);
+        assert!(serde_json::from_value::<SafebooruRating>(value.into()).is_err());
+    }
+}
+
+#[test]
+fn post_recognizes_supported_ratings() {
+    use booru_rs::safebooru::{SafebooruPost, SafebooruPostRating, SafebooruRating};
+
+    let mut fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for (value, rating) in [
+        ("safe", SafebooruRating::Safe),
+        ("general", SafebooruRating::General),
+        ("questionable", SafebooruRating::Questionable),
+        ("explicit", SafebooruRating::Explicit),
+    ] {
+        fixture[0]["rating"] = value.into();
+        let post: SafebooruPost = serde_json::from_value(fixture[0].clone()).unwrap();
+        assert_eq!(post.rating, SafebooruPostRating::Known(rating));
+        assert_eq!(post.rating, rating.into());
+        assert_eq!(post.rating.to_string(), value);
+    }
+}
+
+#[test]
+fn post_rejects_missing_and_non_string_ratings() {
+    use booru_rs::safebooru::SafebooruPost;
+
+    let mut fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for value in [
+        serde_json::Value::Null,
+        serde_json::json!(1),
+        serde_json::json!(true),
+        serde_json::json!([]),
+        serde_json::json!({}),
+    ] {
+        fixture[0]["rating"] = value;
+        assert!(serde_json::from_value::<SafebooruPost>(fixture[0].clone()).is_err());
+    }
+    fixture[0].as_object_mut().unwrap().remove("rating");
+    assert!(serde_json::from_value::<SafebooruPost>(fixture[0].clone()).is_err());
+}

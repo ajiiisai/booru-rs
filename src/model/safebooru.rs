@@ -35,10 +35,33 @@ pub struct SafebooruPost {
     /// that it's provided as a UNIX timestamp. Safebooru provides no `created_at`
     /// field.
     pub change: u32,
-    pub rating: SafebooruRating,
+    pub rating: SafebooruPostRating,
 }
 
-/// Post rating classification for Safebooru.
+/// A Safebooru response rating, including values unknown to this crate.
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum SafebooruPostRating {
+    Known(SafebooruRating),
+    Unknown(String),
+}
+
+impl From<SafebooruRating> for SafebooruPostRating {
+    fn from(rating: SafebooruRating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for SafebooruPostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Safebooru.
 ///
 /// While Safebooru is primarily a SFW site, the rating field
 /// can contain other values for deleted/hidden content.
