@@ -27,7 +27,11 @@ mod autocomplete {
 
             assert!(suggestions.is_ok());
             let suggestions = suggestions.unwrap();
-            assert!(suggestions.len() <= 5, "Should respect limit parameter (expected 5, got {})", suggestions.len());
+            assert!(
+                suggestions.len() <= 5,
+                "Should respect limit parameter (expected 5, got {})",
+                suggestions.len()
+            );
         }
 
         #[tokio::test]
@@ -104,7 +108,11 @@ mod autocomplete {
 
             assert!(suggestions.is_ok());
             let suggestions = suggestions.unwrap();
-            assert!(suggestions.len() <= 5, "Should respect limit parameter (expected 5, got {})", suggestions.len());
+            assert!(
+                suggestions.len() <= 5,
+                "Should respect limit parameter (expected 5, got {})",
+                suggestions.len()
+            );
         }
 
         #[tokio::test]
@@ -158,7 +166,11 @@ mod autocomplete {
             }
 
             let suggestions = suggestions.unwrap();
-            assert!(suggestions.len() <= 5, "Should respect limit parameter (expected 5, got {})", suggestions.len());
+            assert!(
+                suggestions.len() <= 5,
+                "Should respect limit parameter (expected 5, got {})",
+                suggestions.len()
+            );
         }
     }
 
