@@ -53,9 +53,7 @@ pub use crate::model::danbooru::{DanbooruPost, DanbooruPostRating, DanbooruRatin
 
 // Gelbooru
 #[cfg(feature = "gelbooru")]
-pub use crate::model::gelbooru::{
-    GelbooruPost, GelbooruPostRating, GelbooruRating, GelbooruResponse,
-};
+pub use crate::model::gelbooru::{GelbooruPost, GelbooruPostRating, GelbooruRating};
 
 // Rule34
 #[cfg(feature = "rule34")]

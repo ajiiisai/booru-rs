@@ -91,7 +91,7 @@ pub struct GelbooruPost {
 
 /// Wrapper for Gelbooru's API response containing a list of posts.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GelbooruResponse {
+pub(crate) struct GelbooruResponse {
     #[serde(rename = "post")]
     #[serde(default)]
     pub posts: Vec<GelbooruPost>,
