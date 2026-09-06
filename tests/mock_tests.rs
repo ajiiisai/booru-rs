@@ -9,7 +9,7 @@
 
 use booru_rs::client::Client;
 use booru_rs::error::BooruError;
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// Test fixture for Safebooru posts
@@ -183,14 +183,17 @@ mod mock_safebooru {
 mod mock_danbooru {
     use super::*;
     use booru_rs::prelude::*;
-    use wiremock::matchers::any;
 
     #[tokio::test]
     async fn test_get_posts_success() {
         let mock_server = MockServer::start().await;
 
-        // Use any() matcher since Danbooru adds query params
-        Mock::given(any())
+        Mock::given(method("GET"))
+            .and(path("/posts.json"))
+            .and(query_param("limit", "10"))
+            .and(query_param("page", "0"))
+            .and(query_param("tags", "cat_ears"))
+            .and(header("User-Agent", "booru-rs/0.3.0"))
             .respond_with(ResponseTemplate::new(200).set_body_string(danbooru_posts_json()))
             .mount(&mock_server)
             .await;
@@ -215,7 +218,9 @@ mod mock_danbooru {
     async fn test_get_post_by_id_success() {
         let mock_server = MockServer::start().await;
 
-        Mock::given(any())
+        Mock::given(method("GET"))
+            .and(path("/posts/7654321.json"))
+            .and(header("User-Agent", "booru-rs/0.3.0"))
             .respond_with(ResponseTemplate::new(200).set_body_string(danbooru_post_json()))
             .mount(&mock_server)
             .await;
