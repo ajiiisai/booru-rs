@@ -167,7 +167,6 @@ struct GelbooruAutocompleteItem {
 }
 
 impl Autocomplete for GelbooruClient {
-    /// Note: limit is ignored for now
     async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
         let client = shared_client();
         let url = format!("{}/index.php", Self::URL);
@@ -193,6 +192,7 @@ impl Autocomplete for GelbooruClient {
 
         Ok(items
             .into_iter()
+            .take(limit as usize)
             .map(|item| {
                 // Try to parse post count from label if not provided directly
                 let post_count = item
