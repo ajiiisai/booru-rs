@@ -55,6 +55,7 @@ use std::time::Duration;
 use crate::error::{BooruError, Result};
 use crate::ratelimit::RateLimiter;
 use crate::retry::{RetryConfig, is_retryable};
+use reqwest::header::HeaderMap;
 
 #[cfg(feature = "danbooru")]
 pub mod danbooru;
@@ -213,9 +214,12 @@ where
             limiter.acquire().await;
         }
 
-        let result = match operation().await {
-            Ok(response) => ensure_success(response).await,
-            Err(error) => Err(error),
+        let (result, retry_after) = match operation().await {
+            Ok(response) => {
+                let retry_after = parse_retry_after(response.headers());
+                (ensure_success(response).await, retry_after)
+            }
+            Err(error) => (Err(error), None),
         };
 
         match result {
@@ -225,8 +229,40 @@ where
                     return Err(error);
                 }
                 attempt += 1;
-                tokio::time::sleep(policy.retry.delay_for_attempt(attempt)).await;
+                let delay = retry_after
+                    .unwrap_or_else(|| policy.retry.delay_for_attempt(attempt))
+                    .min(policy.retry.max_delay);
+                tokio::time::sleep(delay).await;
             }
         }
+    }
+}
+
+fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
+    let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
+    let seconds = value.trim().parse::<u64>().ok()?;
+    Some(Duration::from_secs(seconds))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_retry_after;
+    use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
+    use std::time::Duration;
+
+    #[test]
+    fn parses_numeric_retry_after() {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, HeaderValue::from_static("3"));
+
+        assert_eq!(parse_retry_after(&headers), Some(Duration::from_secs(3)));
+    }
+
+    #[test]
+    fn ignores_non_numeric_retry_after() {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, HeaderValue::from_static("tomorrow"));
+
+        assert_eq!(parse_retry_after(&headers), None);
     }
 }
