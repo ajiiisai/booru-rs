@@ -1,5 +1,6 @@
 use booru_rs::error::BooruError;
-use booru_rs::safebooru::Client;
+use booru_rs::model::safebooru::SafebooruRating;
+use booru_rs::safebooru::{Client, Query};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -295,5 +296,102 @@ async fn empty_first_page_ends_streams() {
         .collect()
         .await
         .expect("stream must succeed");
+    assert!(posts.is_empty());
+}
+
+#[tokio::test]
+async fn whitespace_tag_rejected_before_request() {
+    let mock_server = MockServer::start().await;
+    let client = test_client(&mock_server);
+
+    let result = client.search().tag("cat ears").send().await;
+
+    assert!(matches!(result.unwrap_err(), BooruError::InvalidTag { .. }));
+}
+
+#[tokio::test]
+async fn empty_tag_rejected_before_request() {
+    let mock_server = MockServer::start().await;
+    let client = test_client(&mock_server);
+
+    let result = client.search().tag("").send().await;
+
+    assert!(matches!(result.unwrap_err(), BooruError::InvalidTag { .. }));
+}
+
+#[test]
+fn validate_preflight() {
+    assert!(Query::new().tag("cat_ears").limit(5).validate().is_ok());
+    assert!(Query::new().tag("cat ears").validate().is_err());
+    assert!(Query::new().tag("").validate().is_err());
+}
+
+#[tokio::test]
+async fn saved_query_runs_twice() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "cat_ears"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_fixture()))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+    let query = Query::new().tag("cat_ears").limit(2);
+
+    for _ in 0..2 {
+        let posts = client
+            .search_with(query.clone())
+            .send()
+            .await
+            .expect("search must succeed");
+        assert_eq!(posts.len(), 2);
+    }
+
+    assert_eq!(
+        client.search().tag("cat_ears").query(),
+        &Query::new().tag("cat_ears")
+    );
+}
+
+#[tokio::test]
+async fn stream_yields_invalid_once_then_ends() {
+    let mock_server = MockServer::start().await;
+    let client = test_client(&mock_server);
+
+    let mut stream = client.search().tag("cat ears").posts();
+
+    assert!(matches!(
+        stream.next().await.expect("stream must yield"),
+        Err(BooruError::InvalidTag { .. })
+    ));
+    assert!(stream.next().await.is_none());
+}
+
+#[tokio::test]
+async fn repeated_rating_and_limit_replace_on_wire() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "rating:general"))
+        .and(query_param("limit", "10"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .rating(SafebooruRating::Safe)
+        .rating(SafebooruRating::General)
+        .limit(5)
+        .limit(10)
+        .send()
+        .await
+        .expect("search must succeed");
+
     assert!(posts.is_empty());
 }

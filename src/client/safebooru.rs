@@ -207,12 +207,13 @@ impl Client {
     }
 
     pub fn search(&self) -> Search {
+        self.search_with(Query::new())
+    }
+
+    pub fn search_with(&self, query: Query) -> Search {
         Search {
             client: self.clone(),
-            tags: Vec::new(),
-            rating: None,
-            sort: None,
-            limit: 100,
+            query,
             page: 0,
         }
     }
@@ -263,17 +264,30 @@ impl Client {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Search {
-    client: Client,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Query {
     tags: Vec<String>,
     rating: Option<String>,
     sort: Option<String>,
     limit: u32,
-    page: u32,
 }
 
-impl Search {
+impl Default for Query {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Query {
+    pub fn new() -> Self {
+        Self {
+            tags: Vec::new(),
+            rating: None,
+            sort: None,
+            limit: 100,
+        }
+    }
+
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
         self
@@ -292,6 +306,57 @@ impl Search {
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = limit;
         self
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        for tag in &self.tags {
+            if tag.is_empty() {
+                return Err(BooruError::InvalidTag {
+                    tag: tag.clone(),
+                    reason: "tag must not be empty".to_string(),
+                });
+            }
+            if tag.chars().any(char::is_whitespace) {
+                return Err(BooruError::InvalidTag {
+                    tag: tag.clone(),
+                    reason: "tag must not contain whitespace".to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Search {
+    client: Client,
+    query: Query,
+    page: u32,
+}
+
+impl Search {
+    pub fn tag(mut self, tag: impl Into<String>) -> Self {
+        self.query = self.query.tag(tag);
+        self
+    }
+
+    pub fn rating(mut self, rating: SafebooruRating) -> Self {
+        self.query = self.query.rating(rating);
+        self
+    }
+
+    pub fn sort(mut self, order: Sort) -> Self {
+        self.query = self.query.sort(order);
+        self
+    }
+
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.query = self.query.limit(limit);
+        self
+    }
+
+    pub fn query(&self) -> &Query {
+        &self.query
     }
 
     /// Fetches the first page of results.
@@ -326,11 +391,12 @@ impl Search {
     }
 
     async fn fetch(&self) -> Result<Vec<SafebooruPost>> {
-        let mut tags = self.tags.clone();
-        if let Some(rating) = &self.rating {
+        self.query.validate()?;
+        let mut tags = self.query.tags.clone();
+        if let Some(rating) = &self.query.rating {
             tags.push(format!("rating:{rating}"));
         }
-        if let Some(sort) = &self.sort {
+        if let Some(sort) = &self.query.sort {
             tags.push(sort.clone());
         }
         let tags = tags.join(" ");
@@ -344,7 +410,7 @@ impl Search {
                 ("s", "post"),
                 ("q", "index"),
                 ("pid", &self.page.to_string()),
-                ("limit", &self.limit.to_string()),
+                ("limit", &self.query.limit.to_string()),
                 ("tags", &tags),
                 ("json", "1"),
             ])
