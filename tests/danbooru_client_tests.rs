@@ -222,7 +222,7 @@ async fn autocomplete_uses_instance_endpoint() {
         .and(query_param("search[query]", "cat_"))
         .and(query_param("limit", "3"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
-            r#"[{"value":"cat_ears","label":"Cat ears (123)","category":0,"post_count":123,"tag":"cat_ears","type":"tag"}]"#,
+            r#"[{"value":"cat_ears","label":"Cat ears (123)","category":0,"post_count":123,"tag":{"name":"cat_ears","category":0},"type":"tag"}]"#,
         ))
         .mount(&mock_server)
         .await;

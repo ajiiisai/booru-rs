@@ -31,9 +31,24 @@ struct DanbooruAutocompleteItem {
     category: Option<u8>,
     post_count: Option<u32>,
     #[serde(default)]
-    tag: Option<String>,
+    tag: Option<DanbooruAutocompleteTag>,
     #[serde(rename = "type", default)]
     suggestion_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum DanbooruAutocompleteTag {
+    Object { name: String },
+    Name(String),
+}
+
+impl DanbooruAutocompleteTag {
+    fn into_name(self) -> String {
+        match self {
+            Self::Object { name } | Self::Name(name) => name,
+        }
+    }
 }
 
 const DEFAULT_ENDPOINT: &str = "https://danbooru.donmai.us";
@@ -158,7 +173,7 @@ impl Client {
                 label: item.label,
                 post_count: item.post_count,
                 category: item.category,
-                tag: item.tag,
+                tag: item.tag.map(DanbooruAutocompleteTag::into_name),
                 suggestion_type: item.suggestion_type,
             })
             .collect())
