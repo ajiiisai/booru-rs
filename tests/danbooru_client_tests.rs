@@ -260,3 +260,123 @@ fn client_shares_safely_across_tasks() {
     assert_send_sync_clone::<booru_rs::danbooru::Search>();
     assert_send_sync_clone::<booru_rs::danbooru::Query>();
 }
+
+#[tokio::test]
+async fn sort_keeps_provider_prefix_on_wire() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("tags", "order:score"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[])))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let posts = client
+        .search()
+        .sort(booru_rs::client::generic::Sort::Score)
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert!(posts.is_empty());
+}
+
+#[tokio::test]
+async fn blacklist_appends_on_wire() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("tags", "cat_ears -explicit"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[])))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("cat_ears")
+        .blacklist_tag(booru_rs::model::danbooru::DanbooruRating::Explicit)
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert!(posts.is_empty());
+}
+
+#[tokio::test]
+async fn random_requests_random_order() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("tags", "order:random"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[])))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .random()
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert!(posts.is_empty());
+}
+
+#[tokio::test]
+async fn start_page_starts_there() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![], vec![], vec![7]]).await;
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .start_page(2)
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert_eq!(ids(&posts), vec![7]);
+}
+
+#[tokio::test]
+async fn posts_max_posts_caps_and_stops() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .posts()
+        .max_posts(3)
+        .collect()
+        .await
+        .expect("stream must succeed");
+
+    assert_eq!(ids(&posts), vec![1, 2, 3]);
+}
+
+#[tokio::test]
+async fn pages_max_pages_caps_fetching() {
+    let mock_server = MockServer::start().await;
+    mock_pages(&mock_server, &[vec![1, 2], vec![3, 4], vec![]]).await;
+    let client = test_client(&mock_server);
+
+    let mut pages = client.search().pages().max_pages(1);
+
+    let page = pages.next().await.expect("page must follow");
+    assert_eq!(ids(&page.expect("page must succeed").posts), vec![1, 2]);
+    assert!(pages.next().await.is_none());
+}
