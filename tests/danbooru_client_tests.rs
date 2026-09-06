@@ -427,3 +427,76 @@ fn post_preserves_unknown_rating() {
     assert_eq!(post.rating.as_ref().unwrap().to_string(), "x");
     assert!(serde_json::from_value::<DanbooruRating>("x".into()).is_err());
 }
+#[test]
+fn post_preserves_optional_metadata() {
+    use booru_rs::danbooru::DanbooruPost;
+
+    let mut value: serde_json::Value = serde_json::from_str(&single_post_json(1)).unwrap();
+    value["tag_count"] = 42.into();
+    value["last_commented_at"] = "2026-01-02T03:04:05.000Z".into();
+    value["media_asset"] = serde_json::json!({
+        "id": 7,
+        "status": "active",
+        "nested": {"provider_key": true}
+    });
+    let post: DanbooruPost = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(post.tag_count, Some(42));
+    assert_eq!(
+        post.last_commented_at.as_deref(),
+        Some("2026-01-02T03:04:05.000Z")
+    );
+    assert_eq!(post.media_asset, Some(value["media_asset"].clone()));
+    let serialized = serde_json::to_value(&post).unwrap();
+    assert_eq!(serialized["tag_count"], 42);
+    assert_eq!(serialized["last_commented_at"], value["last_commented_at"]);
+    assert_eq!(serialized["media_asset"], value["media_asset"]);
+}
+
+#[test]
+fn post_allows_missing_and_null_optional_metadata() {
+    use booru_rs::danbooru::DanbooruPost;
+
+    let fixture: serde_json::Value = serde_json::from_str(&single_post_json(1)).unwrap();
+    for null_value in [false, true] {
+        let mut value = fixture.clone();
+        for field in ["tag_count", "last_commented_at", "media_asset"] {
+            if null_value {
+                value[field] = serde_json::Value::Null;
+            } else {
+                value.as_object_mut().unwrap().remove(field);
+            }
+        }
+        let post: DanbooruPost = serde_json::from_value(value).unwrap();
+        assert_eq!(post.tag_count, None);
+        assert_eq!(post.last_commented_at, None);
+        assert_eq!(post.media_asset, None);
+    }
+}
+
+#[test]
+fn post_rejects_invalid_tag_count_and_timestamp() {
+    use booru_rs::danbooru::DanbooruPost;
+
+    let fixture: serde_json::Value = serde_json::from_str(&single_post_json(1)).unwrap();
+    for invalid in [
+        serde_json::json!(-1),
+        serde_json::json!(u64::from(u32::MAX) + 1),
+        serde_json::json!(1.5),
+        serde_json::json!("42"),
+        serde_json::json!([]),
+    ] {
+        let mut value = fixture.clone();
+        value["tag_count"] = invalid;
+        assert!(serde_json::from_value::<DanbooruPost>(value).is_err());
+    }
+    for invalid in [
+        serde_json::json!(1),
+        serde_json::json!(true),
+        serde_json::json!([]),
+        serde_json::json!({}),
+    ] {
+        let mut value = fixture.clone();
+        value["last_commented_at"] = invalid;
+        assert!(serde_json::from_value::<DanbooruPost>(value).is_err());
+    }
+}

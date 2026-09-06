@@ -44,6 +44,15 @@ pub struct DanbooruPost {
     pub tag_count_copyright: u32,
     pub tag_count_character: u32,
     pub tag_count_meta: u32,
+    /// Total number of tags, if supplied by Danbooru.
+    #[serde(default)]
+    pub tag_count: Option<u32>,
+    /// Timestamp of the latest comment, if supplied.
+    #[serde(default)]
+    pub last_commented_at: Option<String>,
+    /// Media asset metadata, preserved without narrowing nested provider fields.
+    #[serde(default)]
+    pub media_asset: Option<serde_json::Value>,
     pub last_comment_bumped_at: Option<String>,
     pub last_noted_at: Option<String>,
     pub has_large: bool,
