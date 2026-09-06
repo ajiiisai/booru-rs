@@ -12,7 +12,7 @@ pub type Result<T> = std::result::Result<T, BooruError>;
 pub enum BooruError {
     /// HTTP request failed.
     #[error("HTTP request failed: {0}")]
-    Request(#[from] reqwest::Error),
+    Request(reqwest::Error),
 
     /// Failed to parse the API response.
     #[error("Failed to parse API response: {0}")]
@@ -101,6 +101,12 @@ pub enum BooruError {
     /// Download concurrency must be greater than zero.
     #[error("Download concurrency must be greater than zero")]
     InvalidConcurrency,
+}
+
+impl From<reqwest::Error> for BooruError {
+    fn from(error: reqwest::Error) -> Self {
+        Self::Request(error.without_url())
+    }
 }
 
 impl BooruError {

@@ -6,7 +6,7 @@ use futures_core::Stream;
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::Deserialize;
 
-use super::{RequestPolicy, execute_with_policy};
+use super::{RequestPolicy, Secret, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
@@ -44,8 +44,8 @@ const SORT_PREFIX: &str = "order:";
 pub struct Client {
     http: reqwest::Client,
     endpoint: String,
-    key: Option<String>,
-    user: Option<String>,
+    key: Option<Secret>,
+    user: Option<Secret>,
     policy: RequestPolicy,
 }
 
@@ -90,8 +90,8 @@ impl Client {
     pub async fn post(&self, id: u32) -> Result<DanbooruPost> {
         let mut query = Vec::new();
         if let (Some(key), Some(user)) = (&self.key, &self.user) {
-            query.push(("login", user.clone()));
-            query.push(("api_key", key.clone()));
+            query.push(("login", user.expose().to_string()));
+            query.push(("api_key", key.expose().to_string()));
         }
 
         let response = match execute_with_policy(&self.policy, || async {
@@ -334,8 +334,8 @@ impl Search {
             ("tags", tags),
         ];
         if let (Some(key), Some(user)) = (&self.client.key, &self.client.user) {
-            query.push(("login", user.clone()));
-            query.push(("api_key", key.clone()));
+            query.push(("login", user.expose().to_string()));
+            query.push(("api_key", key.expose().to_string()));
         }
 
         let response = execute_with_policy(&self.client.policy, || async {
@@ -481,8 +481,8 @@ impl Stream for PostStream {
 pub struct ClientBuilder {
     http: Option<reqwest::Client>,
     endpoint: Option<String>,
-    key: Option<String>,
-    user: Option<String>,
+    key: Option<Secret>,
+    user: Option<Secret>,
     policy: Option<RequestPolicy>,
 }
 
@@ -496,8 +496,8 @@ impl ClientBuilder {
     }
 
     pub fn set_credentials(mut self, key: impl Into<String>, user: impl Into<String>) -> Self {
-        self.key = Some(key.into());
-        self.user = Some(user.into());
+        self.key = Some(Secret::new(key));
+        self.user = Some(Secret::new(user));
         self
     }
 

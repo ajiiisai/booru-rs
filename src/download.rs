@@ -89,7 +89,7 @@ async fn stream_response_to_file(
                     });
                 }
             }
-            Some(Err(error)) => return Err(BooruError::Request(error)),
+            Some(Err(error)) => return Err(error.into()),
             None => break,
         }
     }
@@ -295,7 +295,7 @@ impl Downloader {
             .send()
             .await?
             .error_for_status()
-            .map_err(BooruError::Request)?;
+            .map_err(BooruError::from)?;
 
         stream_response_to_file(response, &dest_path, self.options.overwrite, None, None).await
     }
@@ -340,7 +340,7 @@ impl Downloader {
             .send()
             .await?
             .error_for_status()
-            .map_err(BooruError::Request)?;
+            .map_err(BooruError::from)?;
 
         stream_response_to_file(
             response,
@@ -478,7 +478,7 @@ impl Downloader {
                         .send()
                         .await?
                         .error_for_status()
-                        .map_err(BooruError::Request)?;
+                        .map_err(BooruError::from)?;
 
                     stream_response_to_file(response, &dest_path, options.overwrite, None, None)
                         .await

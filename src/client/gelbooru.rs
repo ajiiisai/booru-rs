@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use serde::Deserialize;
 
-use super::{RequestPolicy, execute_with_policy};
+use super::{RequestPolicy, Secret, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
@@ -57,8 +57,8 @@ const SORT_PREFIX: &str = "sort:";
 pub struct Client {
     http: reqwest::Client,
     endpoint: String,
-    key: Option<String>,
-    user: Option<String>,
+    key: Option<Secret>,
+    user: Option<Secret>,
     policy: RequestPolicy,
 }
 
@@ -525,8 +525,8 @@ impl Stream for PostStream {
 pub struct ClientBuilder {
     http: Option<reqwest::Client>,
     endpoint: Option<String>,
-    key: Option<String>,
-    user: Option<String>,
+    key: Option<Secret>,
+    user: Option<Secret>,
     policy: Option<RequestPolicy>,
 }
 
@@ -540,8 +540,8 @@ impl ClientBuilder {
     }
 
     pub fn set_credentials(mut self, key: impl Into<String>, user: impl Into<String>) -> Self {
-        self.key = Some(key.into());
-        self.user = Some(user.into());
+        self.key = Some(Secret::new(key));
+        self.user = Some(Secret::new(user));
         self
     }
 

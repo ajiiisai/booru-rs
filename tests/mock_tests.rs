@@ -261,3 +261,47 @@ mod endpoint_config {
         assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
     }
 }
+
+mod credential_redaction {
+    #[test]
+    fn client_debug_output_omits_credentials() {
+        let secret = "debug-secret";
+        let user = "debug-user";
+
+        let danbooru_builder = booru_rs::danbooru::Client::builder().set_credentials(secret, user);
+        let gelbooru_builder = booru_rs::gelbooru::Client::builder().set_credentials(secret, user);
+        let rule34_builder = booru_rs::rule34::Client::builder().set_credentials(secret, user);
+
+        for debug in [
+            format!("{danbooru_builder:?}"),
+            format!("{gelbooru_builder:?}"),
+            format!("{rule34_builder:?}"),
+            format!("{:?}", danbooru_builder.build().unwrap()),
+            format!("{:?}", gelbooru_builder.build().unwrap()),
+            format!("{:?}", rule34_builder.build().unwrap()),
+        ] {
+            assert!(!debug.contains(secret));
+            assert!(!debug.contains(user));
+        }
+    }
+
+    #[tokio::test]
+    async fn request_errors_omit_credentials() {
+        let secret = "request-secret";
+        let user = "request-user";
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        drop(listener);
+        let client = booru_rs::danbooru::Client::builder()
+            .endpoint(endpoint)
+            .unwrap()
+            .set_credentials(secret, user)
+            .build()
+            .unwrap();
+
+        let error = client.post(1).await.unwrap_err();
+        let diagnostics = format!("{error:?} {error}");
+        assert!(!diagnostics.contains(secret));
+        assert!(!diagnostics.contains(user));
+    }
+}

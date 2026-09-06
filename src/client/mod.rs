@@ -61,6 +61,25 @@ use crate::ratelimit::RateLimiter;
 use crate::retry::{RetryConfig, is_retryable};
 use reqwest::header::HeaderMap;
 
+#[derive(Clone, Default)]
+pub(crate) struct Secret(String);
+
+impl Secret {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+
 #[cfg(feature = "danbooru")]
 pub mod danbooru;
 #[cfg(feature = "gelbooru")]
@@ -103,9 +122,9 @@ pub(crate) fn dapi_url(endpoint: &str) -> String {
 }
 
 pub(crate) fn dapi_credentials<'a>(
-    key: &'a Option<String>,
-    user: &'a Option<String>,
-) -> Option<(&'a String, &'a String)> {
+    key: &'a Option<Secret>,
+    user: &'a Option<Secret>,
+) -> Option<(&'a Secret, &'a Secret)> {
     match (key, user) {
         (Some(key), Some(user)) => Some((key, user)),
         _ => None,
@@ -114,7 +133,7 @@ pub(crate) fn dapi_credentials<'a>(
 
 pub(crate) fn dapi_query(
     params: &[(&'static str, String)],
-    credentials: Option<(&String, &String)>,
+    credentials: Option<(&Secret, &Secret)>,
 ) -> Vec<(String, String)> {
     let mut query: Vec<(String, String)> = vec![
         ("page".to_string(), "dapi".to_string()),
@@ -126,8 +145,8 @@ pub(crate) fn dapi_query(
         query.push(((*key).to_string(), value.clone()));
     }
     if let Some((key, user)) = credentials {
-        query.push(("api_key".to_string(), key.clone()));
-        query.push(("user_id".to_string(), user.clone()));
+        query.push(("api_key".to_string(), key.expose().to_string()));
+        query.push(("user_id".to_string(), user.expose().to_string()));
     }
     query
 }
