@@ -229,3 +229,31 @@ fn client_shares_safely_across_tasks() {
     assert_send_sync_clone::<booru_rs::rule34::Search>();
     assert_send_sync_clone::<booru_rs::rule34::Query>();
 }
+
+#[tokio::test]
+async fn sort_keeps_provider_prefix_on_wire() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "sort:score"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .set_credentials("test_key", "test_user")
+        .build()
+        .unwrap();
+
+    let posts = client
+        .search()
+        .sort(booru_rs::client::generic::Sort::Score)
+        .send()
+        .await
+        .expect("search must succeed");
+
+    assert!(posts.is_empty());
+}
