@@ -57,6 +57,49 @@ fn filename_from_url(url: &str) -> Result<String> {
     Ok(filename)
 }
 
+async fn stream_response_to_file(
+    response: reqwest::Response,
+    dest_path: &Path,
+    post_id: Option<u32>,
+    on_progress: Option<&(dyn Fn(DownloadProgress) + Send + Sync)>,
+) -> Result<u64> {
+    use futures_core::Stream;
+
+    let parent = dest_path.parent().unwrap_or_else(|| Path::new("."));
+    let temp = tempfile::NamedTempFile::new_in(parent)?;
+    let mut file = tokio::fs::File::from_std(temp.reopen()?);
+    let total = response.content_length();
+    let mut downloaded = 0;
+    let mut stream = std::pin::pin!(response.bytes_stream());
+
+    loop {
+        let chunk = std::future::poll_fn(|cx| stream.as_mut().poll_next(cx)).await;
+        match chunk {
+            Some(Ok(bytes)) => {
+                file.write_all(&bytes).await?;
+                downloaded += bytes.len() as u64;
+                if let Some(on_progress) = on_progress
+                    && let Some(post_id) = post_id
+                {
+                    on_progress(DownloadProgress {
+                        total,
+                        downloaded,
+                        post_id,
+                    });
+                }
+            }
+            Some(Err(error)) => return Err(BooruError::Request(error)),
+            None => break,
+        }
+    }
+
+    file.flush().await?;
+    drop(file);
+    temp.persist(dest_path)
+        .map_err(|error| BooruError::Io(error.error))?;
+    Ok(downloaded)
+}
+
 /// Options for configuring downloads.
 #[derive(Debug, Clone, Default)]
 pub struct DownloadOptions {
@@ -246,13 +289,7 @@ impl Downloader {
             .error_for_status()
             .map_err(BooruError::Request)?;
 
-        let bytes = response.bytes().await?;
-        let size = bytes.len() as u64;
-
-        // Write to file
-        let mut file = tokio::fs::File::create(&dest_path).await?;
-        file.write_all(&bytes).await?;
-        file.flush().await?;
+        let size = stream_response_to_file(response, &dest_path, None, None).await?;
 
         Ok(DownloadResult {
             path: dest_path,
@@ -273,7 +310,7 @@ impl Downloader {
         on_progress: F,
     ) -> Result<DownloadResult>
     where
-        F: Fn(DownloadProgress) + Send,
+        F: Fn(DownloadProgress) + Send + Sync,
     {
         let filename = match filename {
             Some(f) => {
@@ -303,39 +340,9 @@ impl Downloader {
             .error_for_status()
             .map_err(BooruError::Request)?;
 
-        let total = response.content_length();
-        let mut downloaded: u64 = 0;
-
-        let mut file = tokio::fs::File::create(&dest_path).await?;
-        let mut stream = response.bytes_stream();
-
-        use futures_core::Stream;
-        use std::pin::Pin;
-        use std::task::Context;
-
-        // Consume stream manually to track progress
-        let mut stream = Pin::new(&mut stream);
-        loop {
-            let chunk =
-                std::future::poll_fn(|cx: &mut Context<'_>| stream.as_mut().poll_next(cx)).await;
-
-            match chunk {
-                Some(Ok(bytes)) => {
-                    file.write_all(&bytes).await?;
-                    downloaded += bytes.len() as u64;
-
-                    on_progress(DownloadProgress {
-                        total,
-                        downloaded,
-                        post_id,
-                    });
-                }
-                Some(Err(e)) => return Err(BooruError::Request(e)),
-                None => break,
-            }
-        }
-
-        file.flush().await?;
+        let downloaded =
+            stream_response_to_file(response, &dest_path, Some(post_id), Some(&on_progress))
+                .await?;
 
         Ok(DownloadResult {
             path: dest_path,
@@ -368,7 +375,7 @@ impl Downloader {
         on_progress: F,
     ) -> Result<DownloadResult>
     where
-        F: Fn(DownloadProgress) + Send,
+        F: Fn(DownloadProgress) + Send + Sync,
     {
         let url = post
             .file_url()
@@ -442,12 +449,7 @@ impl Downloader {
                     .error_for_status()
                     .map_err(BooruError::Request)?;
 
-                let bytes = response.bytes().await?;
-                let size = bytes.len() as u64;
-
-                let mut file = tokio::fs::File::create(&dest_path).await?;
-                file.write_all(&bytes).await?;
-                file.flush().await?;
+                let size = stream_response_to_file(response, &dest_path, None, None).await?;
 
                 Ok(DownloadResult {
                     path: dest_path,
