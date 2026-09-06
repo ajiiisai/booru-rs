@@ -511,3 +511,83 @@ fn post_normalization_rejects_invalid_values() {
         );
     }
 }
+#[test]
+fn post_preserves_sample_metadata() {
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    let post: Rule34Post = serde_json::from_value(fixture[0].clone()).unwrap();
+    assert_eq!(post.sample, Some(true));
+    assert_eq!(post.sample_height, Some(600));
+    assert_eq!(post.sample_width, Some(450));
+    let serialized = serde_json::to_value(&post).unwrap();
+    for field in ["sample", "sample_height", "sample_width"] {
+        assert_eq!(serialized[field], fixture[0][field], "{field}");
+    }
+    assert_eq!(
+        serde_json::from_value::<Rule34Post>(serialized).unwrap(),
+        post
+    );
+}
+
+#[test]
+fn post_preserves_absent_and_zero_sample_metadata() {
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for missing in [true, false] {
+        let mut value = fixture[0].clone();
+        for field in ["sample", "sample_height", "sample_width"] {
+            if missing {
+                value.as_object_mut().unwrap().remove(field);
+            } else {
+                value[field] = serde_json::Value::Null;
+            }
+        }
+        let post: Rule34Post = serde_json::from_value(value).unwrap();
+        assert_eq!(post.sample, None);
+        assert_eq!(post.sample_height, None);
+        assert_eq!(post.sample_width, None);
+        assert_eq!(
+            serde_json::from_value::<Rule34Post>(serde_json::to_value(&post).unwrap()).unwrap(),
+            post
+        );
+    }
+    for dimension in [0, u32::MAX] {
+        let mut value = fixture[0].clone();
+        value["sample"] = false.into();
+        value["sample_height"] = dimension.into();
+        value["sample_width"] = dimension.into();
+        let post: Rule34Post = serde_json::from_value(value).unwrap();
+        assert_eq!(post.sample, Some(false));
+        assert_eq!(post.sample_height, Some(dimension));
+        assert_eq!(post.sample_width, Some(dimension));
+    }
+}
+
+#[test]
+fn post_rejects_invalid_sample_metadata() {
+    use booru_rs::model::rule34::Rule34Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    for (field, invalid) in [
+        ("sample", serde_json::json!(1)),
+        ("sample", serde_json::json!("true")),
+        ("sample_height", serde_json::json!(-1)),
+        ("sample_height", serde_json::json!(u64::from(u32::MAX) + 1)),
+        ("sample_width", serde_json::json!(-1)),
+        ("sample_width", serde_json::json!(u64::from(u32::MAX) + 1)),
+        ("sample_height", serde_json::json!("600")),
+        ("sample_width", serde_json::json!(1.5)),
+    ] {
+        let mut value = fixture[0].clone();
+        value[field] = invalid;
+        assert!(
+            serde_json::from_value::<Rule34Post>(value).is_err(),
+            "{field}"
+        );
+    }
+}

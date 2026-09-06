@@ -27,6 +27,12 @@ pub struct Rule34Post {
     pub preview_url: Option<String>,
     /// Post's sample (resized) url  
     pub sample_url: Option<String>,
+    /// Provider's sample flag, if supplied.
+    pub sample: Option<bool>,
+    /// Sample height in pixels, if supplied.
+    pub sample_height: Option<u32>,
+    /// Sample width in pixels, if supplied.
+    pub sample_width: Option<u32>,
     /// Post's tags (space-separated)
     pub tags: String,
     /// Post's rating
@@ -72,6 +78,9 @@ struct Rule34PostWire {
     file_url: Option<String>,
     preview_url: Option<String>,
     sample_url: Option<String>,
+    sample: Option<bool>,
+    sample_height: Option<u32>,
+    sample_width: Option<u32>,
     tags: String,
     rating: Rule34Rating,
     #[serde(default)]
@@ -106,6 +115,9 @@ impl From<Rule34PostWire> for Rule34Post {
             file_url: wire.file_url.filter(|url| !url.is_empty()),
             preview_url: wire.preview_url.filter(|url| !url.is_empty()),
             sample_url: wire.sample_url.filter(|url| !url.is_empty()),
+            sample: wire.sample,
+            sample_height: wire.sample_height,
+            sample_width: wire.sample_width,
             tags: wire.tags,
             rating: wire.rating,
             source: wire.source,
