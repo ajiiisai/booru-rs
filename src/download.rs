@@ -31,6 +31,32 @@ use crate::model::Post;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
+fn validate_filename(filename: &str) -> Result<()> {
+    if filename.is_empty()
+        || filename == "."
+        || filename == ".."
+        || filename.contains('/')
+        || filename.contains('\\')
+    {
+        return Err(BooruError::InvalidFilename(filename.to_string()));
+    }
+    Ok(())
+}
+
+fn filename_from_url(url: &str) -> Result<String> {
+    let parsed = reqwest::Url::parse(url).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
+    if parsed.path().is_empty() || parsed.path().ends_with('/') {
+        return Err(BooruError::InvalidUrl(url.to_string()));
+    }
+    let filename = parsed
+        .path_segments()
+        .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+        .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?;
+    let filename = filename.to_string();
+    validate_filename(&filename)?;
+    Ok(filename)
+}
+
 /// Options for configuring downloads.
 #[derive(Debug, Clone, Default)]
 pub struct DownloadOptions {
@@ -182,12 +208,11 @@ impl Downloader {
     ) -> Result<DownloadResult> {
         // Extract filename from URL if not provided
         let filename = match filename {
-            Some(f) => f.to_string(),
-            None => url
-                .rsplit('/')
-                .next()
-                .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?
-                .to_string(),
+            Some(f) => {
+                validate_filename(f)?;
+                f.to_string()
+            }
+            None => filename_from_url(url)?,
         };
 
         let dest_path = dest_dir.join(&filename);
@@ -244,12 +269,11 @@ impl Downloader {
         F: Fn(DownloadProgress) + Send,
     {
         let filename = match filename {
-            Some(f) => f.to_string(),
-            None => url
-                .rsplit('/')
-                .next()
-                .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?
-                .to_string(),
+            Some(f) => {
+                validate_filename(f)?;
+                f.to_string()
+            }
+            None => filename_from_url(url)?,
         };
 
         let dest_path = dest_dir.join(&filename);
@@ -473,6 +497,42 @@ mod tests {
 
         assert!(opts.overwrite);
         assert!(opts.filename_template.is_some());
+    }
+
+    #[test]
+    fn filename_from_url_uses_path_without_query() {
+        assert_eq!(
+            filename_from_url("https://example.com/media/image.jpg?token=secret").unwrap(),
+            "image.jpg"
+        );
+    }
+
+    #[test]
+    fn filename_from_url_rejects_empty_paths() {
+        for url in ["https://example.com", "https://example.com/dir/"] {
+            assert!(matches!(
+                filename_from_url(url),
+                Err(BooruError::InvalidUrl(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn filename_validation_rejects_path_components() {
+        for filename in [
+            "",
+            ".",
+            "..",
+            "../image.jpg",
+            "nested/image.jpg",
+            r"..\image.jpg",
+        ] {
+            assert!(matches!(
+                validate_filename(filename),
+                Err(BooruError::InvalidFilename(_))
+            ));
+        }
+        assert!(validate_filename("image.jpg").is_ok());
     }
 
     #[tokio::test]

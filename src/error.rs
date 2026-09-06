@@ -43,6 +43,10 @@ pub enum BooruError {
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
 
+    /// Invalid destination filename.
+    #[error("Invalid destination filename: {0}")]
+    InvalidFilename(String),
+
     /// Authentication required or failed.
     ///
     /// Some booru sites (like Gelbooru) require API credentials.
