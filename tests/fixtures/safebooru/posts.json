@@ -1,0 +1,34 @@
+[
+  {
+    "id": 12345,
+    "score": 100,
+    "height": 1080,
+    "width": 1920,
+    "hash": "abc123def456",
+    "tags": "cat_ears blue_eyes",
+    "image": "abc123.jpg",
+    "directory": 1234,
+    "file_url": "https://example.com/images/1234/abc123.jpg",
+    "preview_url": "https://example.com/thumbnails/1234/thumbnail_abc123.jpg",
+    "sample_url": "https://example.com/samples/1234/sample_abc123.jpg",
+    "source": "https://twitter.com/artist/status/123",
+    "change": 1700000000,
+    "rating": "general"
+  },
+  {
+    "id": 12346,
+    "score": 50,
+    "height": 720,
+    "width": 1280,
+    "hash": "def789ghi012",
+    "tags": "landscape nature",
+    "image": "def789.png",
+    "directory": 1234,
+    "file_url": "https://example.com/images/1234/def789.png",
+    "preview_url": "https://example.com/thumbnails/1234/thumbnail_def789.png",
+    "sample_url": "https://example.com/samples/1234/sample_def789.png",
+    "source": "",
+    "change": 1700000001,
+    "rating": "safe"
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "@attributes": {
+    "limit": 1,
+    "offset": 0,
+    "count": 1000
+  },
+  "post": [
+    {
+      "id": 9876543,
+      "created_at": "Mon Dec 23 12:00:00 -0600 2024",
+      "score": 150,
+      "width": 1920,
+      "height": 1080,
+      "md5": "gelbooru123abc",
+      "directory": "ge/lb",
+      "image": "gelbooru123abc.jpg",
+      "rating": "general",
+      "source": "https://twitter.com/artist/status/456",
+      "change": 1700000000,
+      "owner": "uploader_name",
+      "creator_id": 12345,
+      "parent_id": 0,
+      "sample": 1,
+      "preview_height": 150,
+      "preview_width": 200,
+      "tags": "cat_ears blue_eyes 1girl",
+      "title": "",
+      "has_notes": "false",
+      "has_comments": "false",
+      "file_url": "https://example.com/images/ge/lb/gelbooru123abc.jpg",
+      "preview_url": "https://example.com/thumbnails/ge/lb/thumbnail_gelbooru123abc.jpg",
+      "sample_url": "https://example.com/samples/ge/lb/sample_gelbooru123abc.jpg",
+      "sample_height": 720,
+      "sample_width": 1280,
+      "status": "active",
+      "post_locked": 0,
+      "has_children": "false"
+    }
+  ]
+}

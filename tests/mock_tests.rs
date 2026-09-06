@@ -14,140 +14,18 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// Test fixture for Safebooru posts
 fn safebooru_posts_json() -> &'static str {
-    r#"[
-        {
-            "id": 12345,
-            "score": 100,
-            "height": 1080,
-            "width": 1920,
-            "hash": "abc123def456",
-            "tags": "cat_ears blue_eyes",
-            "image": "abc123.jpg",
-            "directory": 1234,
-            "file_url": "https://example.com/images/1234/abc123.jpg",
-            "preview_url": "https://example.com/thumbnails/1234/thumbnail_abc123.jpg",
-            "sample_url": "https://example.com/samples/1234/sample_abc123.jpg",
-            "source": "https://twitter.com/artist/status/123",
-            "change": 1700000000,
-            "rating": "general"
-        },
-        {
-            "id": 12346,
-            "score": 50,
-            "height": 720,
-            "width": 1280,
-            "hash": "def789ghi012",
-            "tags": "landscape nature",
-            "image": "def789.png",
-            "directory": 1234,
-            "file_url": "https://example.com/images/1234/def789.png",
-            "preview_url": "https://example.com/thumbnails/1234/thumbnail_def789.png",
-            "sample_url": "https://example.com/samples/1234/sample_def789.png",
-            "source": "",
-            "change": 1700000001,
-            "rating": "safe"
-        }
-    ]"#
+    include_str!("fixtures/safebooru/posts.json")
 }
 
 /// Test fixture for a single Danbooru post
 fn danbooru_post_json() -> &'static str {
-    r#"{
-        "id": 7654321,
-        "created_at": "2024-01-15T12:00:00.000Z",
-        "updated_at": "2024-01-15T12:00:00.000Z",
-        "uploader_id": 12345,
-        "approver_id": null,
-        "tag_string": "1girl solo cat_ears blue_hair",
-        "tag_string_general": "1girl solo cat_ears",
-        "tag_string_artist": "artist_name",
-        "tag_string_copyright": "",
-        "tag_string_character": "",
-        "tag_string_meta": "",
-        "rating": "g",
-        "parent_id": null,
-        "pixiv_id": null,
-        "source": "https://pixiv.net/artworks/123456",
-        "md5": "abcdef1234567890",
-        "file_url": "https://example.com/original/abcdef.png",
-        "large_file_url": "https://example.com/sample/abcdef.jpg",
-        "preview_file_url": "https://example.com/preview/abcdef.jpg",
-        "file_ext": "png",
-        "file_size": 2500000,
-        "image_width": 2048,
-        "image_height": 1536,
-        "score": 250,
-        "up_score": 300,
-        "down_score": 50,
-        "fav_count": 100,
-        "tag_count_general": 3,
-        "tag_count_artist": 1,
-        "tag_count_copyright": 0,
-        "tag_count_character": 0,
-        "tag_count_meta": 0,
-        "last_comment_bumped_at": null,
-        "last_noted_at": null,
-        "has_large": true,
-        "has_children": false,
-        "has_visible_children": false,
-        "has_active_children": false,
-        "is_banned": false,
-        "is_deleted": false,
-        "is_flagged": false,
-        "is_pending": false,
-        "bit_flags": 0
-    }"#
+    include_str!("fixtures/danbooru/post.json")
 }
 
 /// Test fixture for Danbooru posts array
 fn danbooru_posts_json() -> &'static str {
-    r#"[
-        {
-            "id": 7654321,
-            "created_at": "2024-01-15T12:00:00.000Z",
-            "updated_at": "2024-01-15T12:00:00.000Z",
-            "uploader_id": 12345,
-            "approver_id": null,
-            "tag_string": "1girl solo cat_ears blue_hair",
-            "tag_string_general": "1girl solo cat_ears",
-            "tag_string_artist": "artist_name",
-            "tag_string_copyright": "",
-            "tag_string_character": "",
-            "tag_string_meta": "",
-            "rating": "g",
-            "parent_id": null,
-            "pixiv_id": null,
-            "source": "https://pixiv.net/artworks/123456",
-            "md5": "abcdef1234567890",
-            "file_url": "https://example.com/original/abcdef.png",
-            "large_file_url": "https://example.com/sample/abcdef.jpg",
-            "preview_file_url": "https://example.com/preview/abcdef.jpg",
-            "file_ext": "png",
-            "file_size": 2500000,
-            "image_width": 2048,
-            "image_height": 1536,
-            "score": 250,
-            "up_score": 300,
-            "down_score": 50,
-            "fav_count": 100,
-            "tag_count_general": 3,
-            "tag_count_artist": 1,
-            "tag_count_copyright": 0,
-            "tag_count_character": 0,
-            "tag_count_meta": 0,
-            "last_comment_bumped_at": null,
-            "last_noted_at": null,
-            "has_large": true,
-            "has_children": false,
-            "has_visible_children": false,
-            "has_active_children": false,
-            "is_banned": false,
-            "is_deleted": false,
-            "is_flagged": false,
-            "is_pending": false,
-            "bit_flags": 0
-        }
-    ]"#
+    include_str!("fixtures/danbooru/posts.json")
+    prin
 }
 
 mod mock_safebooru {
@@ -181,6 +59,7 @@ mod mock_safebooru {
         let posts = client.get().await;
 
         assert!(posts.is_ok());
+        assert!(posts.is_ok());
         let posts = posts.unwrap();
         assert_eq!(posts.len(), 2);
         assert_eq!(posts[0].id, 12345);
@@ -193,22 +72,7 @@ mod mock_safebooru {
         let mock_server = MockServer::start().await;
 
         // Single post wrapped in array for Safebooru
-        let single_post = r#"[{
-            "id": 12345,
-            "score": 100,
-            "height": 1080,
-            "width": 1920,
-            "hash": "abc123def456",
-            "tags": "cat_ears blue_eyes",
-            "image": "abc123.jpg",
-            "directory": 1234,
-            "file_url": "https://example.com/images/1234/abc123.jpg",
-            "preview_url": "https://example.com/thumbnails/1234/thumbnail_abc123.jpg",
-            "sample_url": "https://example.com/samples/1234/sample_abc123.jpg",
-            "source": "",
-            "change": 1700000000,
-            "rating": "general"
-        }]"#;
+        let single_post = include_str!("fixtures/safebooru/post.json");
 
         Mock::given(method("GET"))
             .and(path("/index.php"))
@@ -474,46 +338,7 @@ mod mock_gelbooru {
 
     /// Test fixture for Gelbooru posts (wrapped in @attributes + post array)
     fn gelbooru_response_json() -> &'static str {
-        r#"{
-            "@attributes": {
-                "limit": 1,
-                "offset": 0,
-                "count": 1000
-            },
-            "post": [
-                {
-                    "id": 9876543,
-                    "created_at": "Mon Dec 23 12:00:00 -0600 2024",
-                    "score": 150,
-                    "width": 1920,
-                    "height": 1080,
-                    "md5": "gelbooru123abc",
-                    "directory": "ge/lb",
-                    "image": "gelbooru123abc.jpg",
-                    "rating": "general",
-                    "source": "https://twitter.com/artist/status/456",
-                    "change": 1700000000,
-                    "owner": "uploader_name",
-                    "creator_id": 12345,
-                    "parent_id": 0,
-                    "sample": 1,
-                    "preview_height": 150,
-                    "preview_width": 200,
-                    "tags": "cat_ears blue_eyes 1girl",
-                    "title": "",
-                    "has_notes": "false",
-                    "has_comments": "false",
-                    "file_url": "https://example.com/images/ge/lb/gelbooru123abc.jpg",
-                    "preview_url": "https://example.com/thumbnails/ge/lb/thumbnail_gelbooru123abc.jpg",
-                    "sample_url": "https://example.com/samples/ge/lb/sample_gelbooru123abc.jpg",
-                    "sample_height": 720,
-                    "sample_width": 1280,
-                    "status": "active",
-                    "post_locked": 0,
-                    "has_children": "false"
-                }
-            ]
-        }"#
+        include_str!("fixtures/gelbooru/posts.json")
     }
 
     #[tokio::test]
@@ -606,32 +431,7 @@ mod mock_rule34 {
 
     /// Test fixture for Rule34 posts (same format as Safebooru)
     fn rule34_posts_json() -> &'static str {
-        r#"[
-            {
-                "id": 15000000,
-                "score": 75,
-                "height": 1200,
-                "width": 900,
-                "hash": "rule34hash123",
-                "tags": "1girl blue_hair",
-                "image": "rule34hash123.png",
-                "directory": 3900,
-                "file_url": "https://example.com/images/3900/rule34hash123.png",
-                "preview_url": "https://example.com/thumbnails/3900/thumbnail_rule34hash123.jpg",
-                "sample_url": "https://example.com/samples/3900/sample_rule34hash123.jpg",
-                "source": "https://pixiv.net/artworks/789",
-                "change": 1700000000,
-                "rating": "explicit",
-                "owner": "uploader",
-                "parent_id": 0,
-                "sample": true,
-                "sample_height": 600,
-                "sample_width": 450,
-                "status": "active",
-                "has_notes": false,
-                "comment_count": 0
-            }
-        ]"#
+        include_str!("fixtures/rule34/posts.json")
     }
 
     #[tokio::test]

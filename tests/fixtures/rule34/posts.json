@@ -1,0 +1,26 @@
+[
+  {
+    "id": 15000000,
+    "score": 75,
+    "height": 1200,
+    "width": 900,
+    "hash": "rule34hash123",
+    "tags": "1girl blue_hair",
+    "image": "rule34hash123.png",
+    "directory": 3900,
+    "file_url": "https://example.com/images/3900/rule34hash123.png",
+    "preview_url": "https://example.com/thumbnails/3900/thumbnail_rule34hash123.jpg",
+    "sample_url": "https://example.com/samples/3900/sample_rule34hash123.jpg",
+    "source": "https://pixiv.net/artworks/789",
+    "change": 1700000000,
+    "rating": "explicit",
+    "owner": "uploader",
+    "parent_id": 0,
+    "sample": true,
+    "sample_height": 600,
+    "sample_width": 450,
+    "status": "active",
+    "has_notes": false,
+    "comment_count": 0
+  }
+]
