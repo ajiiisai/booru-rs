@@ -49,6 +49,11 @@ pub trait Post {
     /// Returns the tags associated with this post as a single string.
     fn tags(&self) -> &str;
 
+    /// Iterates over whitespace-separated tags without allocating.
+    fn tags_iter(&self) -> std::str::SplitWhitespace<'_> {
+        self.tags().split_whitespace()
+    }
+
     /// Returns the post's score/rating value, if available.
     fn score(&self) -> Option<i64>;
 

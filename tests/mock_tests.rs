@@ -48,6 +48,10 @@ mod mock_post_trait {
             Some("https://example.com/images/1234/abc123.jpg")
         );
         assert_eq!(post.tags(), "cat_ears blue_eyes");
+        assert_eq!(
+            post.tags_iter().collect::<Vec<_>>(),
+            ["cat_ears", "blue_eyes"]
+        );
         assert_eq!(post.score(), Some(100));
         assert_eq!(post.md5(), Some("abc123def456"));
         assert_eq!(post.source(), Some("https://twitter.com/artist/status/123"));
