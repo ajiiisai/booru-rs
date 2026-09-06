@@ -46,7 +46,7 @@ async fn stream_ids(pages: &[Vec<u32>]) -> Vec<u32> {
     mock_pages(&mock_server, pages).await;
 
     SafebooruClient::builder()
-        .endpoint(&mock_server.uri())
+        .endpoint(mock_server.uri())
         .unwrap()
         .limit(2)
         .into_post_stream()
