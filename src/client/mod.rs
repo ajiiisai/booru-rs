@@ -64,6 +64,7 @@ use std::time::Duration;
 ))]
 use crate::error::BooruError;
 use crate::error::Result;
+use crate::model::Post;
 use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
 #[cfg(any(
@@ -112,6 +113,40 @@ pub mod generic;
 pub mod rule34;
 #[cfg(feature = "safebooru")]
 pub mod safebooru;
+
+/// Result of one page fetched through the provider operation interface.
+#[derive(Debug, Clone)]
+pub struct PageResult<P, C> {
+    /// Posts returned by the provider, in wire order.
+    pub posts: Vec<P>,
+    /// Continuation for the next page, if one exists.
+    pub next: Option<C>,
+}
+
+/// Operation interface for generic provider callers and external adapters.
+///
+/// Provider clients retain their fluent, provider-specific inherent methods.
+/// Implementations of this trait expose the small common seam needed by
+/// generic pagination code without requiring access to client internals.
+#[allow(async_fn_in_trait)]
+pub trait Client {
+    /// Owned query accepted by this provider.
+    type Query: Clone;
+    /// Provider-specific post type.
+    type Post: Post;
+    /// Provider-specific continuation for a subsequent page.
+    type Continuation: Clone;
+
+    /// Fetches one page and returns its continuation.
+    async fn page(
+        &self,
+        query: Self::Query,
+        continuation: Option<Self::Continuation>,
+    ) -> Result<PageResult<Self::Post, Self::Continuation>>;
+
+    /// Fetches one post by ID.
+    async fn post(&self, id: u32) -> Result<Self::Post>;
+}
 
 /// Shared HTTP client with connection pooling and timeouts.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {

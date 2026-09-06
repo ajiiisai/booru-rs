@@ -429,6 +429,31 @@ pub struct Page {
     pub next: Option<Search>,
 }
 
+impl super::Client for Client {
+    type Query = Query;
+    type Post = Rule34Post;
+    type Continuation = Search;
+
+    async fn page(
+        &self,
+        query: Self::Query,
+        continuation: Option<Self::Continuation>,
+    ) -> Result<super::PageResult<Self::Post, Self::Continuation>> {
+        let page = match continuation {
+            Some(search) => search.page().await?,
+            None => self.search_with(query).page().await?,
+        };
+        Ok(super::PageResult {
+            posts: page.posts,
+            next: page.next,
+        })
+    }
+
+    async fn post(&self, id: u32) -> Result<Self::Post> {
+        self.post_inner(id).await
+    }
+}
+
 pub struct PageStream {
     search: Option<Search>,
     pending: Option<Pin<Box<dyn Future<Output = Result<Page>> + Send>>>,

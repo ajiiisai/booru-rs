@@ -103,6 +103,23 @@ let second = client.search_with(query).send().await?;
 
 The fluent search builder and `search_with()` use the same query representation and validation path.
 
+Generic callers can use the operation trait at `booru_rs::client::Client`.
+It keeps provider query, post, and continuation types associated with each
+adapter while exposing one page operation:
+
+```rust
+use booru_rs::client::Client as ProviderClient;
+
+async fn first_page<C: ProviderClient>(client: &C, query: C::Query) -> booru_rs::Result<()> {
+    let page = client.page(query, None).await?;
+    println!("{} posts", page.posts.len());
+    Ok(())
+}
+```
+
+External adapters can implement this trait with their own configuration; they
+do not need access to provider client internals.
+
 ## Fetch posts, autocomplete, and pages
 
 Use `post(id)` instead of the old `get_by_id` operation:
