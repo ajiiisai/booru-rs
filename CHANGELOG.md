@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1](https://github.com/ajiiisai/booru-rs/compare/v1.0.0...v1.0.1) - 2026-09-06
+
+### Other
+
+- Update copyright year in LICENSE-MIT
+
 ## [1.0.0](https://github.com/ajiiisai/booru-rs/compare/v0.3.2...v1.0.0) - 2026-09-06
 
 ### Added
