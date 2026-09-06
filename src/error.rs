@@ -99,7 +99,11 @@ impl BooruError {
     /// Returns `true` if this error is a parse/deserialization error.
     #[must_use]
     pub fn is_parse_error(&self) -> bool {
-        matches!(self, Self::Parse(_))
+        match self {
+            Self::Parse(_) => true,
+            Self::Request(error) => error.is_decode(),
+            _ => false,
+        }
     }
 
     /// Returns `true` if this error indicates the resource was not found.

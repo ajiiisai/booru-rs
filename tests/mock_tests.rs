@@ -185,7 +185,7 @@ mod mock_safebooru {
     }
 
     #[tokio::test]
-    async fn test_invalid_json_response() {
+    async fn test_invalid_json_is_parse_error() {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("GET"))
@@ -200,8 +200,7 @@ mod mock_safebooru {
 
         let result = client.get().await;
 
-        // Invalid JSON causes a Request error (reqwest's json parsing)
-        assert!(result.is_err());
+        assert!(result.unwrap_err().is_parse_error());
     }
 }
 
@@ -695,6 +694,8 @@ mod mock_rule34 {
 
         let result = client.get().await;
 
-        assert!(matches!(result.unwrap_err(), BooruError::Parse(_)));
+        let error = result.unwrap_err();
+        assert!(matches!(error, BooruError::Parse(_)));
+        assert!(error.is_parse_error());
     }
 }
