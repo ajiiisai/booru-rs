@@ -4,18 +4,18 @@
 //! responses from the Safebooru API.
 
 use core::fmt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// A post from Safebooru.
 ///
 /// This struct represents a single image post from Safebooru.
 /// Safebooru is a SFW-only booru site.
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SafebooruPost {
     pub id: u32,
     pub score: Option<u32>,
-    /// This can be `null` for really recent posts
-    pub height: u32,
+    /// Image height in pixels, if available.
+    pub height: Option<u32>,
     pub width: u32,
     pub hash: String,
     pub tags: String,
@@ -35,14 +35,37 @@ pub struct SafebooruPost {
     /// that it's provided as a UNIX timestamp. Safebooru provides no `created_at`
     /// field.
     pub change: u32,
-    pub rating: SafebooruRating,
+    pub rating: SafebooruPostRating,
 }
 
-/// Post rating classification for Safebooru.
+/// A Safebooru response rating, including values unknown to this crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum SafebooruPostRating {
+    Known(SafebooruRating),
+    Unknown(String),
+}
+
+impl From<SafebooruRating> for SafebooruPostRating {
+    fn from(rating: SafebooruRating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for SafebooruPostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Safebooru.
 ///
 /// While Safebooru is primarily a SFW site, the rating field
 /// can contain other values for deleted/hidden content.
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum SafebooruRating {
     Safe,

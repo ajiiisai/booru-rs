@@ -6,12 +6,14 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
-//! use booru_rs::autocomplete::Autocomplete;
+//! # #[cfg(feature = "danbooru")]
+//! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! // Get tag suggestions starting with "cat_"
-//! let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
+//! let client = Client::builder().build()?;
+//! let suggestions = client.autocomplete("cat_", 10).await?;
 //!
 //! for tag in suggestions {
 //!     println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
@@ -20,7 +22,6 @@
 //! # }
 //! ```
 
-use crate::error::Result;
 use serde::{Deserialize, Serialize};
 
 /// A tag suggestion from autocomplete.
@@ -34,6 +35,11 @@ pub struct TagSuggestion {
     pub post_count: Option<u32>,
     /// Tag category (0=general, 1=artist, 3=copyright, 4=character, 5=meta).
     pub category: Option<u8>,
+    /// Provider-supplied tag value, if available.
+    pub tag: Option<String>,
+    /// Provider-supplied suggestion type, if available.
+    #[serde(rename = "type")]
+    pub suggestion_type: Option<String>,
 }
 
 impl TagSuggestion {
@@ -44,6 +50,8 @@ impl TagSuggestion {
             label: label.into(),
             post_count: None,
             category: None,
+            tag: None,
+            suggestion_type: None,
         }
     }
 
@@ -54,6 +62,8 @@ impl TagSuggestion {
             label: label.into(),
             post_count: Some(post_count),
             category: None,
+            tag: None,
+            suggestion_type: None,
         }
     }
 
@@ -71,39 +81,6 @@ impl TagSuggestion {
     }
 }
 
-/// Trait for clients that support tag autocomplete.
-///
-/// # Example
-///
-/// ```no_run
-/// use booru_rs::prelude::*;
-/// use booru_rs::autocomplete::Autocomplete;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let suggestions = SafebooruClient::autocomplete("land", 5).await?;
-/// for tag in suggestions {
-///     println!("{}", tag.name);
-/// }
-/// # Ok(())
-/// # }
-/// ```
-pub trait Autocomplete {
-    /// Returns tag suggestions matching the given query prefix.
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - The prefix to search for (e.g., "cat_" for tags starting with "cat_")
-    /// * `limit` - Maximum number of suggestions to return
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be parsed.
-    fn autocomplete(
-        query: &str,
-        limit: u32,
-    ) -> impl std::future::Future<Output = Result<Vec<TagSuggestion>>> + Send;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,6 +92,8 @@ mod tests {
         assert_eq!(tag.label, "cat ears");
         assert_eq!(tag.post_count, None);
         assert_eq!(tag.category, None);
+        assert_eq!(tag.tag, None);
+        assert_eq!(tag.suggestion_type, None);
     }
 
     #[test]
@@ -124,6 +103,8 @@ mod tests {
         assert_eq!(tag.label, "cat ears (12345)");
         assert_eq!(tag.post_count, Some(12345));
         assert_eq!(tag.category, None);
+        assert_eq!(tag.tag, None);
+        assert_eq!(tag.suggestion_type, None);
     }
 
     #[test]

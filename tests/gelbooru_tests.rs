@@ -7,22 +7,21 @@
 //! Tests will be skipped if credentials are not available.
 
 mod gelbooru {
-    use booru_rs::{
-        client::{Client, ClientBuilder, gelbooru::GelbooruClient, generic::*},
-        gelbooru::GelbooruRating,
-    };
+    use booru_rs::{client::generic::*, gelbooru::Client, gelbooru::GelbooruRating};
 
-    /// Returns a builder with credentials if available, or None to skip the test.
-    fn builder_with_credentials() -> Option<ClientBuilder<GelbooruClient>> {
+    fn authed_client() -> Option<Client> {
         let api_key = std::env::var("GELBOORU_API_KEY").ok()?;
         let user_id = std::env::var("GELBOORU_USER_ID").ok()?;
-        Some(GelbooruClient::builder().set_credentials(api_key, user_id))
+        Client::builder()
+            .set_credentials(api_key, user_id)
+            .build()
+            .ok()
     }
 
     macro_rules! skip_without_credentials {
         () => {
-            match builder_with_credentials() {
-                Some(builder) => builder,
+            match authed_client() {
+                Some(client) => client,
                 None => {
                     eprintln!("Skipping test: GELBOORU_API_KEY and GELBOORU_USER_ID not set");
                     return;
@@ -32,23 +31,26 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
-        let builder = skip_without_credentials!();
-        let posts = builder.tag("kafuu_chino").unwrap().build().get().await;
+        let posts = skip_without_credentials!()
+            .search()
+            .tag("kafuu_chino")
+            .send()
+            .await;
 
         assert!(posts.is_ok());
         assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .rating(GelbooruRating::General)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -56,14 +58,13 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .sort(Sort::Score)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -71,14 +72,13 @@ mod gelbooru {
     }
 
     #[tokio::test]
-    async fn get_posts_with_blacklist_tag() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
+    async fn get_posts_with_excluded_rating() {
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
-            .blacklist_tag(GelbooruRating::Explicit)
-            .build()
-            .get()
+            .exclude_rating(GelbooruRating::Explicit)
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -86,15 +86,14 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .rating(GelbooruRating::General)
             .limit(3)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -102,16 +101,14 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_multiple_tags() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .tag("table")
-            .unwrap()
             .limit(3)
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -119,14 +116,13 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_random_posts() {
-        let builder = skip_without_credentials!();
-        let posts = builder
+        let posts = skip_without_credentials!()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .random()
-            .build()
-            .get()
+            .send()
             .await;
 
         assert!(posts.is_ok());
@@ -134,21 +130,20 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
-        let builder = skip_without_credentials!();
-        let post = builder.build().get_by_id(7898595).await;
+        let post = skip_without_credentials!().post(7898595).await;
 
         assert!(post.is_ok());
         assert_eq!("e40b797a0e26755b2c0dd7a34d8c95ce", post.unwrap().md5);
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
-        let builder = skip_without_credentials!();
-        let builder2 = builder_with_credentials().unwrap();
-
-        let post_from_first_page = builder.build().get().await;
-        let post_from_specific_page = builder2.page(7).build().get().await;
+        let client = skip_without_credentials!();
+        let post_from_first_page = client.search().send().await;
+        let post_from_specific_page = client.search().start_page(7).send().await;
 
         assert!(post_from_first_page.is_ok());
         assert!(post_from_specific_page.is_ok());

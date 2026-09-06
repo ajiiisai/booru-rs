@@ -25,17 +25,18 @@
 //! The easiest way to get started is with the [`prelude`]:
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! # #[cfg(feature = "danbooru")]
+//! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     let posts = DanbooruClient::builder()
-//!         .tag("cat_ears")?
-//!         .rating(DanbooruRating::General)
-//!         .sort(Sort::Score)
+//! async fn main() -> booru_rs::error::Result<()> {
+//!     let client = Client::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
 //!         .limit(10)
-//!         .build()
-//!         .get()
+//!         .send()
 //!         .await?;
 //!
 //!     for post in posts {
@@ -44,29 +45,35 @@
 //!
 //!     Ok(())
 //! }
+//! # #[cfg(not(feature = "danbooru"))]
+//! # fn main() {}
 //! ```
 //!
 //! ## Supported Sites
 //!
 //! | Site | Client | Tag Limit | Auth Required |
 //! |------|--------|-----------|---------------|
-//! | [Danbooru](https://danbooru.donmai.us) | [`DanbooruClient`] | 2 | No |
-//! | [Gelbooru](https://gelbooru.com) | [`GelbooruClient`] | Unlimited | Yes |
-//! | [Safebooru](https://safebooru.org) | [`SafebooruClient`] | Unlimited | No |
-//! | [Rule34](https://rule34.xxx) | [`Rule34Client`] | Unlimited | Yes |
+//! | [Danbooru](https://danbooru.donmai.us) | `danbooru::Client` | 2 | No |
+//! | [Gelbooru](https://gelbooru.com) | `gelbooru::Client` | Unlimited | Yes |
+//! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
+//! | [Rule34](https://rule34.xxx) | `rule34::Client` | Unlimited | Yes |
 //!
 //! ## Pagination with Async Streams
 //!
-//! Use [`stream::PostStream`] to iterate through all results:
+//! Iterate through all results with `posts()`:
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! # #[cfg(feature = "safebooru")]
+//! use booru_rs::safebooru::Client;
 //!
-//! # async fn example() -> Result<()> {
-//! let mut stream = SafebooruClient::builder()
-//!     .tag("landscape")?
+//! # #[cfg(feature = "safebooru")]
+//! # async fn example() -> booru_rs::error::Result<()> {
+//! let client = Client::new()?;
+//! let mut stream = client
+//!     .search()
+//!     .tag("landscape")
 //!     .limit(100)
-//!     .into_post_stream()
+//!     .posts()
 //!     .max_posts(500);
 //!
 //! while let Some(post) = stream.next().await {
@@ -85,36 +92,31 @@
 //! use booru_rs::model::Post;
 //!
 //! fn print_post(post: &impl Post) {
-//!     println!("#{}: {}x{}", post.id(), post.width(), post.height());
+//!     let height = post.height()
+//!         .map(|height| height.to_string())
+//!         .unwrap_or_else(|| "unknown".into());
+//!     println!("#{}: {}x{}", post.id(), post.width(), height);
 //! }
 //! ```
 
 pub mod autocomplete;
 pub mod cache;
 pub mod client;
+#[cfg(feature = "download")]
 pub mod download;
 pub mod error;
 pub mod model;
 pub mod prelude;
 pub mod ratelimit;
 pub mod retry;
-pub mod stream;
 pub mod validation;
 
 // Re-export core types at crate root for convenience
-pub use autocomplete::{Autocomplete, TagSuggestion};
-pub use client::Client;
-pub use client::ClientBuilder;
-#[cfg(feature = "danbooru")]
-pub use client::DanbooruClient;
-#[cfg(feature = "gelbooru")]
-pub use client::GelbooruClient;
-#[cfg(feature = "rule34")]
-pub use client::Rule34Client;
-#[cfg(feature = "safebooru")]
-pub use client::SafebooruClient;
+pub use autocomplete::TagSuggestion;
+pub use cache::{CacheError, CacheKey, CacheOperation};
 pub use client::generic::Sort;
-pub use error::{BooruError, Result};
+pub use client::{Client, PageResult, RequestPolicy};
+pub use error::{BooruError, ErrorContext, Operation, Provider, Result};
 pub use model::Post;
 
 /// Danbooru client and model types.

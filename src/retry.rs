@@ -77,8 +77,18 @@ impl RetryConfig {
         self
     }
 
+    /// Validates the retry configuration.
+    pub fn validate(&self) -> Result<()> {
+        if !self.backoff_factor.is_finite() || self.backoff_factor < 0.0 {
+            return Err(BooruError::InvalidRetryConfig(
+                "backoff factor must be finite and non-negative".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Calculates the delay for a given attempt number.
-    fn delay_for_attempt(&self, attempt: u32) -> Duration {
+    pub(crate) fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::ZERO;
         }
@@ -97,6 +107,7 @@ impl RetryConfig {
 /// authentication errors, and not-found errors are not retryable.
 pub fn is_retryable(error: &BooruError) -> bool {
     match error {
+        BooruError::Context { source, .. } => is_retryable(source),
         BooruError::Request(e) => {
             // Retry on timeout, connection errors, but not on HTTP 4xx errors
             if e.is_timeout() || e.is_connect() {
@@ -117,8 +128,17 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::InvalidUrl(_) => false,
         BooruError::Unauthorized(_) => false,
         BooruError::InvalidTag { .. } => false,
+        BooruError::InvalidQuery(_) => false,
         BooruError::RateLimited => true, // Rate limit errors can be retried after waiting
-        BooruError::Io(_) => false,      // I/O errors are generally not retryable
+        BooruError::HttpStatus { status, .. } => *status == 429 || (500..600).contains(status),
+        BooruError::Io(_) => false, // I/O errors are generally not retryable
+        BooruError::InvalidConcurrency => false,
+        BooruError::InvalidFilename(_) => false,
+        BooruError::MissingMediaUrl(_) => false,
+        BooruError::DownloadTaskFailed(_) => false,
+        BooruError::DestinationConflict(_) => false,
+        BooruError::InvalidRetryConfig(_) => false,
+        BooruError::InvalidRateLimitConfig(_) => false,
     }
 }
 
@@ -139,6 +159,8 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T>>,
 {
+    config.validate()?;
+
     let mut attempt = 0;
     let mut last_error;
 
@@ -184,5 +206,39 @@ mod tests {
         assert_eq!(config.delay_for_attempt(1), Duration::from_millis(100));
         assert_eq!(config.delay_for_attempt(2), Duration::from_millis(150)); // Capped
         assert_eq!(config.delay_for_attempt(3), Duration::from_millis(150)); // Capped
+    }
+
+    #[tokio::test]
+    async fn invalid_backoff_is_rejected_before_operation() {
+        let mut calls = 0;
+        let config = RetryConfig::default().with_backoff_factor(f64::NAN);
+
+        let result = with_retry(config, || {
+            calls += 1;
+            async { Ok::<_, BooruError>(()) }
+        })
+        .await;
+
+        assert!(matches!(result, Err(BooruError::InvalidRetryConfig(_))));
+        assert_eq!(calls, 0);
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_retry_backoff() {
+        let config = RetryConfig::new(1)
+            .with_initial_delay(Duration::from_secs(60))
+            .with_max_delay(Duration::from_secs(60));
+        let task = tokio::spawn(with_retry(config, || async {
+            Err::<(), _>(BooruError::RateLimited)
+        }));
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        task.abort();
+
+        assert!(
+            task.await
+                .expect_err("retry task must be cancelled")
+                .is_cancelled()
+        );
     }
 }

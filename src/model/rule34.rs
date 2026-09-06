@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// This struct represents a single image post from Rule34.
 /// Rule34 is an NSFW booru site.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(from = "Rule34PostWire")]
 pub struct Rule34Post {
     /// The ID of the post
     pub id: u32,
@@ -21,15 +22,21 @@ pub struct Rule34Post {
     /// Post's image height
     pub height: u32,
     /// Post's image file url
-    pub file_url: String,
+    pub file_url: Option<String>,
     /// Post's preview/thumbnail url
-    pub preview_url: String,
+    pub preview_url: Option<String>,
     /// Post's sample (resized) url  
-    pub sample_url: String,
+    pub sample_url: Option<String>,
+    /// Provider's sample flag, if supplied.
+    pub sample: Option<bool>,
+    /// Sample height in pixels, if supplied.
+    pub sample_height: Option<u32>,
+    /// Sample width in pixels, if supplied.
+    pub sample_width: Option<u32>,
     /// Post's tags (space-separated)
     pub tags: String,
     /// Post's rating
-    pub rating: Rule34Rating,
+    pub rating: Rule34PostRating,
     /// Post's source
     #[serde(default)]
     pub source: String,
@@ -42,9 +49,9 @@ pub struct Rule34Post {
     /// Post owner/uploader
     #[serde(default)]
     pub owner: String,
-    /// Parent post ID (0 if none)
+    /// Parent post ID, if available.
     #[serde(default)]
-    pub parent_id: u32,
+    pub parent_id: Option<u32>,
     /// Post status
     #[serde(default)]
     pub status: String,
@@ -62,7 +69,95 @@ pub struct Rule34Post {
     pub hash: String,
 }
 
-/// Post rating classification for Rule34.
+#[derive(Deserialize)]
+struct Rule34PostWire {
+    id: u32,
+    score: i32,
+    width: u32,
+    height: u32,
+    file_url: Option<String>,
+    preview_url: Option<String>,
+    sample_url: Option<String>,
+    sample: Option<bool>,
+    sample_height: Option<u32>,
+    sample_width: Option<u32>,
+    tags: String,
+    rating: Rule34PostRating,
+    #[serde(default)]
+    source: String,
+    #[serde(default)]
+    has_notes: bool,
+    #[serde(default)]
+    comment_count: u32,
+    #[serde(default)]
+    owner: String,
+    #[serde(default)]
+    parent_id: Option<u32>,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    change: u64,
+    #[serde(default)]
+    directory: u32,
+    #[serde(default)]
+    image: String,
+    #[serde(default)]
+    hash: String,
+}
+
+impl From<Rule34PostWire> for Rule34Post {
+    fn from(wire: Rule34PostWire) -> Self {
+        Self {
+            id: wire.id,
+            score: wire.score,
+            width: wire.width,
+            height: wire.height,
+            file_url: wire.file_url.filter(|url| !url.is_empty()),
+            preview_url: wire.preview_url.filter(|url| !url.is_empty()),
+            sample_url: wire.sample_url.filter(|url| !url.is_empty()),
+            sample: wire.sample,
+            sample_height: wire.sample_height,
+            sample_width: wire.sample_width,
+            tags: wire.tags,
+            rating: wire.rating,
+            source: wire.source,
+            has_notes: wire.has_notes,
+            comment_count: wire.comment_count,
+            owner: wire.owner,
+            parent_id: wire.parent_id.filter(|id| *id != 0),
+            status: wire.status,
+            change: wire.change,
+            directory: wire.directory,
+            image: wire.image,
+            hash: wire.hash,
+        }
+    }
+}
+
+/// A Rule34 response rating, including values unknown to this crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum Rule34PostRating {
+    Known(Rule34Rating),
+    Unknown(String),
+}
+
+impl From<Rule34Rating> for Rule34PostRating {
+    fn from(rating: Rule34Rating) -> Self {
+        Self::Known(rating)
+    }
+}
+
+impl fmt::Display for Rule34PostRating {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(rating) => rating.fmt(f),
+            Self::Unknown(value) => f.write_str(value),
+        }
+    }
+}
+
+/// Supported typed rating filters for Rule34.
 ///
 /// Rule34 is an NSFW site, so most content is explicit or questionable.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]

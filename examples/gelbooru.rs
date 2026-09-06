@@ -6,6 +6,7 @@
 //!
 //! Run with: cargo run --example gelbooru
 
+use booru_rs::gelbooru::Client as Gelbooru;
 use booru_rs::prelude::*;
 
 #[tokio::main]
@@ -38,17 +39,19 @@ async fn main() -> Result<()> {
     println!("=== Gelbooru Example ===\n");
 
     // Gelbooru has no tag limit
-    let posts = GelbooruClient::builder()
+    let client = Gelbooru::builder()
         .set_credentials(&api_key, &user_id)
-        .tag("cat_ears")?
-        .tag("blue_eyes")?
-        .tag("1girl")?
-        .tag("solo")?
+        .build()?;
+    let posts = client
+        .search()
+        .tag("cat_ears")
+        .tag("blue_eyes")
+        .tag("1girl")
+        .tag("solo")
         .rating(GelbooruRating::General)
         .sort(Sort::Score)
         .limit(5)
-        .build()
-        .get()
+        .send()
         .await?;
 
     println!("Found {} posts:", posts.len());
@@ -61,14 +64,13 @@ async fn main() -> Result<()> {
 
     println!("\n=== Random Posts ===\n");
 
-    let random_posts = GelbooruClient::builder()
-        .set_credentials(&api_key, &user_id)
-        .tag("landscape")?
+    let random_posts = client
+        .search()
+        .tag("landscape")
         .rating(GelbooruRating::General)
         .random()
         .limit(3)
-        .build()
-        .get()
+        .send()
         .await?;
 
     println!("Random posts:");

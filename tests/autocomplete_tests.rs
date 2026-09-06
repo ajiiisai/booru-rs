@@ -2,31 +2,23 @@
 
 #[cfg(test)]
 mod autocomplete {
-    use booru_rs::autocomplete::{Autocomplete, TagSuggestion};
+    use booru_rs::autocomplete::TagSuggestion;
 
     #[cfg(feature = "danbooru")]
     mod danbooru {
-        use super::*;
-        use booru_rs::BooruError;
-        use booru_rs::danbooru::DanbooruClient;
-
-        fn suggestions_or_skip(
-            result: booru_rs::error::Result<Vec<TagSuggestion>>,
-        ) -> Option<Vec<TagSuggestion>> {
-            match result {
-                Ok(suggestions) => Some(suggestions),
-                Err(BooruError::Request(_) | BooruError::Parse(_)) => None,
-                Err(error) => panic!("Danbooru autocomplete failed: {error}"),
-            }
-        }
+        use booru_rs::danbooru::Client;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = DanbooruClient::autocomplete("cat_", 10).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_", 10)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok(), "Autocomplete request failed");
+            let suggestions = suggestions.unwrap();
             assert!(
                 !suggestions.is_empty(),
                 "Should return at least one suggestion"
@@ -34,26 +26,30 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = DanbooruClient::autocomplete("a", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("a", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
-            assert!(
-                suggestions.len() <= 5,
-                "Should respect limit parameter (expected 5, got {})",
-                suggestions.len()
-            );
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
+            assert!(suggestions.len() <= 5, "Should respect limit parameter");
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_has_tag_names() {
-            let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_ears", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
             if !suggestions.is_empty() {
                 let first = &suggestions[0];
                 assert!(!first.name.is_empty(), "Tag name should not be empty");
@@ -62,12 +58,16 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_post_counts() {
-            let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_ears", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
             // Danbooru should return post counts
             if !suggestions.is_empty() {
                 assert!(
@@ -78,12 +78,16 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_categories() {
-            let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_ears", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
             // Danbooru should return category info
             if !suggestions.is_empty() {
                 assert!(
@@ -94,38 +98,29 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_empty_query() {
             // Empty query should still work (returns popular tags or empty)
-            let suggestions = DanbooruClient::autocomplete("", 5).await;
-            let Some(_suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            let suggestions = Client::builder().build().unwrap().autocomplete("", 5).await;
+            assert!(suggestions.is_ok());
         }
     }
 
     #[cfg(feature = "safebooru")]
     mod safebooru {
-        use super::*;
-        use booru_rs::BooruError;
-        use booru_rs::safebooru::SafebooruClient;
-
-        fn suggestions_or_skip(
-            result: booru_rs::error::Result<Vec<TagSuggestion>>,
-        ) -> Option<Vec<TagSuggestion>> {
-            match result {
-                Ok(suggestions) => Some(suggestions),
-                Err(BooruError::Request(_) | BooruError::Parse(_)) => None,
-                Err(error) => panic!("Safebooru autocomplete failed: {error}"),
-            }
-        }
+        use booru_rs::safebooru::Client;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = SafebooruClient::autocomplete("cat_", 10).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_", 10)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok(), "Autocomplete request failed");
+            let suggestions = suggestions.unwrap();
             assert!(
                 !suggestions.is_empty(),
                 "Should return at least one suggestion"
@@ -133,26 +128,30 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = SafebooruClient::autocomplete("a", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("a", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
-            assert!(
-                suggestions.len() <= 5,
-                "Should respect limit parameter (expected 5, got {})",
-                suggestions.len()
-            );
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
+            assert!(suggestions.len() <= 5, "Should respect limit parameter");
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count_from_label() {
-            let suggestions = SafebooruClient::autocomplete("cat_ears", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_ears", 5)
+                .await;
 
-            let Some(suggestions) = suggestions_or_skip(suggestions) else {
-                return;
-            };
+            assert!(suggestions.is_ok());
+            let suggestions = suggestions.unwrap();
             // Safebooru embeds post count in label like "cat_ears (177448)"
             if !suggestions.is_empty() {
                 let first = &suggestions[0];
@@ -169,51 +168,54 @@ mod autocomplete {
 
     #[cfg(feature = "gelbooru")]
     mod gelbooru {
-        use super::*;
-        use booru_rs::gelbooru::GelbooruClient;
+        use booru_rs::gelbooru::Client;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             // Gelbooru autocomplete may work without auth
-            let suggestions = GelbooruClient::autocomplete("cat_", 10).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_", 10)
+                .await;
 
             // This might fail due to auth requirements, which is expected
-            if let Err(booru_rs::BooruError::Unauthorized(_)) = suggestions {
-                return;
+            if let Ok(suggestions) = suggestions {
+                assert!(
+                    !suggestions.is_empty(),
+                    "Should return at least one suggestion"
+                );
             }
-
-            let suggestions = suggestions.unwrap();
-            assert!(
-                !suggestions.is_empty(),
-                "Should return at least one suggestion"
-            );
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
-            let suggestions = GelbooruClient::autocomplete("a", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("a", 5)
+                .await;
 
-            if let Err(booru_rs::BooruError::Unauthorized(_)) = suggestions {
-                return;
+            if let Ok(suggestions) = suggestions {
+                assert!(suggestions.len() <= 5, "Should respect limit parameter");
             }
-
-            let suggestions = suggestions.unwrap();
-            assert!(
-                suggestions.len() <= 5,
-                "Should respect limit parameter (expected 5, got {})",
-                suggestions.len()
-            );
         }
     }
 
     #[cfg(feature = "rule34")]
     mod rule34 {
-        use super::*;
-        use booru_rs::rule34::Rule34Client;
+        use booru_rs::rule34::Client;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
-            let suggestions = Rule34Client::autocomplete("cat_", 10).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_", 10)
+                .await;
 
             assert!(suggestions.is_ok(), "Rule34 autocomplete should work");
             let suggestions = suggestions.unwrap();
@@ -224,8 +226,13 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count() {
-            let suggestions = Rule34Client::autocomplete("cat_ears", 5).await;
+            let suggestions = Client::builder()
+                .build()
+                .unwrap()
+                .autocomplete("cat_ears", 5)
+                .await;
 
             assert!(suggestions.is_ok());
             let suggestions = suggestions.unwrap();

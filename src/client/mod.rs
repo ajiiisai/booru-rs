@@ -1,59 +1,54 @@
 //! Client implementations for various booru sites.
 //!
-//! This module provides the [`Client`] trait and [`ClientBuilder`] for constructing
-//! and using booru API clients.
+//! This module provides shared HTTP execution helpers used by the
+//! provider clients.
 //!
 //! # Available Clients
 //!
-//! - [`DanbooruClient`] — For [danbooru.donmai.us](https://danbooru.donmai.us) (2 tag limit)
-//! - [`GelbooruClient`] — For [gelbooru.com](https://gelbooru.com) (unlimited tags)
-//! - [`SafebooruClient`] — For [safebooru.org](https://safebooru.org) (unlimited tags, SFW only)
+//! - `danbooru::Client` for danbooru.donmai.us, 2 tag limit
+//! - `gelbooru::Client` for gelbooru.com, unlimited tags
+//! - `safebooru::Client` for safebooru.org, unlimited tags, SFW only
+//! - `rule34::Client` for api.rule34.xxx, unlimited tags
 //!
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! # #[cfg(feature = "danbooru")]
+//! use booru_rs::danbooru::Client;
 //!
-//! # async fn example() -> Result<()> {
-//! // Using the builder pattern
-//! let posts = GelbooruClient::builder()
-//!     .tags(["cat_ears", "blue_eyes"])?
-//!     .rating(GelbooruRating::General)
-//!     .sort(Sort::Score)
+//! # #[cfg(feature = "danbooru")]
+//! # async fn example() -> booru_rs::error::Result<()> {
+//! let client = Client::new()?;
+//! let posts = client
+//!     .search()
+//!     .tag("cat_ears")
 //!     .limit(10)
-//!     .build()
-//!     .get()
+//!     .send()
 //!     .await?;
 //!
 //! // Get a specific post by ID
-//! let post = DanbooruClient::builder()
-//!     .build()
-//!     .get_by_id(12345)
-//!     .await?;
+//! let post = client.post(12345).await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! # Custom HTTP Client
 //!
-//! By default, all clients share a connection-pooled HTTP client. You can provide
-//! your own client for custom configuration:
+//! By default, all clients share a connection-pooled HTTP client.
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! # #[cfg(feature = "safebooru")]
+//! use booru_rs::safebooru::Client;
 //!
-//! # async fn example() -> Result<()> {
+//! # #[cfg(feature = "safebooru")]
+//! # async fn example() -> booru_rs::error::Result<()> {
 //! let custom_client = reqwest::Client::builder()
 //!     .timeout(std::time::Duration::from_secs(60))
 //!     .build()
 //!     .unwrap();
 //!
-//! // Use ClientBuilder::with_client to create a builder with custom HTTP client
-//! let posts = ClientBuilder::<SafebooruClient>::with_client(custom_client)
-//!     .tag("nature")?
-//!     .build()
-//!     .get()
-//!     .await?;
+//! let client = Client::builder().http_client(custom_client).build()?;
+//! let posts = client.search().tag("nature").send().await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -61,7 +56,53 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-use crate::error::{BooruError, Result};
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+use crate::error::BooruError;
+use crate::error::Result;
+use crate::model::Post;
+use crate::ratelimit::RateLimiter;
+use crate::retry::RetryConfig;
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+use crate::retry::is_retryable;
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+use reqwest::header::HeaderMap;
+
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
+#[derive(Clone, Default)]
+pub(crate) struct Secret(String);
+
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
+impl Secret {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
 
 #[cfg(feature = "danbooru")]
 pub mod danbooru;
@@ -73,10 +114,41 @@ pub mod rule34;
 #[cfg(feature = "safebooru")]
 pub mod safebooru;
 
-/// Shared HTTP client with connection pooling and timeouts.
+/// Result of one page fetched through the provider operation interface.
+#[derive(Debug, Clone)]
+pub struct PageResult<P, C> {
+    /// Posts returned by the provider, in wire order.
+    pub posts: Vec<P>,
+    /// Continuation for the next page, if one exists.
+    pub next: Option<C>,
+}
+
+/// Operation interface for generic provider callers and external adapters.
 ///
-/// This client is lazily initialized and reused across all requests
-/// for better performance.
+/// Provider clients retain their fluent, provider-specific inherent methods.
+/// Implementations of this trait expose the small common seam needed by
+/// generic pagination code without requiring access to client internals.
+#[allow(async_fn_in_trait)]
+pub trait Client {
+    /// Owned query accepted by this provider.
+    type Query: Clone;
+    /// Provider-specific post type.
+    type Post: Post;
+    /// Provider-specific continuation for a subsequent page.
+    type Continuation: Clone;
+
+    /// Fetches one page and returns its continuation.
+    async fn page(
+        &self,
+        query: Self::Query,
+        continuation: Option<Self::Continuation>,
+    ) -> Result<PageResult<Self::Post, Self::Continuation>>;
+
+    /// Fetches one post by ID.
+    async fn post(&self, id: u32) -> Result<Self::Post>;
+}
+
+/// Shared HTTP client with connection pooling and timeouts.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -93,359 +165,267 @@ pub fn shared_client() -> &'static reqwest::Client {
     &SHARED_CLIENT
 }
 
-/// Builder for constructing booru API clients.
-///
-/// This builder allows you to configure various options before
-/// creating a client to query a booru site.
-///
-/// # Example
-///
-/// ```no_run
-/// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
-/// use booru_rs::client::Client;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let client = DanbooruClient::builder()
-///     .tag("cat_ears")?
-///     .rating(DanbooruRating::General)
-///     .limit(10)
-///     .build();
-///
-/// let posts = client.get().await?;
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct ClientBuilder<T: Client> {
-    pub(crate) client: reqwest::Client,
-    pub(crate) key: Option<String>,
-    pub(crate) user: Option<String>,
-    pub(crate) tags: Vec<String>,
-    pub(crate) limit: u32,
-    pub(crate) url: String,
-    pub(crate) page: u32,
-    _marker: std::marker::PhantomData<T>,
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
+    let trimmed = url.trim_end_matches('/');
+    let parsed =
+        reqwest::Url::parse(trimmed).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(BooruError::InvalidUrl(url.to_string()));
+    }
+    Ok(trimmed.to_string())
 }
 
-impl<T: Client> Clone for ClientBuilder<T> {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            key: self.key.clone(),
-            user: self.user.clone(),
-            tags: self.tags.clone(),
-            limit: self.limit,
-            url: self.url.clone(),
-            page: self.page,
-            _marker: std::marker::PhantomData,
-        }
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
+pub(crate) fn dapi_url(endpoint: &str) -> String {
+    format!("{endpoint}/index.php")
+}
+
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
+pub(crate) fn dapi_credentials<'a>(
+    key: &'a Option<Secret>,
+    user: &'a Option<Secret>,
+) -> Option<(&'a Secret, &'a Secret)> {
+    match (key, user) {
+        (Some(key), Some(user)) => Some((key, user)),
+        _ => None,
     }
 }
 
-/// Core trait for booru API clients.
-///
-/// This trait defines the interface that all booru clients must implement.
-/// It provides compile-time type safety for client-specific features like
-/// ratings and tag limits.
-///
-/// # Associated Types
-///
-/// - `Post`: The post type returned by this client
-/// - `Rating`: The rating type specific to this booru site
-///
-/// # Associated Constants
-///
-/// - `URL`: The base URL for the API
-/// - `SORT`: The prefix for sort/order tags
-/// - `MAX_TAGS`: Optional limit on the number of tags per query
-pub trait Client: From<ClientBuilder<Self>> + Sized + Send + Sync {
-    /// The post type returned by this client.
-    type Post: Send;
-
-    /// The rating type for this booru site.
-    type Rating: Into<String> + Send;
-
-    /// Base URL for the booru API.
-    const URL: &'static str;
-
-    /// Prefix used for sorting tags (e.g., "order:" or "sort:").
-    const SORT: &'static str;
-
-    /// Maximum number of tags allowed per query, or `None` for unlimited.
-    const MAX_TAGS: Option<usize>;
-
-    /// Creates a new builder for this client.
-    #[must_use]
-    fn builder() -> ClientBuilder<Self> {
-        ClientBuilder::new()
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
+pub(crate) fn dapi_query(
+    params: &[(&'static str, String)],
+    credentials: Option<(&Secret, &Secret)>,
+) -> Vec<(String, String)> {
+    let mut query: Vec<(String, String)> = vec![
+        ("page".to_string(), "dapi".to_string()),
+        ("s".to_string(), "post".to_string()),
+        ("q".to_string(), "index".to_string()),
+        ("json".to_string(), "1".to_string()),
+    ];
+    for (key, value) in params {
+        query.push(((*key).to_string(), value.clone()));
     }
-
-    /// Retrieves a single post by its unique ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or if the post is not found.
-    fn get_by_id(&self, id: u32) -> impl std::future::Future<Output = Result<Self::Post>> + Send;
-
-    /// Retrieves posts matching the configured query.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or if the response cannot be parsed.
-    fn get(&self) -> impl std::future::Future<Output = Result<Vec<Self::Post>>> + Send;
+    if let Some((key, user)) = credentials {
+        query.push(("api_key".to_string(), key.expose().to_string()));
+        query.push(("user_id".to_string(), user.expose().to_string()));
+    }
+    query
 }
 
-impl<T: Client> ClientBuilder<T> {
-    /// Creates a new builder with default settings.
-    ///
-    /// Uses the shared HTTP client for connection pooling.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            client: SHARED_CLIENT.clone(),
-            key: None,
-            user: None,
-            tags: Vec::new(),
-            limit: 100,
-            url: T::URL.to_string(),
-            page: 0,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    /// Creates a new builder with a custom HTTP client.
-    ///
-    /// Use this when you need custom HTTP configuration (e.g., proxy, custom TLS).
-    #[must_use]
-    pub fn with_client(client: reqwest::Client) -> Self {
-        Self {
-            client,
-            key: None,
-            user: None,
-            tags: Vec::new(),
-            limit: 100,
-            url: T::URL.to_string(),
-            page: 0,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    /// Sets a custom base URL for the API.
-    ///
-    /// This is primarily useful for testing with mock servers.
-    #[must_use]
-    pub fn with_custom_url(mut self, url: &str) -> Self {
-        self.url = url.to_string();
-        self
-    }
-
-    /// Sets the API key and username for authenticated requests.
-    ///
-    /// Some booru sites require or benefit from authentication.
-    #[must_use]
-    pub fn set_credentials(mut self, key: impl Into<String>, user: impl Into<String>) -> Self {
-        self.key = Some(key.into());
-        self.user = Some(user.into());
-        self
-    }
-
-    /// Adds a tag to the search query.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`BooruError::TagLimitExceeded`] if adding this tag would exceed
-    /// the client's maximum tag limit.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use booru_rs::danbooru::DanbooruClient;
-    /// use booru_rs::client::Client;
-    ///
-    /// # fn example() -> booru_rs::error::Result<()> {
-    /// let client = DanbooruClient::builder()
-    ///     .tag("cat_ears")?
-    ///     .tag("blue_eyes")?
-    ///     .build();
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn tag(mut self, tag: impl Into<String>) -> Result<Self> {
-        if let Some(max) = T::MAX_TAGS
-            && self.tags.len() >= max
-        {
-            return Err(BooruError::TagLimitExceeded {
-                client: std::any::type_name::<T>()
-                    .rsplit("::")
-                    .next()
-                    .unwrap_or("Unknown"),
-                max,
-                actual: self.tags.len() + 1,
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
+    for tag in tags {
+        if tag.is_empty() {
+            return Err(BooruError::InvalidTag {
+                tag: tag.clone(),
+                reason: "tag must not be empty".to_string(),
             });
         }
-        self.tags.push(tag.into());
-        Ok(self)
-    }
-
-    /// Adds a rating filter to the search query.
-    ///
-    /// The rating type is specific to each booru site, ensuring
-    /// compile-time type safety.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
-    /// use booru_rs::client::Client;
-    ///
-    /// let client = DanbooruClient::builder()
-    ///     .rating(DanbooruRating::General)
-    ///     .build();
-    /// ```
-    #[must_use]
-    pub fn rating(mut self, rating: T::Rating) -> Self {
-        self.tags.push(format!("rating:{}", rating.into()));
-        self
-    }
-
-    /// Sets the maximum number of posts to retrieve.
-    ///
-    /// Default is 100, which is also typically the maximum allowed by most APIs.
-    #[must_use]
-    pub fn limit(mut self, limit: u32) -> Self {
-        self.limit = limit;
-        self
-    }
-
-    /// Enables random ordering of results.
-    #[must_use]
-    pub fn random(mut self) -> Self {
-        self.tags.push(format!("{}random", T::SORT));
-        self
-    }
-
-    /// Adds a sort order to the query.
-    #[must_use]
-    pub fn sort(mut self, order: generic::Sort) -> Self {
-        self.tags.push(format!("{}{}", T::SORT, order));
-        self
-    }
-
-    /// Excludes posts with the specified tag.
-    ///
-    /// Multiple blacklist tags can be added by calling this method multiple times.
-    #[must_use]
-    pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
-        self.tags.push(format!("-{}", tag.into()));
-        self
-    }
-
-    /// Overrides the default API URL.
-    ///
-    /// Useful for testing or accessing mirror sites.
-    #[must_use]
-    pub fn default_url(mut self, url: impl Into<String>) -> Self {
-        self.url = url.into();
-        self
-    }
-
-    /// Sets the page number for pagination.
-    ///
-    /// Page numbering starts at 0.
-    #[must_use]
-    pub fn page(mut self, page: u32) -> Self {
-        self.page = page;
-        self
-    }
-
-    /// Adds multiple tags to the search query at once.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`BooruError::TagLimitExceeded`] if adding these tags would exceed
-    /// the client's maximum tag limit.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use booru_rs::prelude::*;
-    ///
-    /// # fn example() -> Result<()> {
-    /// let client = GelbooruClient::builder()
-    ///     .tags(["cat_ears", "blue_eyes", "1girl"])?
-    ///     .build();
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn tags<I, S>(mut self, tags: I) -> Result<Self>
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        for tag in tags {
-            self = self.tag(tag)?;
+        if tag.chars().any(char::is_whitespace) {
+            return Err(BooruError::InvalidTag {
+                tag: tag.clone(),
+                reason: "tag must not contain whitespace".to_string(),
+            });
         }
-        Ok(self)
     }
-
-    /// Excludes multiple tags from the search query at once.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use booru_rs::prelude::*;
-    ///
-    /// # fn example() -> Result<()> {
-    /// let client = GelbooruClient::builder()
-    ///     .tag("cat_ears")?
-    ///     .blacklist_tags(["ugly", "low_quality"])
-    ///     .build();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[must_use]
-    pub fn blacklist_tags<I, S>(mut self, tags: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        for tag in tags {
-            self = self.blacklist_tag(tag);
-        }
-        self
-    }
-
-    /// Returns the current number of tags in the query.
-    #[must_use]
-    pub fn tag_count(&self) -> usize {
-        self.tags.len()
-    }
-
-    /// Returns `true` if the builder has any tags configured.
-    #[must_use]
-    pub fn has_tags(&self) -> bool {
-        !self.tags.is_empty()
-    }
-
-    /// Builds the client with the configured options.
-    #[must_use]
-    pub fn build(self) -> T {
-        T::from(self)
-    }
+    Ok(())
 }
 
-impl<T: Client> Default for ClientBuilder<T> {
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn validate_raw_queries(
+    expressions: &[String],
+    has_rating: bool,
+    has_sort: bool,
+) -> Result<()> {
+    if expressions
+        .iter()
+        .any(|expression| expression.trim().is_empty())
+    {
+        return Err(BooruError::InvalidQuery(
+            "raw query expressions must not be empty".to_string(),
+        ));
+    }
+    let contains_rating = expressions.iter().any(|expression| {
+        expression
+            .split_whitespace()
+            .any(|term| term.trim_start_matches('-').starts_with("rating:"))
+    });
+    if has_rating && contains_rating {
+        return Err(BooruError::InvalidQuery(
+            "raw rating filters cannot be combined with rating()".to_string(),
+        ));
+    }
+    let contains_sort = expressions.iter().any(|expression| {
+        expression.split_whitespace().any(|term| {
+            let term = term.trim_start_matches('-');
+            term.starts_with("sort:") || term.starts_with("order:")
+        })
+    });
+    if has_sort && contains_sort {
+        return Err(BooruError::InvalidQuery(
+            "raw sort filters cannot be combined with sort()".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Rejects an API response with an unsuccessful status before decoding.
+///
+/// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.
+/// Callers map endpoint-specific statuses such as missing posts first.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwest::Response> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+    let body = response.text().await.unwrap_or_default();
+    Err(BooruError::http_status(status, &body))
+}
+
+/// Request policies shared by provider clients.
+#[derive(Debug, Clone)]
+pub struct RequestPolicy {
+    retry: RetryConfig,
+    rate_limiter: Option<RateLimiter>,
+}
+
+impl Default for RequestPolicy {
     fn default() -> Self {
-        Self::new()
+        Self {
+            retry: RetryConfig::no_retry(),
+            rate_limiter: None,
+        }
     }
 }
 
-// Re-exports for convenience
-#[cfg(feature = "danbooru")]
-pub use danbooru::DanbooruClient;
-#[cfg(feature = "gelbooru")]
-pub use gelbooru::GelbooruClient;
-#[cfg(feature = "rule34")]
-pub use rule34::Rule34Client;
-#[cfg(feature = "safebooru")]
-pub use safebooru::SafebooruClient;
+impl RequestPolicy {
+    /// Creates a policy with retries disabled and no rate limiter.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the retry configuration after validating it.
+    pub fn with_retry_config(mut self, config: RetryConfig) -> Result<Self> {
+        config.validate()?;
+        self.retry = config;
+        Ok(self)
+    }
+
+    /// Sets a shared rate limiter for outbound requests.
+    #[must_use]
+    pub fn with_rate_limiter(mut self, limiter: RateLimiter) -> Self {
+        self.rate_limiter = Some(limiter);
+        self
+    }
+}
+
+/// Executes a request under the configured limiter and retry policy.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) async fn execute_with_policy<F, Fut>(
+    policy: &RequestPolicy,
+    mut operation: F,
+) -> Result<reqwest::Response>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<reqwest::Response>>,
+{
+    policy.retry.validate()?;
+    let mut attempt = 0;
+
+    loop {
+        if let Some(limiter) = &policy.rate_limiter {
+            limiter.acquire().await;
+        }
+
+        let (result, retry_after) = match operation().await {
+            Ok(response) => {
+                let retry_after = parse_retry_after(response.headers());
+                (ensure_success(response).await, retry_after)
+            }
+            Err(error) => (Err(error), None),
+        };
+
+        match result {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                if attempt >= policy.retry.max_retries || !is_retryable(&error) {
+                    return Err(error);
+                }
+                attempt += 1;
+                let delay = retry_after
+                    .unwrap_or_else(|| policy.retry.delay_for_attempt(attempt))
+                    .min(policy.retry.max_delay);
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
+    let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
+    let seconds = value.trim().parse::<u64>().ok()?;
+    Some(Duration::from_secs(seconds))
+}
+
+#[cfg(test)]
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+mod tests {
+    use super::parse_retry_after;
+    use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
+    use std::time::Duration;
+
+    #[test]
+    fn parses_numeric_retry_after() {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, HeaderValue::from_static("3"));
+
+        assert_eq!(parse_retry_after(&headers), Some(Duration::from_secs(3)));
+    }
+
+    #[test]
+    fn ignores_non_numeric_retry_after() {
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, HeaderValue::from_static("tomorrow"));
+
+        assert_eq!(parse_retry_after(&headers), None);
+    }
+}

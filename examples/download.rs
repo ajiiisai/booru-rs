@@ -5,6 +5,7 @@
 //! Run with: cargo run --example download
 
 use booru_rs::prelude::*;
+use booru_rs::safebooru::Client as Safebooru;
 use std::path::Path;
 
 #[tokio::main]
@@ -12,12 +13,13 @@ async fn main() -> Result<()> {
     let dest_dir = Path::new("./downloads");
 
     // Fetch some posts
-    let posts = SafebooruClient::builder()
-        .tag("landscape")?
+    let client = Safebooru::new()?;
+    let posts = client
+        .search()
+        .tag("landscape")
         .rating(SafebooruRating::General)
         .limit(3)
-        .build()
-        .get()
+        .send()
         .await?;
 
     println!("Found {} posts to download", posts.len());

@@ -1,156 +1,121 @@
 #[cfg(test)]
 mod safebooru {
     use booru_rs::{
-        client::{Client, generic::Sort, safebooru::SafebooruClient},
-        error::BooruError,
-        safebooru::SafebooruRating,
+        client::generic::Sort,
+        safebooru::{Client, SafebooruRating},
     };
 
-    fn result_or_skip<T>(result: booru_rs::error::Result<T>) -> Option<T> {
-        match result {
-            Ok(value) => Some(value),
-            Err(BooruError::Request(_) | BooruError::Parse(_)) => None,
-            Err(error) => panic!("Safebooru request failed: {error}"),
-        }
+    fn client() -> Client {
+        Client::new().expect("default client must build")
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
-        let posts = SafebooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").send().await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
-        let posts = SafebooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .rating(SafebooruRating::General)
-            .build()
-            .get()
+            .send()
             .await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
-        let posts = SafebooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .sort(Sort::Score)
-            .build()
-            .get()
+            .send()
             .await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
-    async fn get_posts_with_blacklist_tag() {
-        let posts = SafebooruClient::builder()
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
+    async fn get_posts_with_excluded_rating() {
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
-            .blacklist_tag(SafebooruRating::Explicit)
-            .build()
-            .get()
+            .exclude_rating(SafebooruRating::Explicit)
+            .send()
             .await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
-        let posts = SafebooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .limit(3)
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").limit(3).send().await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert_eq!(posts.len(), 3);
+        assert!(posts.is_ok());
+        assert!(posts.unwrap().len() == 3);
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_multiple_tags() {
-        let posts = SafebooruClient::builder()
+        let posts = client()
+            .search()
             .tag("kafuu_chino")
-            .unwrap()
             .tag("bangs")
-            .unwrap()
             .limit(3)
-            .build()
-            .get()
+            .send()
             .await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_random_posts() {
-        let posts = SafebooruClient::builder()
-            .tag("kafuu_chino")
-            .unwrap()
-            .random()
-            .build()
-            .get()
-            .await;
+        let posts = client().search().tag("kafuu_chino").random().send().await;
 
-        let Some(posts) = result_or_skip(posts) else {
-            return;
-        };
-        assert!(!posts.is_empty());
+        assert!(posts.is_ok());
+        assert!(!posts.unwrap().is_empty());
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
-        let post = SafebooruClient::builder().build().get_by_id(4348760).await;
+        let post = client().post(4348760).await;
 
-        let Some(post) = result_or_skip(post) else {
-            return;
-        };
-        assert_eq!("3e407a7848804119f1064c2aac731545", post.hash);
+        assert!(post.is_ok());
+        assert_eq!("3e407a7848804119f1064c2aac731545", post.unwrap().hash);
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
-        let post_from_first_page = SafebooruClient::builder().build().get().await;
+        let post_from_first_page = client().search().send().await;
 
-        let post_from_specific_page = SafebooruClient::builder().page(7).build().get().await;
+        let post_from_specific_page = client().search().start_page(7).send().await;
 
-        let Some(post_from_first_page) = result_or_skip(post_from_first_page) else {
-            return;
-        };
-        let Some(post_from_specific_page) = result_or_skip(post_from_specific_page) else {
-            return;
-        };
+        assert!(post_from_first_page.is_ok());
+        assert!(post_from_specific_page.is_ok());
 
-        assert_ne!(post_from_first_page[0].id, post_from_specific_page[0].id);
+        assert_ne!(
+            post_from_first_page.unwrap()[0].id,
+            post_from_specific_page.unwrap()[0].id
+        );
     }
 
     #[test]

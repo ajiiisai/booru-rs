@@ -9,19 +9,22 @@
 //! use booru_rs::ratelimit::RateLimiter;
 //! use std::time::Duration;
 //!
-//! # async fn example() {
+//! # async fn example() -> booru_rs::error::Result<()> {
 //! // Create a limiter allowing 2 requests per second
-//! let limiter = RateLimiter::new(2, Duration::from_secs(1));
+//! let limiter = RateLimiter::new(2, Duration::from_secs(1))?;
 //!
 //! // This will wait if necessary to respect the rate limit
 //! limiter.acquire().await;
 //! // ... make request ...
+//! # Ok(())
 //! # }
 //! ```
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+
+use crate::error::{BooruError, Result};
 
 /// A token bucket rate limiter for controlling API request rates.
 ///
@@ -39,14 +42,15 @@ use tokio::sync::Mutex;
 /// use booru_rs::ratelimit::RateLimiter;
 /// use std::time::Duration;
 ///
-/// # async fn example() {
+/// # async fn example() -> booru_rs::error::Result<()> {
 /// // Allow 5 requests per 2 seconds
-/// let limiter = RateLimiter::new(5, Duration::from_secs(2));
+/// let limiter = RateLimiter::new(5, Duration::from_secs(2))?;
 ///
 /// for _ in 0..10 {
 ///     limiter.acquire().await;
 ///     println!("Making request...");
 /// }
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Clone)]
@@ -85,14 +89,25 @@ impl RateLimiter {
     /// use std::time::Duration;
     ///
     /// // 10 requests per second
-    /// let limiter = RateLimiter::new(10, Duration::from_secs(1));
+    /// let limiter = RateLimiter::new(10, Duration::from_secs(1)).expect("valid rate limit");
     ///
     /// // 100 requests per minute
-    /// let limiter = RateLimiter::new(100, Duration::from_secs(60));
+    /// let limiter = RateLimiter::new(100, Duration::from_secs(60)).expect("valid rate limit");
     /// ```
-    #[must_use]
-    pub fn new(requests: u32, per_interval: Duration) -> Self {
-        Self {
+    #[must_use = "handle the construction error or use the limiter"]
+    pub fn new(requests: u32, per_interval: Duration) -> Result<Self> {
+        if requests == 0 {
+            return Err(BooruError::InvalidRateLimitConfig(
+                "requests must be greater than zero".to_string(),
+            ));
+        }
+        if per_interval.is_zero() {
+            return Err(BooruError::InvalidRateLimitConfig(
+                "refill interval must be greater than zero".to_string(),
+            ));
+        }
+
+        Ok(Self {
             state: Arc::new(Mutex::new(RateLimiterState {
                 tokens: requests as f64,
                 last_update: Instant::now(),
@@ -101,15 +116,15 @@ impl RateLimiter {
                 capacity: requests,
                 refill_interval: per_interval,
             },
-        }
+        })
     }
 
     /// Creates a rate limiter suitable for most booru APIs.
     ///
     /// This uses conservative defaults (2 requests/second) that should
     /// work with any booru without getting blocked.
-    #[must_use]
-    pub fn default_booru() -> Self {
+    #[must_use = "handle the construction error or use the limiter"]
+    pub fn default_booru() -> Result<Self> {
         Self::new(2, Duration::from_secs(1))
     }
 
@@ -124,14 +139,15 @@ impl RateLimiter {
     /// use booru_rs::ratelimit::RateLimiter;
     /// use std::time::Duration;
     ///
-    /// # async fn example() {
-    /// let limiter = RateLimiter::new(1, Duration::from_secs(1));
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let limiter = RateLimiter::new(1, Duration::from_secs(1))?;
     ///
     /// // First request goes through immediately
     /// limiter.acquire().await;
     ///
     /// // Second request waits ~1 second
     /// limiter.acquire().await;
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn acquire(&self) {
@@ -166,14 +182,15 @@ impl RateLimiter {
     /// use booru_rs::ratelimit::RateLimiter;
     /// use std::time::Duration;
     ///
-    /// # async fn example() {
-    /// let limiter = RateLimiter::new(1, Duration::from_secs(1));
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let limiter = RateLimiter::new(1, Duration::from_secs(1))?;
     ///
     /// if limiter.try_acquire().await {
     ///     println!("Request allowed");
     /// } else {
     ///     println!("Rate limited, try again later");
     /// }
+    /// # Ok(())
     /// # }
     /// ```
     pub async fn try_acquire(&self) -> bool {
@@ -225,7 +242,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_try_acquire() {
-        let limiter = RateLimiter::new(2, Duration::from_secs(1));
+        let limiter = RateLimiter::new(2, Duration::from_secs(1)).unwrap();
 
         assert!(limiter.try_acquire().await);
         assert!(limiter.try_acquire().await);
@@ -233,8 +250,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn clones_share_token_state() {
+        let limiter = RateLimiter::new(2, Duration::from_secs(1)).unwrap();
+        let clone = limiter.clone();
+
+        assert!(limiter.try_acquire().await);
+        assert!(clone.try_acquire().await);
+        assert!(!limiter.try_acquire().await);
+    }
+
+    #[tokio::test]
     async fn test_available() {
-        let limiter = RateLimiter::new(5, Duration::from_secs(1));
+        let limiter = RateLimiter::new(5, Duration::from_secs(1)).unwrap();
 
         assert_eq!(limiter.available().await, 5);
         limiter.acquire().await;
@@ -243,7 +270,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_refill() {
-        let limiter = RateLimiter::new(10, Duration::from_millis(100));
+        let limiter = RateLimiter::new(10, Duration::from_millis(100)).unwrap();
 
         // Drain all tokens
         for _ in 0..10 {
@@ -254,5 +281,27 @@ mod tests {
         // Wait for refill
         tokio::time::sleep(Duration::from_millis(150)).await;
         assert!(limiter.available().await >= 10);
+    }
+
+    #[test]
+    fn rejects_zero_requests() {
+        let result = RateLimiter::new(0, Duration::from_secs(1));
+
+        assert!(matches!(
+            result,
+            Err(BooruError::InvalidRateLimitConfig(message))
+                if message == "requests must be greater than zero"
+        ));
+    }
+
+    #[test]
+    fn rejects_zero_refill_interval() {
+        let result = RateLimiter::new(1, Duration::ZERO);
+
+        assert!(matches!(
+            result,
+            Err(BooruError::InvalidRateLimitConfig(message))
+                if message == "refill interval must be greater than zero"
+        ));
     }
 }

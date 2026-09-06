@@ -24,7 +24,10 @@ pub mod safebooru;
 /// use booru_rs::prelude::*;
 ///
 /// fn print_post_info(post: &impl Post) {
-///     println!("Post #{}: {}x{}", post.id(), post.width(), post.height());
+///     let height = post.height()
+///         .map(|height| height.to_string())
+///         .unwrap_or_else(|| "unknown".into());
+///     println!("Post #{}: {}x{}", post.id(), post.width(), height);
 ///     if let Some(url) = post.file_url() {
 ///         println!("  URL: {}", url);
 ///     }
@@ -37,8 +40,8 @@ pub trait Post {
     /// Returns the width of the image in pixels.
     fn width(&self) -> u32;
 
-    /// Returns the height of the image in pixels.
-    fn height(&self) -> u32;
+    /// Returns the height of the image in pixels, if available.
+    fn height(&self) -> Option<u32>;
 
     /// Returns the URL to the full-size image, if available.
     fn file_url(&self) -> Option<&str>;
@@ -46,8 +49,13 @@ pub trait Post {
     /// Returns the tags associated with this post as a single string.
     fn tags(&self) -> &str;
 
+    /// Iterates over whitespace-separated tags without allocating.
+    fn tags_iter(&self) -> std::str::SplitWhitespace<'_> {
+        self.tags().split_whitespace()
+    }
+
     /// Returns the post's score/rating value, if available.
-    fn score(&self) -> Option<i32>;
+    fn score(&self) -> Option<i64>;
 
     /// Returns the MD5 hash of the image, if available.
     fn md5(&self) -> Option<&str>;
@@ -67,8 +75,8 @@ impl Post for danbooru::DanbooruPost {
         self.image_width
     }
 
-    fn height(&self) -> u32 {
-        self.image_height
+    fn height(&self) -> Option<u32> {
+        Some(self.image_height)
     }
 
     fn file_url(&self) -> Option<&str> {
@@ -79,8 +87,8 @@ impl Post for danbooru::DanbooruPost {
         &self.tag_string
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {
@@ -106,8 +114,8 @@ impl Post for gelbooru::GelbooruPost {
         self.width
     }
 
-    fn height(&self) -> u32 {
-        self.height
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
     }
 
     fn file_url(&self) -> Option<&str> {
@@ -118,8 +126,8 @@ impl Post for gelbooru::GelbooruPost {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score as i32)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {
@@ -145,7 +153,7 @@ impl Post for safebooru::SafebooruPost {
         self.width
     }
 
-    fn height(&self) -> u32 {
+    fn height(&self) -> Option<u32> {
         self.height
     }
 
@@ -157,8 +165,8 @@ impl Post for safebooru::SafebooruPost {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        self.score.map(|s| s as i32)
+    fn score(&self) -> Option<i64> {
+        self.score.map(i64::from)
     }
 
     fn md5(&self) -> Option<&str> {
@@ -184,20 +192,20 @@ impl Post for rule34::Rule34Post {
         self.width
     }
 
-    fn height(&self) -> u32 {
-        self.height
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
     }
 
     fn file_url(&self) -> Option<&str> {
-        Some(&self.file_url)
+        self.file_url.as_deref()
     }
 
     fn tags(&self) -> &str {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {

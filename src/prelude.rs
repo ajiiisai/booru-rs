@@ -6,35 +6,36 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! # #[cfg(feature = "danbooru")]
+//! use booru_rs::danbooru::Client;
 //!
+//! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     let posts = DanbooruClient::builder()
-//!         .tag("cat_ears")?
-//!         .rating(DanbooruRating::General)
-//!         .sort(Sort::Score)
+//! async fn main() -> booru_rs::error::Result<()> {
+//!     let client = Client::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
+//!         .rating(booru_rs::model::danbooru::DanbooruRating::General)
+//!         .sort(booru_rs::client::generic::Sort::Score)
 //!         .limit(10)
-//!         .build()
-//!         .get()
+//!         .send()
 //!         .await?;
 //!
 //!     println!("Found {} posts", posts.len());
 //!     Ok(())
 //! }
+//! # #[cfg(not(feature = "danbooru"))]
+//! # fn main() {}
 //! ```
 
 // Core traits and types
-pub use crate::client::Client;
-pub use crate::client::ClientBuilder;
+pub use crate::client::RequestPolicy;
 pub use crate::client::generic::Sort;
 pub use crate::error::{BooruError, Result};
 
 // Autocomplete
-pub use crate::autocomplete::{Autocomplete, TagSuggestion};
-
-// Stream types for pagination
-pub use crate::stream::{PageStream, PostStream};
+pub use crate::autocomplete::TagSuggestion;
 
 // Retry configuration
 pub use crate::retry::RetryConfig;
@@ -43,34 +44,27 @@ pub use crate::retry::RetryConfig;
 pub use crate::ratelimit::RateLimiter;
 
 // Caching
-pub use crate::cache::{Cache, CacheConfig};
+pub use crate::cache::{Cache, CacheConfig, CacheError, CacheKey, CacheOperation};
 
 // Tag validation
 pub use crate::validation::{TagValidation, TagWarning, validate_tag};
 
 // Download utilities
+#[cfg(feature = "download")]
 pub use crate::download::{DownloadOptions, DownloadProgress, DownloadResult, Downloader};
 
 // Danbooru
 #[cfg(feature = "danbooru")]
-pub use crate::client::DanbooruClient;
-#[cfg(feature = "danbooru")]
-pub use crate::model::danbooru::{DanbooruPost, DanbooruRating};
+pub use crate::model::danbooru::{DanbooruPost, DanbooruPostRating, DanbooruRating};
 
 // Gelbooru
 #[cfg(feature = "gelbooru")]
-pub use crate::client::GelbooruClient;
-#[cfg(feature = "gelbooru")]
-pub use crate::model::gelbooru::{GelbooruPost, GelbooruRating, GelbooruResponse};
+pub use crate::model::gelbooru::{GelbooruPost, GelbooruPostRating, GelbooruRating};
 
 // Rule34
-#[cfg(feature = "rule34")]
-pub use crate::client::Rule34Client;
 #[cfg(feature = "rule34")]
 pub use crate::model::rule34::{Rule34Post, Rule34Rating};
 
 // Safebooru
-#[cfg(feature = "safebooru")]
-pub use crate::client::SafebooruClient;
 #[cfg(feature = "safebooru")]
 pub use crate::model::safebooru::{SafebooruPost, SafebooruRating};

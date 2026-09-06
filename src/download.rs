@@ -6,26 +6,19 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::download::{Downloader, DownloadOptions};
-//! use booru_rs::prelude::*;
+//! use booru_rs::download::Downloader;
 //! use std::path::Path;
 //!
 //! # async fn example() -> booru_rs::error::Result<()> {
-//! let posts = SafebooruClient::builder()
-//!     .tag("landscape")?
-//!     .limit(5)
-//!     .build()
-//!     .get()
-//!     .await?;
-//!
 //! let downloader = Downloader::new();
-//!
-//! for post in &posts {
-//!     let path = downloader
-//!         .download_post(post, Path::new("./downloads"))
-//!         .await?;
-//!     println!("Downloaded: {}", path.path.display());
-//! }
+//! let result = downloader
+//!     .download_url(
+//!         "https://example.com/image.jpg",
+//!         Path::new("./downloads"),
+//!         None,
+//!     )
+//!     .await?;
+//! println!("Downloaded: {}", result.path.display());
 //! # Ok(())
 //! # }
 //! ```
@@ -35,6 +28,92 @@ use crate::model::Post;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
+fn validate_filename(filename: &str) -> Result<()> {
+    if filename.is_empty()
+        || filename == "."
+        || filename == ".."
+        || filename.contains('/')
+        || filename.contains('\\')
+    {
+        return Err(BooruError::InvalidFilename(filename.to_string()));
+    }
+    Ok(())
+}
+
+fn filename_from_url(url: &str) -> Result<String> {
+    let parsed = reqwest::Url::parse(url).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
+    if parsed.path().is_empty() || parsed.path().ends_with('/') {
+        return Err(BooruError::InvalidUrl(url.to_string()));
+    }
+    let filename = parsed
+        .path_segments()
+        .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+        .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?;
+    let filename = filename.to_string();
+    validate_filename(&filename)?;
+    Ok(filename)
+}
+
+async fn stream_response_to_file(
+    response: reqwest::Response,
+    dest_path: &Path,
+    overwrite: bool,
+    post_id: Option<u32>,
+    on_progress: Option<&(dyn Fn(DownloadProgress) + Send + Sync)>,
+) -> Result<DownloadResult> {
+    use futures_core::Stream;
+
+    let parent = dest_path.parent().unwrap_or_else(|| Path::new("."));
+    let temp = tempfile::NamedTempFile::new_in(parent)?;
+    let mut file = tokio::fs::File::from_std(temp.reopen()?);
+    let total = response.content_length();
+    let mut downloaded = 0;
+    let mut stream = std::pin::pin!(response.bytes_stream());
+
+    loop {
+        let chunk = std::future::poll_fn(|cx| stream.as_mut().poll_next(cx)).await;
+        match chunk {
+            Some(Ok(bytes)) => {
+                file.write_all(&bytes).await?;
+                downloaded += bytes.len() as u64;
+                if let Some(on_progress) = on_progress
+                    && let Some(post_id) = post_id
+                {
+                    on_progress(DownloadProgress {
+                        total,
+                        downloaded,
+                        post_id,
+                    });
+                }
+            }
+            Some(Err(error)) => return Err(error.into()),
+            None => break,
+        }
+    }
+
+    file.flush().await?;
+    drop(file);
+    if overwrite {
+        temp.persist(dest_path)
+            .map_err(|error| BooruError::Io(error.error))?;
+    } else if let Err(error) = temp.persist_noclobber(dest_path) {
+        if error.error.kind() != std::io::ErrorKind::AlreadyExists {
+            return Err(BooruError::Io(error.error));
+        }
+        let metadata = tokio::fs::metadata(dest_path).await?;
+        return Ok(DownloadResult {
+            path: dest_path.to_path_buf(),
+            size: metadata.len(),
+            skipped: true,
+        });
+    }
+    Ok(DownloadResult {
+        path: dest_path.to_path_buf(),
+        size: downloaded,
+        skipped: false,
+    })
+}
+
 /// Options for configuring downloads.
 #[derive(Debug, Clone, Default)]
 pub struct DownloadOptions {
@@ -42,8 +121,6 @@ pub struct DownloadOptions {
     pub overwrite: bool,
     /// Custom filename template. Use `{id}`, `{md5}`, `{ext}` as placeholders.
     pub filename_template: Option<String>,
-    /// Create subdirectories based on rating.
-    pub organize_by_rating: bool,
 }
 
 impl DownloadOptions {
@@ -63,13 +140,6 @@ impl DownloadOptions {
     #[must_use]
     pub fn filename(mut self, template: impl Into<String>) -> Self {
         self.filename_template = Some(template.into());
-        self
-    }
-
-    /// Organize downloads into subdirectories by rating.
-    #[must_use]
-    pub fn organize_by_rating(mut self) -> Self {
-        self.organize_by_rating = true;
         self
     }
 }
@@ -114,6 +184,7 @@ pub type ProgressCallback = Box<dyn Fn(DownloadProgress) + Send + Sync>;
 pub struct Downloader {
     client: reqwest::Client,
     options: DownloadOptions,
+    timeout: Option<std::time::Duration>,
 }
 
 impl std::fmt::Debug for Downloader {
@@ -131,15 +202,15 @@ impl Default for Downloader {
 }
 
 impl Downloader {
+    const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
     /// Creates a new downloader with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(300))
-                .build()
-                .expect("Failed to create HTTP client"),
+            client: reqwest::Client::new(),
             options: DownloadOptions::default(),
+            timeout: Some(Self::DEFAULT_TIMEOUT),
         }
     }
 
@@ -149,6 +220,7 @@ impl Downloader {
         Self {
             client,
             options: DownloadOptions::default(),
+            timeout: None,
         }
     }
 
@@ -163,11 +235,16 @@ impl Downloader {
     #[must_use]
     pub fn with_timeout(self, timeout: std::time::Duration) -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .timeout(timeout)
-                .build()
-                .expect("Failed to create HTTP client"),
+            client: self.client,
             options: self.options,
+            timeout: Some(timeout),
+        }
+    }
+
+    fn apply_timeout(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match self.timeout {
+            Some(timeout) => request.timeout(timeout),
+            None => request,
         }
     }
 
@@ -186,18 +263,17 @@ impl Downloader {
     ) -> Result<DownloadResult> {
         // Extract filename from URL if not provided
         let filename = match filename {
-            Some(f) => f.to_string(),
-            None => url
-                .rsplit('/')
-                .next()
-                .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?
-                .to_string(),
+            Some(f) => {
+                validate_filename(f)?;
+                f.to_string()
+            }
+            None => filename_from_url(url)?,
         };
 
         let dest_path = dest_dir.join(&filename);
 
         // Check if file exists
-        if dest_path.exists() && !self.options.overwrite {
+        if tokio::fs::try_exists(&dest_path).await? && !self.options.overwrite {
             let metadata = tokio::fs::metadata(&dest_path).await?;
             return Ok(DownloadResult {
                 path: dest_path,
@@ -211,26 +287,13 @@ impl Downloader {
 
         // Download the file
         let response = self
-            .client
-            .get(url)
+            .apply_timeout(self.client.get(url))
             .send()
             .await?
             .error_for_status()
-            .map_err(BooruError::Request)?;
+            .map_err(BooruError::from)?;
 
-        let bytes = response.bytes().await?;
-        let size = bytes.len() as u64;
-
-        // Write to file
-        let mut file = tokio::fs::File::create(&dest_path).await?;
-        file.write_all(&bytes).await?;
-        file.flush().await?;
-
-        Ok(DownloadResult {
-            path: dest_path,
-            size,
-            skipped: false,
-        })
+        stream_response_to_file(response, &dest_path, self.options.overwrite, None, None).await
     }
 
     /// Downloads an image from a URL with progress updates.
@@ -245,20 +308,19 @@ impl Downloader {
         on_progress: F,
     ) -> Result<DownloadResult>
     where
-        F: Fn(DownloadProgress) + Send,
+        F: Fn(DownloadProgress) + Send + Sync,
     {
         let filename = match filename {
-            Some(f) => f.to_string(),
-            None => url
-                .rsplit('/')
-                .next()
-                .ok_or_else(|| BooruError::InvalidUrl(url.to_string()))?
-                .to_string(),
+            Some(f) => {
+                validate_filename(f)?;
+                f.to_string()
+            }
+            None => filename_from_url(url)?,
         };
 
         let dest_path = dest_dir.join(&filename);
 
-        if dest_path.exists() && !self.options.overwrite {
+        if tokio::fs::try_exists(&dest_path).await? && !self.options.overwrite {
             let metadata = tokio::fs::metadata(&dest_path).await?;
             return Ok(DownloadResult {
                 path: dest_path,
@@ -270,52 +332,20 @@ impl Downloader {
         tokio::fs::create_dir_all(dest_dir).await?;
 
         let response = self
-            .client
-            .get(url)
+            .apply_timeout(self.client.get(url))
             .send()
             .await?
             .error_for_status()
-            .map_err(BooruError::Request)?;
+            .map_err(BooruError::from)?;
 
-        let total = response.content_length();
-        let mut downloaded: u64 = 0;
-
-        let mut file = tokio::fs::File::create(&dest_path).await?;
-        let mut stream = response.bytes_stream();
-
-        use futures_core::Stream;
-        use std::pin::Pin;
-        use std::task::Context;
-
-        // Consume stream manually to track progress
-        let mut stream = Pin::new(&mut stream);
-        loop {
-            let chunk =
-                std::future::poll_fn(|cx: &mut Context<'_>| stream.as_mut().poll_next(cx)).await;
-
-            match chunk {
-                Some(Ok(bytes)) => {
-                    file.write_all(&bytes).await?;
-                    downloaded += bytes.len() as u64;
-
-                    on_progress(DownloadProgress {
-                        total,
-                        downloaded,
-                        post_id,
-                    });
-                }
-                Some(Err(e)) => return Err(BooruError::Request(e)),
-                None => break,
-            }
-        }
-
-        file.flush().await?;
-
-        Ok(DownloadResult {
-            path: dest_path,
-            size: downloaded,
-            skipped: false,
-        })
+        stream_response_to_file(
+            response,
+            &dest_path,
+            self.options.overwrite,
+            Some(post_id),
+            Some(&on_progress),
+        )
+        .await
     }
 
     /// Downloads an image from a post.
@@ -328,7 +358,7 @@ impl Downloader {
     pub async fn download_post(&self, post: &impl Post, dest_dir: &Path) -> Result<DownloadResult> {
         let url = post
             .file_url()
-            .ok_or_else(|| BooruError::InvalidUrl("Post has no file URL".to_string()))?;
+            .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
         self.download_url(url, dest_dir, Some(&filename)).await
@@ -342,11 +372,11 @@ impl Downloader {
         on_progress: F,
     ) -> Result<DownloadResult>
     where
-        F: Fn(DownloadProgress) + Send,
+        F: Fn(DownloadProgress) + Send + Sync,
     {
         let url = post
             .file_url()
-            .ok_or_else(|| BooruError::InvalidUrl("Post has no file URL".to_string()))?;
+            .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
         self.download_url_with_progress(url, dest_dir, Some(&filename), post.id(), on_progress)
@@ -362,73 +392,120 @@ impl Downloader {
         dest_dir: &Path,
         concurrency: usize,
     ) -> Vec<Result<DownloadResult>> {
+        use std::collections::HashMap;
         use std::sync::Arc;
         use tokio::sync::Semaphore;
 
-        let semaphore = Arc::new(Semaphore::new(concurrency));
-        let mut handles = Vec::with_capacity(posts.len());
+        if concurrency == 0 {
+            return (0..posts.len())
+                .map(|_| Err(BooruError::InvalidConcurrency))
+                .collect();
+        }
 
-        for post in posts {
+        let semaphore = Arc::new(Semaphore::new(concurrency));
+        let mut tasks: tokio::task::JoinSet<(usize, Result<DownloadResult>)> =
+            tokio::task::JoinSet::new();
+        let mut task_indexes = HashMap::new();
+        let mut destinations: HashMap<std::path::PathBuf, Vec<usize>> = HashMap::new();
+        let mut filenames = vec![None; posts.len()];
+        let mut results: Vec<Option<Result<DownloadResult>>> =
+            (0..posts.len()).map(|_| None).collect();
+
+        for (index, post) in posts.iter().enumerate() {
+            let Some(url) = post.file_url() else {
+                results[index] = Some(Err(BooruError::MissingMediaUrl(post.id())));
+                continue;
+            };
+            let filename = self.generate_filename(post, url);
+            if let Err(error) = validate_filename(&filename) {
+                results[index] = Some(Err(error));
+                continue;
+            }
+            destinations
+                .entry(dest_dir.join(&filename))
+                .or_default()
+                .push(index);
+            filenames[index] = Some(filename);
+        }
+        let conflicts: HashMap<usize, std::path::PathBuf> = destinations
+            .into_iter()
+            .filter(|(_, indexes)| indexes.len() > 1)
+            .flat_map(|(destination, indexes)| {
+                indexes
+                    .into_iter()
+                    .map(move |index| (index, destination.clone()))
+            })
+            .collect();
+
+        for (index, post) in posts.iter().enumerate() {
+            if results[index].is_some() || conflicts.contains_key(&index) {
+                continue;
+            }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let url = post.file_url().map(|s| s.to_string());
-            let id = post.id();
-            let filename = url.as_ref().map(|u| self.generate_filename(post, u));
+            let url = post.file_url().unwrap().to_string();
+            let filename = filenames[index].take().unwrap();
             let dest = dest_dir.to_path_buf();
             let client = self.client.clone();
             let options = self.options.clone();
+            let timeout = self.timeout;
 
-            handles.push(tokio::spawn(async move {
+            let task = tasks.spawn(async move {
                 let _permit = permit;
+                let result = async {
+                    let dest_path = dest.join(&filename);
 
-                let url = url.ok_or_else(|| {
-                    BooruError::InvalidUrl(format!("Post {} has no file URL", id))
-                })?;
+                    if tokio::fs::try_exists(&dest_path).await? && !options.overwrite {
+                        let metadata = tokio::fs::metadata(&dest_path).await?;
+                        return Ok(DownloadResult {
+                            path: dest_path,
+                            size: metadata.len(),
+                            skipped: true,
+                        });
+                    }
 
-                let filename = filename.unwrap();
-                let dest_path = dest.join(&filename);
+                    tokio::fs::create_dir_all(&dest).await?;
 
-                if dest_path.exists() && !options.overwrite {
-                    let metadata = tokio::fs::metadata(&dest_path).await?;
-                    return Ok(DownloadResult {
-                        path: dest_path,
-                        size: metadata.len(),
-                        skipped: true,
-                    });
+                    let request = client.get(&url);
+                    let request = match timeout {
+                        Some(timeout) => request.timeout(timeout),
+                        None => request,
+                    };
+                    let response = request
+                        .send()
+                        .await?
+                        .error_for_status()
+                        .map_err(BooruError::from)?;
+
+                    stream_response_to_file(response, &dest_path, options.overwrite, None, None)
+                        .await
                 }
-
-                tokio::fs::create_dir_all(&dest).await?;
-
-                let response = client
-                    .get(&url)
-                    .send()
-                    .await?
-                    .error_for_status()
-                    .map_err(BooruError::Request)?;
-
-                let bytes = response.bytes().await?;
-                let size = bytes.len() as u64;
-
-                let mut file = tokio::fs::File::create(&dest_path).await?;
-                file.write_all(&bytes).await?;
-                file.flush().await?;
-
-                Ok(DownloadResult {
-                    path: dest_path,
-                    size,
-                    skipped: false,
-                })
-            }));
+                .await;
+                (index, result)
+            });
+            task_indexes.insert(task.id(), index);
         }
 
-        let mut results = Vec::with_capacity(handles.len());
-        for handle in handles {
-            results.push(
-                handle.await.unwrap_or_else(|e| {
-                    Err(BooruError::InvalidUrl(format!("Task panicked: {}", e)))
-                }),
-            );
+        for (index, destination) in conflicts {
+            results[index] = Some(Err(BooruError::DestinationConflict(destination)));
+        }
+        while let Some(result) = tasks.join_next_with_id().await {
+            match result {
+                Ok((task_id, (index, result))) => {
+                    task_indexes.remove(&task_id);
+                    results[index] = Some(result);
+                }
+                Err(error) => {
+                    if let Some(index) = task_indexes.remove(&error.id()) {
+                        results[index] =
+                            Some(Err(BooruError::DownloadTaskFailed(error.to_string())));
+                    }
+                }
+            }
         }
         results
+            .into_iter()
+            .map(|result| result.expect("every download task must return a result"))
+            .collect()
     }
 
     fn generate_filename(&self, post: &impl Post, url: &str) -> String {
@@ -471,5 +548,424 @@ mod tests {
 
         assert!(opts.overwrite);
         assert!(opts.filename_template.is_some());
+    }
+
+    #[test]
+    fn default_downloader_applies_default_timeout() {
+        assert_eq!(
+            Downloader::new().timeout,
+            Some(std::time::Duration::from_secs(300))
+        );
+    }
+
+    #[test]
+    fn filename_from_url_uses_path_without_query() {
+        assert_eq!(
+            filename_from_url("https://example.com/media/image.jpg?token=secret").unwrap(),
+            "image.jpg"
+        );
+    }
+
+    #[test]
+    fn filename_from_url_rejects_empty_paths() {
+        for url in ["https://example.com", "https://example.com/dir/"] {
+            assert!(matches!(
+                filename_from_url(url),
+                Err(BooruError::InvalidUrl(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn filename_validation_rejects_path_components() {
+        for filename in [
+            "",
+            ".",
+            "..",
+            "../image.jpg",
+            "nested/image.jpg",
+            r"..\image.jpg",
+        ] {
+            assert!(matches!(
+                validate_filename(filename),
+                Err(BooruError::InvalidFilename(_))
+            ));
+        }
+        assert!(validate_filename("image.jpg").is_ok());
+    }
+
+    #[tokio::test]
+    async fn timeout_preserves_injected_client_configuration() {
+        use wiremock::matchers::{header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("x-test", reqwest::header::HeaderValue::from_static("kept"));
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+        let downloader =
+            Downloader::with_client(client).with_timeout(std::time::Duration::from_secs(7));
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .and(header("x-test", "kept"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+
+        let dest =
+            std::env::temp_dir().join(format!("booru-rs-download-test-{}", std::process::id()));
+        let result = downloader
+            .download_url(&format!("{}/image.jpg", server.uri()), &dest, None)
+            .await
+            .unwrap();
+        assert_eq!(result.size, 3);
+        assert_eq!(tokio::fs::read(&result.path).await.unwrap(), vec![1, 2, 3]);
+        tokio::fs::remove_dir_all(dest).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn no_overwrite_preserves_file_created_during_download() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+        let destination = tempfile::tempdir().unwrap();
+        let target = destination.path().join("image.jpg");
+        let callback_target = target.clone();
+
+        let result = Downloader::new()
+            .download_url_with_progress(
+                &format!("{}/image.jpg", server.uri()),
+                destination.path(),
+                None,
+                1,
+                move |_| std::fs::write(&callback_target, b"existing").unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.skipped);
+        assert_eq!(result.size, 8);
+        assert_eq!(std::fs::read(target).unwrap(), b"existing");
+    }
+
+    #[tokio::test]
+    async fn zero_concurrency_returns_errors_without_waiting() {
+        struct TestPost;
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                1
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/1.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                Some(0)
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let posts = [TestPost, TestPost];
+        let results = Downloader::new()
+            .download_posts(&posts, Path::new("unused"), 0)
+            .await;
+
+        assert_eq!(results.len(), 2);
+        assert!(
+            results
+                .iter()
+                .all(|result| matches!(result, Err(BooruError::InvalidConcurrency)))
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_media_url_has_download_error() {
+        struct NoMediaPost;
+
+        impl Post for NoMediaPost {
+            fn id(&self) -> u32 {
+                42
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                None
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let error = Downloader::new()
+            .download_post(&NoMediaPost, Path::new("unused"))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, BooruError::MissingMediaUrl(42)));
+
+        let results = Downloader::new()
+            .download_posts(&[NoMediaPost], Path::new("unused"), 1)
+            .await;
+        assert!(matches!(
+            results.as_slice(),
+            [Err(BooruError::MissingMediaUrl(42))]
+        ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_destination_collisions() {
+        struct SameDestinationPost;
+
+        impl Post for SameDestinationPost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/image.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let posts = [SameDestinationPost, SameDestinationPost];
+        let results = Downloader::new()
+            .download_posts(&posts, Path::new("downloads"), 2)
+            .await;
+        assert!(matches!(
+            results.as_slice(),
+            [
+                Err(BooruError::DestinationConflict(_)),
+                Err(BooruError::DestinationConflict(_))
+            ]
+        ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_generated_path_components() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct TestPost(String);
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.0)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+        let root = tempfile::tempdir().unwrap();
+        let destination = root.path().join("downloads");
+        let posts = [TestPost(format!("{}/image.jpg", server.uri()))];
+        let results = Downloader::new()
+            .options(DownloadOptions::default().filename("../escaped.jpg"))
+            .download_posts(&posts, &destination, 1)
+            .await;
+
+        assert!(matches!(
+            results.as_slice(),
+            [Err(BooruError::InvalidFilename(filename))] if filename == "../escaped.jpg"
+        ));
+        assert!(!root.path().join("escaped.jpg").exists());
+    }
+
+    #[tokio::test]
+    async fn batch_keeps_failures_in_input_order() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct TestPost {
+            id: u32,
+            url: Option<String>,
+        }
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                self.id
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                self.url.as_deref()
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/slow.jpg"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![1, 2, 3])
+                    .set_delay(std::time::Duration::from_millis(50)),
+            )
+            .mount(&server)
+            .await;
+        let destination = tempfile::tempdir().unwrap();
+        let posts = [
+            TestPost {
+                id: 1,
+                url: Some(format!("{}/slow.jpg", server.uri())),
+            },
+            TestPost { id: 2, url: None },
+        ];
+        let results = Downloader::new()
+            .download_posts(&posts, destination.path(), 2)
+            .await;
+
+        assert!(results[0].is_ok());
+        assert!(matches!(results[1], Err(BooruError::MissingMediaUrl(2))));
+    }
+
+    #[tokio::test]
+    async fn cancelling_batch_aborts_in_flight_downloads() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct TestPost(String);
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                1
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.0)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![1, 2, 3])
+                    .set_delay(std::time::Duration::from_millis(200)),
+            )
+            .mount(&server)
+            .await;
+
+        let dest =
+            std::env::temp_dir().join(format!("booru-rs-download-cancel-{}", std::process::id()));
+        let _ = tokio::fs::remove_dir_all(&dest).await;
+        let post = TestPost(format!("{}/image.jpg", server.uri()));
+        let downloader = Downloader::new();
+        let task_dest = dest.clone();
+        let task =
+            tokio::spawn(async move { downloader.download_posts(&[post], &task_dest, 1).await });
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        task.abort();
+        let _ = task.await;
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        assert!(!dest.join("1.jpg").exists());
+        let _ = tokio::fs::remove_dir_all(dest).await;
     }
 }
