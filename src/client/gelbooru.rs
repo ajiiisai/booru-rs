@@ -254,3 +254,72 @@ where
         })
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::assert_eq;
+
+    #[test]
+    fn autocomplete_parses_post_count_from_string() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": "10"
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert_eq!(item.post_count, Some(10));
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_num() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": 10
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert_eq!(item.post_count, Some(10));
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_null() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": null
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert!(item.post_count.is_none());
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_missing() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag"
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert!(item.post_count.is_none());
+    }
+}
