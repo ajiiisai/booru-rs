@@ -162,11 +162,12 @@ struct GelbooruAutocompleteItem {
     #[serde(default)]
     category: Option<String>,
     /// Number of posts with this tag (optional).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_post_count")]
     post_count: Option<u32>,
 }
 
 impl Autocomplete for GelbooruClient {
+    /// Note: limit is ignored for now
     async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
         let client = shared_client();
         let url = format!("{}/index.php", Self::URL);
@@ -232,5 +233,94 @@ fn parse_post_count_from_label(label: &str) -> Option<u32> {
         label[start + 1..end].parse().ok()
     } else {
         None
+    }
+}
+
+/// Deserialize post count from string or numeric value
+fn deserialize_post_count<'de, D>(deserializer: D) -> std::result::Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum PostCount {
+        Number(u32),
+        String(String),
+    }
+
+    Option::<PostCount>::deserialize(deserializer).map(|count| {
+        count.and_then(|count| match count {
+            PostCount::Number(value) => Some(value),
+            PostCount::String(value) => value.parse().ok(),
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::assert_eq;
+
+    #[test]
+    fn autocomplete_parses_post_count_from_string() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": "10"
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert_eq!(item.post_count, Some(10));
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_num() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": 10
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert_eq!(item.post_count, Some(10));
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_null() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag",
+            "post_count": null
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert!(item.post_count.is_none());
+    }
+
+    #[test]
+    fn autocomplete_parses_post_count_from_missing() {
+        let json = r#"{
+            "value": "cat_ears",
+            "label": "cat ears",
+            "category": "tag"
+        }"#;
+
+        let item = serde_json::from_str::<GelbooruAutocompleteItem>(json);
+        assert!(item.is_ok(), "Parsing error: {}", item.unwrap_err());
+
+        let item = item.unwrap();
+        assert!(item.post_count.is_none());
     }
 }
