@@ -42,7 +42,7 @@ mod mock_post_trait {
 
         assert_eq!(post.id(), 12345);
         assert_eq!(post.width(), 1920);
-        assert_eq!(post.height(), 1080);
+        assert_eq!(post.height(), Some(1080));
         assert_eq!(
             post.file_url(),
             Some("https://example.com/images/1234/abc123.jpg")

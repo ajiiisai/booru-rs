@@ -14,8 +14,8 @@ use serde::Deserialize;
 pub struct SafebooruPost {
     pub id: u32,
     pub score: Option<u32>,
-    /// This can be `null` for really recent posts
-    pub height: u32,
+    /// Image height in pixels, if available.
+    pub height: Option<u32>,
     pub width: u32,
     pub hash: String,
     pub tags: String,

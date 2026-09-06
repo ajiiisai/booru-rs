@@ -49,7 +49,12 @@ async fn main() -> Result<()> {
     for post in &posts {
         println!(
             "  #{}: {}x{} - {}",
-            post.id, post.width, post.height, post.image
+            post.id,
+            post.width,
+            post.height
+                .map(|height| height.to_string())
+                .unwrap_or_else(|| "unknown".into()),
+            post.image
         );
     }
 

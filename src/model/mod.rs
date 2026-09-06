@@ -24,7 +24,10 @@ pub mod safebooru;
 /// use booru_rs::prelude::*;
 ///
 /// fn print_post_info(post: &impl Post) {
-///     println!("Post #{}: {}x{}", post.id(), post.width(), post.height());
+///     let height = post.height()
+///         .map(|height| height.to_string())
+///         .unwrap_or_else(|| "unknown".into());
+///     println!("Post #{}: {}x{}", post.id(), post.width(), height);
 ///     if let Some(url) = post.file_url() {
 ///         println!("  URL: {}", url);
 ///     }
@@ -37,8 +40,8 @@ pub trait Post {
     /// Returns the width of the image in pixels.
     fn width(&self) -> u32;
 
-    /// Returns the height of the image in pixels.
-    fn height(&self) -> u32;
+    /// Returns the height of the image in pixels, if available.
+    fn height(&self) -> Option<u32>;
 
     /// Returns the URL to the full-size image, if available.
     fn file_url(&self) -> Option<&str>;
@@ -67,8 +70,8 @@ impl Post for danbooru::DanbooruPost {
         self.image_width
     }
 
-    fn height(&self) -> u32 {
-        self.image_height
+    fn height(&self) -> Option<u32> {
+        Some(self.image_height)
     }
 
     fn file_url(&self) -> Option<&str> {
@@ -106,8 +109,8 @@ impl Post for gelbooru::GelbooruPost {
         self.width
     }
 
-    fn height(&self) -> u32 {
-        self.height
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
     }
 
     fn file_url(&self) -> Option<&str> {
@@ -145,7 +148,7 @@ impl Post for safebooru::SafebooruPost {
         self.width
     }
 
-    fn height(&self) -> u32 {
+    fn height(&self) -> Option<u32> {
         self.height
     }
 
@@ -184,8 +187,8 @@ impl Post for rule34::Rule34Post {
         self.width
     }
 
-    fn height(&self) -> u32 {
-        self.height
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
     }
 
     fn file_url(&self) -> Option<&str> {

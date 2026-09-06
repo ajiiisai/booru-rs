@@ -86,7 +86,10 @@
 //! use booru_rs::model::Post;
 //!
 //! fn print_post(post: &impl Post) {
-//!     println!("#{}: {}x{}", post.id(), post.width(), post.height());
+//!     let height = post.height()
+//!         .map(|height| height.to_string())
+//!         .unwrap_or_else(|| "unknown".into());
+//!     println!("#{}: {}x{}", post.id(), post.width(), height);
 //! }
 //! ```
 

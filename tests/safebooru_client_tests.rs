@@ -560,3 +560,49 @@ fn common_score_preserves_provider_range() {
     post.score = None;
     assert_eq!(post.score(), None);
 }
+#[test]
+fn post_decodes_null_height() {
+    use booru_rs::model::Post;
+
+    let mut value: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    value[0]["height"] = serde_json::Value::Null;
+    let posts = serde_json::from_value::<Vec<booru_rs::safebooru::SafebooruPost>>(value).unwrap();
+    assert_eq!(posts[0].height, None);
+    assert_eq!(posts[0].height(), None);
+}
+
+#[test]
+fn post_height_preserves_missing_and_numeric_values() {
+    use booru_rs::model::Post;
+
+    let fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for height in [None, Some(0), Some(1080), Some(u32::MAX)] {
+        let mut value = fixture[0].clone();
+        if let Some(height) = height {
+            value["height"] = height.into();
+        } else {
+            value.as_object_mut().unwrap().remove("height");
+        }
+        let post: booru_rs::safebooru::SafebooruPost = serde_json::from_value(value).unwrap();
+        assert_eq!(post.height, height);
+        assert_eq!(post.height(), height);
+    }
+}
+
+#[test]
+fn post_rejects_invalid_heights_and_missing_identity() {
+    let fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for height in [
+        serde_json::json!(-1),
+        serde_json::json!(u64::from(u32::MAX) + 1),
+        serde_json::json!("1080"),
+        serde_json::json!(1.5),
+    ] {
+        let mut value = fixture[0].clone();
+        value["height"] = height;
+        assert!(serde_json::from_value::<booru_rs::safebooru::SafebooruPost>(value).is_err());
+    }
+    let mut value = fixture[0].clone();
+    value.as_object_mut().unwrap().remove("id");
+    assert!(serde_json::from_value::<booru_rs::safebooru::SafebooruPost>(value).is_err());
+}

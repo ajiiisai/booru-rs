@@ -405,7 +405,7 @@ async fn post_trait_methods() {
     use booru_rs::model::Post;
     assert_eq!(post.id(), 15000000);
     assert_eq!(post.width(), 900);
-    assert_eq!(post.height(), 1200);
+    assert_eq!(post.height(), Some(1200));
     assert_eq!(
         post.file_url(),
         Some("https://example.com/images/3900/rule34hash123.png")

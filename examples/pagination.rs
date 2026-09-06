@@ -54,7 +54,12 @@ async fn main() -> Result<()> {
         if count <= 5 || count > 45 {
             println!(
                 "  Post #{}: {} ({}x{})",
-                count, post.id, post.width, post.height
+                count,
+                post.id,
+                post.width,
+                post.height
+                    .map(|height| height.to_string())
+                    .unwrap_or_else(|| "unknown".into())
             );
         } else if count == 6 {
             println!("  ... ({} more posts) ...", 50 - 10);
