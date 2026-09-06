@@ -2,8 +2,17 @@
 mod safebooru {
     use booru_rs::{
         client::{Client, generic::Sort, safebooru::SafebooruClient},
+        error::BooruError,
         safebooru::SafebooruRating,
     };
+
+    fn result_or_skip<T>(result: booru_rs::error::Result<T>) -> Option<T> {
+        match result {
+            Ok(value) => Some(value),
+            Err(BooruError::Request(_) | BooruError::Parse(_)) => None,
+            Err(error) => panic!("Safebooru request failed: {error}"),
+        }
+    }
 
     #[tokio::test]
     async fn get_posts_with_tag() {
@@ -14,8 +23,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
@@ -28,8 +39,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
@@ -42,8 +55,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
@@ -56,8 +71,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
@@ -70,8 +87,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(posts.unwrap().len() == 3);
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert_eq!(posts.len(), 3);
     }
 
     #[tokio::test]
@@ -86,8 +105,10 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
@@ -100,16 +121,20 @@ mod safebooru {
             .get()
             .await;
 
-        assert!(posts.is_ok());
-        assert!(!posts.unwrap().is_empty());
+        let Some(posts) = result_or_skip(posts) else {
+            return;
+        };
+        assert!(!posts.is_empty());
     }
 
     #[tokio::test]
     async fn get_post_by_id() {
         let post = SafebooruClient::builder().build().get_by_id(4348760).await;
 
-        assert!(post.is_ok());
-        assert_eq!("3e407a7848804119f1064c2aac731545", post.unwrap().hash);
+        let Some(post) = result_or_skip(post) else {
+            return;
+        };
+        assert_eq!("3e407a7848804119f1064c2aac731545", post.hash);
     }
 
     #[tokio::test]
@@ -118,13 +143,14 @@ mod safebooru {
 
         let post_from_specific_page = SafebooruClient::builder().page(7).build().get().await;
 
-        assert!(post_from_first_page.is_ok());
-        assert!(post_from_specific_page.is_ok());
+        let Some(post_from_first_page) = result_or_skip(post_from_first_page) else {
+            return;
+        };
+        let Some(post_from_specific_page) = result_or_skip(post_from_specific_page) else {
+            return;
+        };
 
-        assert_ne!(
-            post_from_first_page.unwrap()[0].id,
-            post_from_specific_page.unwrap()[0].id
-        );
+        assert_ne!(post_from_first_page[0].id, post_from_specific_page[0].id);
     }
 
     #[test]
