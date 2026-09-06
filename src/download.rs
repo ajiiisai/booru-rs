@@ -60,9 +60,10 @@ fn filename_from_url(url: &str) -> Result<String> {
 async fn stream_response_to_file(
     response: reqwest::Response,
     dest_path: &Path,
+    overwrite: bool,
     post_id: Option<u32>,
     on_progress: Option<&(dyn Fn(DownloadProgress) + Send + Sync)>,
-) -> Result<u64> {
+) -> Result<DownloadResult> {
     use futures_core::Stream;
 
     let parent = dest_path.parent().unwrap_or_else(|| Path::new("."));
@@ -95,9 +96,25 @@ async fn stream_response_to_file(
 
     file.flush().await?;
     drop(file);
-    temp.persist(dest_path)
-        .map_err(|error| BooruError::Io(error.error))?;
-    Ok(downloaded)
+    if overwrite {
+        temp.persist(dest_path)
+            .map_err(|error| BooruError::Io(error.error))?;
+    } else if let Err(error) = temp.persist_noclobber(dest_path) {
+        if error.error.kind() != std::io::ErrorKind::AlreadyExists {
+            return Err(BooruError::Io(error.error));
+        }
+        let metadata = tokio::fs::metadata(dest_path).await?;
+        return Ok(DownloadResult {
+            path: dest_path.to_path_buf(),
+            size: metadata.len(),
+            skipped: true,
+        });
+    }
+    Ok(DownloadResult {
+        path: dest_path.to_path_buf(),
+        size: downloaded,
+        skipped: false,
+    })
 }
 
 /// Options for configuring downloads.
@@ -280,13 +297,7 @@ impl Downloader {
             .error_for_status()
             .map_err(BooruError::Request)?;
 
-        let size = stream_response_to_file(response, &dest_path, None, None).await?;
-
-        Ok(DownloadResult {
-            path: dest_path,
-            size,
-            skipped: false,
-        })
+        stream_response_to_file(response, &dest_path, self.options.overwrite, None, None).await
     }
 
     /// Downloads an image from a URL with progress updates.
@@ -331,15 +342,14 @@ impl Downloader {
             .error_for_status()
             .map_err(BooruError::Request)?;
 
-        let downloaded =
-            stream_response_to_file(response, &dest_path, Some(post_id), Some(&on_progress))
-                .await?;
-
-        Ok(DownloadResult {
-            path: dest_path,
-            size: downloaded,
-            skipped: false,
-        })
+        stream_response_to_file(
+            response,
+            &dest_path,
+            self.options.overwrite,
+            Some(post_id),
+            Some(&on_progress),
+        )
+        .await
     }
 
     /// Downloads an image from a post.
@@ -470,13 +480,8 @@ impl Downloader {
                         .error_for_status()
                         .map_err(BooruError::Request)?;
 
-                    let size = stream_response_to_file(response, &dest_path, None, None).await?;
-
-                    Ok(DownloadResult {
-                        path: dest_path,
-                        size,
-                        skipped: false,
-                    })
+                    stream_response_to_file(response, &dest_path, options.overwrite, None, None)
+                        .await
                 }
                 .await;
                 (index, result)
@@ -615,6 +620,37 @@ mod tests {
         assert_eq!(result.size, 3);
         assert_eq!(tokio::fs::read(&result.path).await.unwrap(), vec![1, 2, 3]);
         tokio::fs::remove_dir_all(dest).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn no_overwrite_preserves_file_created_during_download() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/image.jpg"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+        let destination = tempfile::tempdir().unwrap();
+        let target = destination.path().join("image.jpg");
+        let callback_target = target.clone();
+
+        let result = Downloader::new()
+            .download_url_with_progress(
+                &format!("{}/image.jpg", server.uri()),
+                destination.path(),
+                None,
+                1,
+                move |_| std::fs::write(&callback_target, b"existing").unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.skipped);
+        assert_eq!(result.size, 8);
+        assert_eq!(std::fs::read(target).unwrap(), b"existing");
     }
 
     #[tokio::test]
