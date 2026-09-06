@@ -132,8 +132,7 @@ impl<T: Client> PageStream<T> {
 /// ```
 pub struct PostStream<T: Client> {
     page_stream: PageStream<T>,
-    buffer: Vec<T::Post>,
-    buffer_index: usize,
+    buffer: std::vec::IntoIter<T::Post>,
     posts_yielded: u32,
     max_posts: Option<u32>,
 }
@@ -143,8 +142,7 @@ impl<T: Client> PostStream<T> {
     pub fn new(builder: ClientBuilder<T>) -> Self {
         Self {
             page_stream: PageStream::new(builder),
-            buffer: Vec::new(),
-            buffer_index: 0,
+            buffer: Vec::new().into_iter(),
             posts_yielded: 0,
             max_posts: None,
         }
@@ -185,33 +183,22 @@ impl<T: Client> PostStream<T> {
             return None;
         }
 
-        // If we have posts in the buffer, return the next one
-        if self.buffer_index < self.buffer.len() {
-            let post = self.buffer.swap_remove(self.buffer_index);
-            // Note: swap_remove changes order but we're consuming, so OK
-            self.buffer_index = 0; // Reset since swap_remove moves last to current
-            self.posts_yielded += 1;
-            return Some(Ok(post));
-        }
-
-        // Need to fetch more posts
-        match self.page_stream.next().await? {
-            Ok(posts) => {
-                if posts.is_empty() {
-                    return None;
-                }
-                self.buffer = posts;
-                self.buffer_index = 1; // Will return index 0
+        loop {
+            // Drain the current page in server order before fetching more.
+            if let Some(post) = self.buffer.next() {
                 self.posts_yielded += 1;
-
-                // Pop the first post
-                if self.buffer.is_empty() {
-                    None
-                } else {
-                    Some(Ok(self.buffer.swap_remove(0)))
-                }
+                return Some(Ok(post));
             }
-            Err(e) => Some(Err(e)),
+
+            match self.page_stream.next().await? {
+                Ok(posts) => {
+                    if posts.is_empty() {
+                        return None;
+                    }
+                    self.buffer = posts.into_iter();
+                }
+                Err(e) => return Some(Err(e)),
+            }
         }
     }
 
