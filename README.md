@@ -43,7 +43,7 @@ The default feature set includes all four providers. Select only the providers y
 booru-rs = { version = "0.3", default-features = false, features = ["danbooru"] }
 ```
 
-Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, and `download`. Enable `download` when you use `booru_rs::download`:
+Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`, and `live-tests`. Enable `download` when you use `booru_rs::download`:
 
 ```toml
 booru-rs = { version = "0.3", default-features = false, features = ["safebooru", "download"] }
@@ -220,6 +220,20 @@ let client = Client::builder()
 ```
 
 Use `Rule34` in the same way. Keep credentials in application configuration and do not print the client or its errors with secret values.
+
+## Test against live APIs
+
+The live contract tests are ignored by default. Run them when you want to check the provider adapters against their current APIs:
+
+```sh
+export BOORU_RS_LIVE_GELBOORU_API_KEY="your_gelbooru_api_key"
+export BOORU_RS_LIVE_GELBOORU_USER_ID="your_gelbooru_user_id"
+export BOORU_RS_LIVE_RULE34_API_KEY="your_rule34_api_key"
+export BOORU_RS_LIVE_RULE34_USER_ID="your_rule34_user_id"
+cargo test --features live-tests --test live_contract_tests -- --ignored --nocapture
+```
+
+Gelbooru and Rule34 require both credential variables. Danbooru accepts optional credentials. Set `BOORU_RS_LIVE_<PROVIDER>_ENDPOINT` to override a provider endpoint during a check.
 
 ## Configure requests
 
