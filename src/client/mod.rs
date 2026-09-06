@@ -218,11 +218,22 @@ impl<T: Client> ClientBuilder<T> {
         }
     }
 
-    /// This is primarily useful for testing with mock servers.
-    #[must_use]
-    pub fn with_custom_url(mut self, url: &str) -> Self {
-        self.url = url.to_string();
-        self
+    /// Sets the API endpoint. Trailing slashes are removed, base paths are kept.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BooruError::InvalidUrl`] if the endpoint is blank, does not
+    /// parse, or uses a scheme other than HTTP(S).
+    pub fn endpoint(mut self, url: impl Into<String>) -> Result<Self> {
+        let endpoint = url.into();
+        let trimmed = endpoint.trim_end_matches('/');
+        let parsed =
+            reqwest::Url::parse(trimmed).map_err(|_| BooruError::InvalidUrl(endpoint.clone()))?;
+        if parsed.scheme() != "http" && parsed.scheme() != "https" {
+            return Err(BooruError::InvalidUrl(endpoint));
+        }
+        self.url = trimmed.to_string();
+        Ok(self)
     }
 
     /// Some booru sites require or benefit from authentication.
@@ -310,13 +321,6 @@ impl<T: Client> ClientBuilder<T> {
     #[must_use]
     pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(format!("-{}", tag.into()));
-        self
-    }
-
-    /// Useful for testing or accessing mirror sites.
-    #[must_use]
-    pub fn default_url(mut self, url: impl Into<String>) -> Self {
-        self.url = url.into();
         self
     }
 

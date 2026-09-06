@@ -49,7 +49,8 @@ mod mock_safebooru {
 
         // Create client pointing to mock server
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .tag("cat_ears")
             .unwrap()
             .limit(10)
@@ -81,7 +82,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let post = client.get_by_id(12345).await;
@@ -106,7 +108,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get_by_id(99999).await;
@@ -129,7 +132,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .tag("nonexistent_tag_xyz")
             .unwrap()
             .build();
@@ -151,7 +155,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get().await;
@@ -173,7 +178,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get().await;
@@ -195,7 +201,8 @@ mod mock_safebooru {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get().await;
@@ -223,7 +230,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .tag("cat_ears")
             .unwrap()
             .limit(10)
@@ -250,7 +258,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let post = client.get_by_id(7654321).await;
@@ -292,7 +301,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get_by_id(99999).await;
@@ -314,7 +324,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let result = client.get().await;
@@ -339,7 +350,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("cat_ears")
             .unwrap()
@@ -363,7 +375,8 @@ mod mock_danbooru {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -392,7 +405,8 @@ mod mock_post_trait {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let posts = client.get().await.unwrap();
@@ -423,7 +437,8 @@ mod mock_post_trait {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let posts = client.get().await.unwrap();
@@ -464,7 +479,8 @@ mod mock_gelbooru {
             .await;
 
         let client = GelbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("cat_ears")
             .unwrap()
@@ -494,7 +510,8 @@ mod mock_gelbooru {
             .await;
 
         let client = GelbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("bad_key", "bad_user")
             .build();
 
@@ -524,7 +541,8 @@ mod mock_gelbooru {
             .await;
 
         let client = GelbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("nonexistent_tag_xyz")
             .unwrap()
@@ -548,7 +566,8 @@ mod mock_gelbooru {
             .await;
 
         let client = GelbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -591,7 +610,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("1girl")
             .unwrap()
@@ -624,7 +644,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("bad_key", "bad_user")
             .build();
 
@@ -651,7 +672,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("nonexistent_tag_xyz")
             .unwrap()
@@ -676,7 +698,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -713,7 +736,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .tag("1girl")
             .unwrap()
@@ -738,7 +762,8 @@ mod mock_rule34 {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -770,7 +795,8 @@ mod mock_autocomplete {
             .await;
 
         let client = DanbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let suggestions = client
@@ -801,7 +827,8 @@ mod mock_autocomplete {
             .await;
 
         let client = GelbooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -831,7 +858,8 @@ mod mock_autocomplete {
             .await;
 
         let client = SafebooruClient::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .build();
 
         let suggestions = client
@@ -859,7 +887,8 @@ mod mock_autocomplete {
             .await;
 
         let client = Rule34Client::builder()
-            .with_custom_url(&mock_server.uri())
+            .endpoint(&mock_server.uri())
+            .unwrap()
             .set_credentials("test_key", "test_user")
             .build();
 
@@ -871,5 +900,56 @@ mod mock_autocomplete {
         assert_eq!(suggestions.len(), 2);
         assert_eq!(suggestions[0].name, "cat_ears");
         assert_eq!(suggestions[1].name, "cat_girl");
+    }
+}
+
+mod endpoint_config {
+    use super::*;
+    use booru_rs::prelude::*;
+
+    #[tokio::test]
+    async fn test_trailing_slash_still_routes() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/index.php"))
+            .and(query_param("id", "12345"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(include_str!("fixtures/safebooru/post.json")),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let post = SafebooruClient::builder()
+            .endpoint(format!("{}/", mock_server.uri()))
+            .unwrap()
+            .build()
+            .get_by_id(12345)
+            .await
+            .expect("lookup must succeed");
+
+        assert_eq!(post.id, 12345);
+    }
+
+    #[test]
+    fn test_blank_endpoint_is_invalid() {
+        let result = SafebooruClient::builder().endpoint("   ");
+
+        assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
+    }
+
+    #[test]
+    fn test_unparsable_endpoint_is_invalid() {
+        let result = SafebooruClient::builder().endpoint("not a url");
+
+        assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
+    }
+
+    #[test]
+    fn test_non_http_endpoint_is_invalid() {
+        let result = SafebooruClient::builder().endpoint("ftp://example.com/x");
+
+        assert!(matches!(result.unwrap_err(), BooruError::InvalidUrl(_)));
     }
 }
