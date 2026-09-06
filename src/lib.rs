@@ -56,7 +56,7 @@
 //!
 //! ## Pagination with Async Streams
 //!
-//! Use [`stream::PostStream`] to iterate through all results:
+//! Iterate through all results with `posts()`:
 //!
 //! ```no_run
 //! use booru_rs::safebooru::Client;
@@ -99,13 +99,10 @@ pub mod model;
 pub mod prelude;
 pub mod ratelimit;
 pub mod retry;
-pub mod stream;
 pub mod validation;
 
 // Re-export core types at crate root for convenience
-pub use autocomplete::{Autocomplete, TagSuggestion};
-pub use client::Client;
-pub use client::ClientBuilder;
+pub use autocomplete::TagSuggestion;
 pub use client::generic::Sort;
 pub use error::{BooruError, Result};
 pub use model::Post;

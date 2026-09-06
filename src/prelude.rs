@@ -26,16 +26,11 @@
 //! ```
 
 // Core traits and types
-pub use crate::client::Client;
-pub use crate::client::ClientBuilder;
 pub use crate::client::generic::Sort;
 pub use crate::error::{BooruError, Result};
 
 // Autocomplete
-pub use crate::autocomplete::{Autocomplete, TagSuggestion};
-
-// Stream types for pagination
-pub use crate::stream::{PageStream, PostStream};
+pub use crate::autocomplete::TagSuggestion;
 
 // Retry configuration
 pub use crate::retry::RetryConfig;

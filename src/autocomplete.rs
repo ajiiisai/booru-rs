@@ -20,7 +20,6 @@
 //! # }
 //! ```
 
-use crate::error::Result;
 use serde::{Deserialize, Serialize};
 
 /// A tag suggestion from autocomplete.
@@ -69,40 +68,6 @@ impl TagSuggestion {
             _ => "unknown",
         })
     }
-}
-
-/// Trait for clients that support tag autocomplete.
-///
-/// # Example
-///
-/// ```no_run
-/// use booru_rs::safebooru::Client;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let client = Client::builder().build()?;
-/// let suggestions = client.autocomplete("land", 5).await?;
-/// for tag in suggestions {
-///     println!("{}", tag.name);
-/// }
-/// # Ok(())
-/// # }
-/// ```
-pub trait Autocomplete {
-    /// Returns tag suggestions matching the given query prefix.
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - The prefix to search for (e.g., "cat_" for tags starting with "cat_")
-    /// * `limit` - Maximum number of suggestions to return
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response cannot be parsed.
-    fn autocomplete(
-        &self,
-        query: &str,
-        limit: u32,
-    ) -> impl std::future::Future<Output = Result<Vec<TagSuggestion>>> + Send;
 }
 
 #[cfg(test)]
