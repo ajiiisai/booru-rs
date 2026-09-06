@@ -462,8 +462,7 @@ impl Downloader {
                 Ok(Ok((index, result))) => results[index] = Some(Ok(result)),
                 Ok(Err(error)) => {
                     if let Some(index) = results.iter().position(Option::is_none) {
-                        results[index] =
-                            Some(Err(BooruError::DownloadTaskFailed(error.to_string())));
+                        results[index] = Some(Err(error));
                     }
                 }
                 Err(error) => {
@@ -670,6 +669,14 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(error, BooruError::MissingMediaUrl(42)));
+
+        let results = Downloader::new()
+            .download_posts(&[NoMediaPost], Path::new("unused"), 1)
+            .await;
+        assert!(matches!(
+            results.as_slice(),
+            [Err(BooruError::MissingMediaUrl(42))]
+        ));
     }
 
     #[tokio::test]
