@@ -100,6 +100,24 @@ pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
     Ok(trimmed.to_string())
 }
 
+pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
+    for tag in tags {
+        if tag.is_empty() {
+            return Err(BooruError::InvalidTag {
+                tag: tag.clone(),
+                reason: "tag must not be empty".to_string(),
+            });
+        }
+        if tag.chars().any(char::is_whitespace) {
+            return Err(BooruError::InvalidTag {
+                tag: tag.clone(),
+                reason: "tag must not contain whitespace".to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Rejects an API response with an unsuccessful status before decoding.
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.

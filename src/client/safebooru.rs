@@ -309,21 +309,7 @@ impl Query {
     }
 
     pub fn validate(&self) -> Result<()> {
-        for tag in &self.tags {
-            if tag.is_empty() {
-                return Err(BooruError::InvalidTag {
-                    tag: tag.clone(),
-                    reason: "tag must not be empty".to_string(),
-                });
-            }
-            if tag.chars().any(char::is_whitespace) {
-                return Err(BooruError::InvalidTag {
-                    tag: tag.clone(),
-                    reason: "tag must not contain whitespace".to_string(),
-                });
-            }
-        }
-        Ok(())
+        super::validate_tags(&self.tags)
     }
 }
 
