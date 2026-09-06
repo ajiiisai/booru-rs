@@ -124,6 +124,7 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::InvalidFilename(_) => false,
         BooruError::MissingMediaUrl(_) => false,
         BooruError::DownloadTaskFailed(_) => false,
+        BooruError::DestinationConflict(_) => false,
     }
 }
 

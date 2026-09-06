@@ -386,6 +386,7 @@ impl Downloader {
         dest_dir: &Path,
         concurrency: usize,
     ) -> Vec<Result<DownloadResult>> {
+        use std::collections::HashMap;
         use std::sync::Arc;
         use tokio::sync::Semaphore;
 
@@ -398,8 +399,33 @@ impl Downloader {
         let semaphore = Arc::new(Semaphore::new(concurrency));
         let mut tasks: tokio::task::JoinSet<Result<(usize, DownloadResult)>> =
             tokio::task::JoinSet::new();
+        let mut destinations: HashMap<std::path::PathBuf, Vec<usize>> = HashMap::new();
 
         for (index, post) in posts.iter().enumerate() {
+            let destination = post
+                .file_url()
+                .map(|url| dest_dir.join(self.generate_filename(post, url)));
+            if let Some(destination) = &destination {
+                destinations
+                    .entry(destination.clone())
+                    .or_default()
+                    .push(index);
+            }
+        }
+        let conflicts: HashMap<usize, std::path::PathBuf> = destinations
+            .into_iter()
+            .filter(|(_, indexes)| indexes.len() > 1)
+            .flat_map(|(destination, indexes)| {
+                indexes
+                    .into_iter()
+                    .map(move |index| (index, destination.clone()))
+            })
+            .collect();
+
+        for (index, post) in posts.iter().enumerate() {
+            if conflicts.contains_key(&index) {
+                continue;
+            }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let url = post.file_url().map(|s| s.to_string());
             let id = post.id();
@@ -457,6 +483,9 @@ impl Downloader {
 
         let mut results: Vec<Option<Result<DownloadResult>>> =
             (0..posts.len()).map(|_| None).collect();
+        for (index, destination) in conflicts {
+            results[index] = Some(Err(BooruError::DestinationConflict(destination)));
+        }
         while let Some(result) = tasks.join_next().await {
             match result {
                 Ok(Ok((index, result))) => results[index] = Some(Ok(result)),
@@ -676,6 +705,50 @@ mod tests {
         assert!(matches!(
             results.as_slice(),
             [Err(BooruError::MissingMediaUrl(42))]
+        ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_destination_collisions() {
+        struct SameDestinationPost;
+
+        impl Post for SameDestinationPost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/image.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let posts = [SameDestinationPost, SameDestinationPost];
+        let results = Downloader::new()
+            .download_posts(&posts, Path::new("downloads"), 2)
+            .await;
+        assert!(matches!(
+            results.as_slice(),
+            [
+                Err(BooruError::DestinationConflict(_)),
+                Err(BooruError::DestinationConflict(_))
+            ]
         ));
     }
 

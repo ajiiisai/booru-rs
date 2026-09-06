@@ -55,6 +55,10 @@ pub enum BooruError {
     #[error("Download task failed: {0}")]
     DownloadTaskFailed(String),
 
+    /// Multiple batch posts resolve to the same destination path.
+    #[error("Multiple downloads target the same destination: {0}")]
+    DestinationConflict(std::path::PathBuf),
+
     /// Authentication required or failed.
     ///
     /// Some booru sites (like Gelbooru) require API credentials.
