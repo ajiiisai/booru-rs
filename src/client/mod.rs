@@ -90,6 +90,16 @@ pub fn shared_client() -> &'static reqwest::Client {
     &SHARED_CLIENT
 }
 
+pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
+    let trimmed = url.trim_end_matches('/');
+    let parsed =
+        reqwest::Url::parse(trimmed).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(BooruError::InvalidUrl(url.to_string()));
+    }
+    Ok(trimmed.to_string())
+}
+
 /// Rejects an API response with an unsuccessful status before decoding.
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.
@@ -225,14 +235,7 @@ impl<T: Client> ClientBuilder<T> {
     /// Returns [`BooruError::InvalidUrl`] if the endpoint is blank, does not
     /// parse, or uses a scheme other than HTTP(S).
     pub fn endpoint(mut self, url: impl Into<String>) -> Result<Self> {
-        let endpoint = url.into();
-        let trimmed = endpoint.trim_end_matches('/');
-        let parsed =
-            reqwest::Url::parse(trimmed).map_err(|_| BooruError::InvalidUrl(endpoint.clone()))?;
-        if parsed.scheme() != "http" && parsed.scheme() != "https" {
-            return Err(BooruError::InvalidUrl(endpoint));
-        }
-        self.url = trimmed.to_string();
+        self.url = validate_endpoint(&url.into())?;
         Ok(self)
     }
 

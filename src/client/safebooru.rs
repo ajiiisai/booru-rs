@@ -1,5 +1,6 @@
-use super::{Client, ClientBuilder, ensure_success};
+use super::{Client as ClientTrait, ensure_success};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
+use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
 
@@ -29,15 +30,15 @@ use serde::Deserialize;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SafebooruClient(ClientBuilder<Self>);
+pub struct SafebooruClient(super::ClientBuilder<Self>);
 
-impl From<ClientBuilder<Self>> for SafebooruClient {
-    fn from(value: ClientBuilder<Self>) -> Self {
+impl From<super::ClientBuilder<Self>> for SafebooruClient {
+    fn from(value: super::ClientBuilder<Self>) -> Self {
         Self(value)
     }
 }
 
-impl Client for SafebooruClient {
+impl ClientTrait for SafebooruClient {
     type Post = SafebooruPost;
     type Rating = SafebooruRating;
 
@@ -164,5 +165,188 @@ fn parse_post_count_from_label(label: &str) -> Option<u32> {
         label[start + 1..end].parse().ok()
     } else {
         None
+    }
+}
+
+// Reusable client with search state kept out of client configuration.
+
+const DEFAULT_ENDPOINT: &str = <SafebooruClient as ClientTrait>::URL;
+
+#[derive(Debug, Clone)]
+pub struct Client {
+    http: reqwest::Client,
+    endpoint: String,
+}
+
+impl Client {
+    /// # Example
+    ///
+    /// ```no_run
+    /// use booru_rs::safebooru::Client;
+    ///
+    /// # async fn example() -> booru_rs::error::Result<()> {
+    /// let client = Client::new()?;
+    /// let posts = client.search().tag("cat_ears").limit(10).send().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            http: super::shared_client().clone(),
+            endpoint: DEFAULT_ENDPOINT.to_string(),
+        })
+    }
+
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::default()
+    }
+
+    pub fn search(&self) -> Search {
+        Search {
+            client: self.clone(),
+            tags: Vec::new(),
+            rating: None,
+            sort: None,
+            limit: 100,
+        }
+    }
+
+    pub async fn post(&self, id: u32) -> Result<SafebooruPost> {
+        let response = self
+            .http
+            .get(format!("{}/index.php", self.endpoint))
+            .query(&[
+                ("page", "dapi"),
+                ("s", "post"),
+                ("q", "index"),
+                ("id", &id.to_string()),
+                ("json", "1"),
+            ])
+            .send()
+            .await?;
+
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(BooruError::PostNotFound(id));
+        }
+        let response = ensure_success(response).await?;
+
+        let posts = response.json::<Vec<SafebooruPost>>().await?;
+        posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
+    }
+
+    pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let response = self
+            .http
+            .get(format!("{}/autocomplete.php", self.endpoint))
+            .query(&[("q", query)])
+            .send()
+            .await?;
+
+        let suggestions = response.json::<Vec<SafebooruAutocompleteItem>>().await?;
+        Ok(suggestions
+            .into_iter()
+            .take(limit as usize)
+            .map(|item| TagSuggestion {
+                name: item.value,
+                label: item.label.clone(),
+                post_count: parse_post_count_from_label(&item.label),
+                category: None,
+            })
+            .collect())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Search {
+    client: Client,
+    tags: Vec<String>,
+    rating: Option<String>,
+    sort: Option<String>,
+    limit: u32,
+}
+
+impl Search {
+    pub fn tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
+        self
+    }
+
+    pub fn rating(mut self, rating: SafebooruRating) -> Self {
+        self.rating = Some(rating.into());
+        self
+    }
+
+    pub fn sort(mut self, order: Sort) -> Self {
+        self.sort = Some(order.to_string());
+        self
+    }
+
+    pub fn limit(mut self, limit: u32) -> Self {
+        self.limit = limit;
+        self
+    }
+
+    /// Fetches the first page of results.
+    pub async fn send(self) -> Result<Vec<SafebooruPost>> {
+        let mut tags = self.tags;
+        if let Some(rating) = self.rating {
+            tags.push(format!("rating:{rating}"));
+        }
+        if let Some(sort) = self.sort {
+            tags.push(sort);
+        }
+        let tags = tags.join(" ");
+
+        let response = self
+            .client
+            .http
+            .get(format!("{}/index.php", self.client.endpoint))
+            .query(&[
+                ("page", "dapi"),
+                ("s", "post"),
+                ("q", "index"),
+                ("pid", "0"),
+                ("limit", &self.limit.to_string()),
+                ("tags", &tags),
+                ("json", "1"),
+            ])
+            .send()
+            .await?;
+
+        let response = ensure_success(response).await?;
+
+        let posts = response.json::<Vec<SafebooruPost>>().await?;
+        Ok(posts)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ClientBuilder {
+    http: Option<reqwest::Client>,
+    endpoint: Option<String>,
+}
+
+impl ClientBuilder {
+    /// # Errors
+    ///
+    /// Returns [`BooruError::InvalidUrl`] for blank, unparsable, or non-HTTP(S) endpoints.
+    pub fn endpoint(mut self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint = Some(super::validate_endpoint(&url.into())?);
+        Ok(self)
+    }
+
+    pub fn http_client(mut self, client: reqwest::Client) -> Self {
+        self.http = Some(client);
+        self
+    }
+
+    pub fn build(self) -> Result<Client> {
+        Ok(Client {
+            http: self.http.unwrap_or_else(|| super::shared_client().clone()),
+            endpoint: self
+                .endpoint
+                .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
+        })
     }
 }
