@@ -77,6 +77,16 @@ impl RetryConfig {
         self
     }
 
+    /// Validates the retry configuration.
+    pub fn validate(&self) -> Result<()> {
+        if !self.backoff_factor.is_finite() || self.backoff_factor < 0.0 {
+            return Err(BooruError::InvalidRetryConfig(
+                "backoff factor must be finite and non-negative".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Calculates the delay for a given attempt number.
     fn delay_for_attempt(&self, attempt: u32) -> Duration {
         if attempt == 0 {
@@ -125,6 +135,7 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::MissingMediaUrl(_) => false,
         BooruError::DownloadTaskFailed(_) => false,
         BooruError::DestinationConflict(_) => false,
+        BooruError::InvalidRetryConfig(_) => false,
     }
 }
 
@@ -145,6 +156,8 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T>>,
 {
+    config.validate()?;
+
     let mut attempt = 0;
     let mut last_error;
 
@@ -190,5 +203,20 @@ mod tests {
         assert_eq!(config.delay_for_attempt(1), Duration::from_millis(100));
         assert_eq!(config.delay_for_attempt(2), Duration::from_millis(150)); // Capped
         assert_eq!(config.delay_for_attempt(3), Duration::from_millis(150)); // Capped
+    }
+
+    #[tokio::test]
+    async fn invalid_backoff_is_rejected_before_operation() {
+        let mut calls = 0;
+        let config = RetryConfig::default().with_backoff_factor(f64::NAN);
+
+        let result = with_retry(config, || {
+            calls += 1;
+            async { Ok::<_, BooruError>(()) }
+        })
+        .await;
+
+        assert!(matches!(result, Err(BooruError::InvalidRetryConfig(_))));
+        assert_eq!(calls, 0);
     }
 }

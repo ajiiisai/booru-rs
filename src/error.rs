@@ -86,6 +86,10 @@ pub enum BooruError {
     #[error("Rate limit exceeded, please wait before making more requests")]
     RateLimited,
 
+    /// Retry configuration is invalid.
+    #[error("Invalid retry configuration: {0}")]
+    InvalidRetryConfig(String),
+
     /// I/O error occurred.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
