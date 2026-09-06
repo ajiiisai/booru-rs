@@ -6,17 +6,18 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! use booru_rs::danbooru::Client;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     let posts = DanbooruClient::builder()
-//!         .tag("cat_ears")?
-//!         .rating(DanbooruRating::General)
-//!         .sort(Sort::Score)
+//! async fn main() -> booru_rs::error::Result<()> {
+//!     let client = Client::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
+//!         .rating(booru_rs::model::danbooru::DanbooruRating::General)
+//!         .sort(booru_rs::client::generic::Sort::Score)
 //!         .limit(10)
-//!         .build()
-//!         .get()
+//!         .send()
 //!         .await?;
 //!
 //!     println!("Found {} posts", posts.len());
@@ -52,8 +53,6 @@ pub use crate::validation::{TagValidation, TagWarning, validate_tag};
 pub use crate::download::{DownloadOptions, DownloadProgress, DownloadResult, Downloader};
 
 // Danbooru
-#[cfg(feature = "danbooru")]
-pub use crate::client::DanbooruClient;
 #[cfg(feature = "danbooru")]
 pub use crate::model::danbooru::{DanbooruPost, DanbooruRating};
 

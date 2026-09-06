@@ -25,17 +25,16 @@
 //! The easiest way to get started is with the [`prelude`]:
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
+//! use booru_rs::danbooru::Client;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     let posts = DanbooruClient::builder()
-//!         .tag("cat_ears")?
-//!         .rating(DanbooruRating::General)
-//!         .sort(Sort::Score)
+//! async fn main() -> booru_rs::error::Result<()> {
+//!     let client = Client::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
 //!         .limit(10)
-//!         .build()
-//!         .get()
+//!         .send()
 //!         .await?;
 //!
 //!     for post in posts {
@@ -50,7 +49,7 @@
 //!
 //! | Site | Client | Tag Limit | Auth Required |
 //! |------|--------|-----------|---------------|
-//! | [Danbooru](https://danbooru.donmai.us) | [`DanbooruClient`] | 2 | No |
+//! | [Danbooru](https://danbooru.donmai.us) | `danbooru::Client` | 2 | No |
 //! | [Gelbooru](https://gelbooru.com) | [`GelbooruClient`] | Unlimited | Yes |
 //! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
 //! | [Rule34](https://rule34.xxx) | [`Rule34Client`] | Unlimited | Yes |
@@ -107,8 +106,6 @@ pub mod validation;
 pub use autocomplete::{Autocomplete, TagSuggestion};
 pub use client::Client;
 pub use client::ClientBuilder;
-#[cfg(feature = "danbooru")]
-pub use client::DanbooruClient;
 #[cfg(feature = "gelbooru")]
 pub use client::GelbooruClient;
 #[cfg(feature = "rule34")]

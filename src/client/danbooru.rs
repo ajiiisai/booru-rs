@@ -6,8 +6,8 @@ use futures_core::Stream;
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::Deserialize;
 
-use super::{Client as ClientTrait, ensure_success};
-use crate::autocomplete::{Autocomplete, TagSuggestion};
+use super::ensure_success;
+use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::danbooru::*;
@@ -22,106 +22,6 @@ fn get_headers() -> HeaderMap {
     headers
 }
 
-/// Client for interacting with the Danbooru API.
-///
-/// Danbooru allows 2 tags per query without authentication.
-///
-/// # Example
-///
-/// ```no_run
-/// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
-/// use booru_rs::client::Client;
-///
-/// # async fn example() -> booru_rs::error::Result<()> {
-/// let posts = DanbooruClient::builder()
-///     .tag("cat_ears")?
-///     .rating(DanbooruRating::General)
-///     .limit(10)
-///     .build()
-///     .get()
-///     .await?;
-///
-/// println!("Found {} posts", posts.len());
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct DanbooruClient(super::ClientBuilder<Self>);
-
-impl From<super::ClientBuilder<Self>> for DanbooruClient {
-    fn from(value: super::ClientBuilder<Self>) -> Self {
-        Self(value)
-    }
-}
-
-impl ClientTrait for DanbooruClient {
-    type Post = DanbooruPost;
-    type Rating = DanbooruRating;
-
-    const URL: &'static str = "https://danbooru.donmai.us";
-    const SORT: &'static str = "order:";
-    const MAX_TAGS: Option<usize> = Some(2);
-
-    async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
-        let builder = &self.0;
-        let url = &builder.url;
-
-        let mut query = Vec::new();
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("login", user.clone()));
-            query.push(("api_key", key.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/posts/{id}.json"))
-            .headers(get_headers())
-            .query(&query)
-            .send()
-            .await?;
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
-
-        let post = response.json::<DanbooruPost>().await?;
-
-        Ok(post)
-    }
-
-    async fn get(&self) -> Result<Vec<Self::Post>> {
-        let builder = &self.0;
-        let tag_string = builder.tags.join(" ");
-        let url = &builder.url;
-
-        let mut query = vec![
-            ("limit", builder.limit.to_string()),
-            ("page", builder.page.to_string()),
-            ("tags", tag_string),
-        ];
-        if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
-            query.push(("login", user.clone()));
-            query.push(("api_key", key.clone()));
-        }
-
-        let response = builder
-            .client
-            .get(format!("{url}/posts.json"))
-            .headers(get_headers())
-            .query(&query)
-            .send()
-            .await?;
-
-        let response = ensure_success(response).await?;
-
-        let posts = response.json::<Vec<DanbooruPost>>().await?;
-
-        Ok(posts)
-    }
-}
-
 #[derive(Debug, Deserialize)]
 struct DanbooruAutocompleteItem {
     value: String,
@@ -130,52 +30,9 @@ struct DanbooruAutocompleteItem {
     post_count: Option<u32>,
 }
 
-impl Autocomplete for DanbooruClient {
-    /// # Example
-    ///
-    /// ```no_run
-    /// use booru_rs::danbooru::DanbooruClient;
-    /// use booru_rs::autocomplete::Autocomplete;
-    /// use booru_rs::client::Client;
-    ///
-    /// # async fn example() -> booru_rs::error::Result<()> {
-    /// let client = DanbooruClient::builder().build();
-    /// let suggestions = client.autocomplete("cat_", 10).await?;
-    /// for tag in suggestions {
-    ///     println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let builder = &self.0;
-        let response = builder
-            .client
-            .get(format!("{}/autocomplete.json", builder.url))
-            .headers(get_headers())
-            .query(&[
-                ("search[query]", query),
-                ("search[type]", "tag_query"),
-                ("limit", &limit.to_string()),
-            ])
-            .send()
-            .await?
-            .json::<Vec<DanbooruAutocompleteItem>>()
-            .await?;
-
-        Ok(response
-            .into_iter()
-            .map(|item| TagSuggestion {
-                name: item.value,
-                label: item.label,
-                post_count: item.post_count,
-                category: item.category,
-            })
-            .collect())
-    }
-}
-
-const DEFAULT_ENDPOINT: &str = <DanbooruClient as ClientTrait>::URL;
+const DEFAULT_ENDPOINT: &str = "https://danbooru.donmai.us";
+const MAX_TAGS: usize = 2;
+const SORT_PREFIX: &str = "order:";
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -335,19 +192,16 @@ impl Query {
     }
 
     pub fn random(mut self) -> Self {
-        self.tags
-            .push(format!("{}random", <DanbooruClient as ClientTrait>::SORT));
+        self.tags.push(format!("{SORT_PREFIX}random"));
         self
     }
 
     pub fn validate(&self) -> Result<()> {
         super::validate_tags(&self.tags)?;
-        if let Some(max) = <DanbooruClient as ClientTrait>::MAX_TAGS
-            && self.tags.len() > max
-        {
+        if self.tags.len() > MAX_TAGS {
             return Err(BooruError::TagLimitExceeded {
                 client: "DanbooruClient",
-                max,
+                max: MAX_TAGS,
                 actual: self.tags.len(),
             });
         }
@@ -453,7 +307,7 @@ impl Search {
             tags.push(format!("rating:{rating}"));
         }
         if let Some(sort) = &self.query.sort {
-            tags.push(format!("{}{sort}", <DanbooruClient as ClientTrait>::SORT));
+            tags.push(format!("{SORT_PREFIX}{sort}"));
         }
         let tags = tags.join(" ");
 

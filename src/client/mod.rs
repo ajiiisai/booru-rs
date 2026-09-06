@@ -5,7 +5,6 @@
 //!
 //! # Available Clients
 //!
-//! - [`DanbooruClient`] for danbooru.donmai.us, 2 tag limit
 //! - [`GelbooruClient`] for gelbooru.com, unlimited tags
 //! - [`Rule34Client`] for api.rule34.xxx, unlimited tags
 //!
@@ -26,10 +25,8 @@
 //!     .await?;
 //!
 //! // Get a specific post by ID
-//! let post = DanbooruClient::builder()
-//!     .build()
-//!     .get_by_id(12345)
-//!     .await?;
+//! let danbooru = booru_rs::danbooru::Client::new()?;
+//! let post = danbooru.post(12345).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -131,17 +128,17 @@ pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwes
 /// # Example
 ///
 /// ```no_run
-/// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
-/// use booru_rs::client::Client;
+/// use booru_rs::danbooru::{Client, DanbooruRating};
 ///
 /// # async fn example() -> booru_rs::error::Result<()> {
-/// let client = DanbooruClient::builder()
-///     .tag("cat_ears")?
+/// let client = Client::new()?;
+/// let posts = client
+///     .search()
+///     .tag("cat_ears")
 ///     .rating(DanbooruRating::General)
 ///     .limit(10)
-///     .build();
-///
-/// let posts = client.get().await?;
+///     .send()
+///     .await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -268,11 +265,11 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::danbooru::DanbooruClient;
+    /// use booru_rs::gelbooru::GelbooruClient;
     /// use booru_rs::client::Client;
     ///
     /// # fn example() -> booru_rs::error::Result<()> {
-    /// let client = DanbooruClient::builder()
+    /// let client = GelbooruClient::builder()
     ///     .tag("cat_ears")?
     ///     .tag("blue_eyes")?
     ///     .build();
@@ -299,11 +296,11 @@ impl<T: Client> ClientBuilder<T> {
     /// # Example
     ///
     /// ```no_run
-    /// use booru_rs::danbooru::{DanbooruClient, DanbooruRating};
+    /// use booru_rs::gelbooru::{GelbooruClient, GelbooruRating};
     /// use booru_rs::client::Client;
     ///
-    /// let client = DanbooruClient::builder()
-    ///     .rating(DanbooruRating::General)
+    /// let client = GelbooruClient::builder()
+    ///     .rating(GelbooruRating::General)
     ///     .build();
     /// ```
     #[must_use]
@@ -422,8 +419,6 @@ impl<T: Client> Default for ClientBuilder<T> {
     }
 }
 
-#[cfg(feature = "danbooru")]
-pub use danbooru::DanbooruClient;
 #[cfg(feature = "gelbooru")]
 pub use gelbooru::GelbooruClient;
 #[cfg(feature = "rule34")]

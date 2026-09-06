@@ -6,12 +6,11 @@
 //! # Example
 //!
 //! ```no_run
-//! use booru_rs::prelude::*;
-//! use booru_rs::autocomplete::Autocomplete;
+//! use booru_rs::danbooru::Client;
 //!
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! // Get tag suggestions starting with "cat_"
-//! let client = DanbooruClient::builder().build();
+//! let client = Client::builder().build()?;
 //! let suggestions = client.autocomplete("cat_", 10).await?;
 //!
 //! for tag in suggestions {

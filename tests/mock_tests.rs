@@ -422,10 +422,11 @@ mod mock_autocomplete {
             .mount(&mock_server)
             .await;
 
-        let client = DanbooruClient::builder()
+        let client = booru_rs::danbooru::Client::builder()
             .endpoint(mock_server.uri())
             .unwrap()
-            .build();
+            .build()
+            .unwrap();
 
         let suggestions = client
             .autocomplete("cat_", 3)
