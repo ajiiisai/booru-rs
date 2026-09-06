@@ -224,6 +224,22 @@ fn describe(post: &impl Post) {
 
 `tags_iter()` borrows the existing tag string. It does not allocate a second tag list.
 
+Several provider fields now preserve missing or unknown wire values:
+
+- `SafebooruPost::height` is `Option<u32>`. Use `unwrap_or(0)` or handle `None` explicitly.
+- `Rule34Post::file_url`, `preview_url`, and `sample_url` are `Option<String>`. Check the value before building a download request.
+- Danbooru, Gelbooru, and Rule34 post ratings use provider post-rating enums that preserve unknown response values. Match the known variant or use `Display` when the exact classification is not required.
+- `Rule34Post::parent_id` maps the provider's `0` sentinel to `None`.
+
+For example, handle a Rule34 URL and a Safebooru dimension before using them:
+
+```rust
+if let Some(file_url) = rule34_post.file_url.as_deref() {
+    println!("download {file_url}");
+}
+let height = safebooru_post.height.unwrap_or(0);
+```
+
 Gelbooru now exposes `GelbooruPost::directory` as `Option<String>`. Gelbooru sends current directory values as paths such as `"49/c6"`; older numeric values decode to their decimal string form. Treat the value as a path component instead of a number:
 
 ```rust
