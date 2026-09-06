@@ -107,8 +107,6 @@ pub struct DownloadOptions {
     pub overwrite: bool,
     /// Custom filename template. Use `{id}`, `{md5}`, `{ext}` as placeholders.
     pub filename_template: Option<String>,
-    /// Create subdirectories based on rating.
-    pub organize_by_rating: bool,
 }
 
 impl DownloadOptions {
@@ -128,13 +126,6 @@ impl DownloadOptions {
     #[must_use]
     pub fn filename(mut self, template: impl Into<String>) -> Self {
         self.filename_template = Some(template.into());
-        self
-    }
-
-    /// Organize downloads into subdirectories by rating.
-    #[must_use]
-    pub fn organize_by_rating(mut self) -> Self {
-        self.organize_by_rating = true;
         self
     }
 }
