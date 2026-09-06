@@ -1,4 +1,4 @@
-use super::{Client, ClientBuilder, ensure_success, shared_client};
+use super::{Client, ClientBuilder, ensure_success};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::gelbooru::*;
@@ -148,24 +148,22 @@ impl Client for GelbooruClient {
 
 #[derive(Debug, Deserialize)]
 struct GelbooruAutocompleteItem {
-    /// The tag name.
     value: String,
-    /// Display label (includes post count).
     label: String,
-    /// Tag category (optional).
     #[serde(default)]
     category: Option<String>,
-    /// Number of posts with this tag (optional).
+    /// The API sends this as a string or a number.
     #[serde(default)]
-    post_count: Option<u32>,
+    post_count: Option<serde_json::Value>,
 }
 
 impl Autocomplete for GelbooruClient {
-    async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let client = shared_client();
-        let url = format!("{}/index.php", Self::URL);
+    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let builder = &self.0;
+        let url = format!("{}/index.php", builder.url);
 
-        let response = client
+        let response = builder
+            .client
             .get(&url)
             .query(&[
                 ("page", "autocomplete2"),
@@ -186,9 +184,17 @@ impl Autocomplete for GelbooruClient {
 
         Ok(items
             .into_iter()
+            .take(limit as usize)
             .map(|item| {
                 let post_count = item
                     .post_count
+                    .and_then(|count| match count {
+                        serde_json::Value::Number(number) => {
+                            number.as_u64().and_then(|n| u32::try_from(n).ok())
+                        }
+                        serde_json::Value::String(text) => text.parse().ok(),
+                        _ => None,
+                    })
                     .or_else(|| parse_post_count_from_label(&item.label));
 
                 let category = item.category.as_deref().and_then(parse_category);

@@ -1,6 +1,6 @@
 //! Rule34 API client implementation.
 
-use super::{Client, ClientBuilder, ensure_success, shared_client};
+use super::{Client, ClientBuilder, ensure_success};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::rule34::*;
@@ -181,12 +181,16 @@ struct Rule34AutocompleteItem {
 }
 
 impl Autocomplete for Rule34Client {
-    async fn autocomplete(query: &str, _limit: u32) -> Result<Vec<TagSuggestion>> {
-        let client = shared_client();
-        // Rule34 autocomplete is on api.rule34.xxx, not the main URL
-        let url = "https://api.rule34.xxx/autocomplete.php";
+    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let builder = &self.0;
+        let url = format!("{}/autocomplete.php", builder.url);
 
-        let response = client.get(url).query(&[("q", query)]).send().await?;
+        let response = builder
+            .client
+            .get(&url)
+            .query(&[("q", query)])
+            .send()
+            .await?;
 
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(BooruError::Unauthorized(
@@ -198,6 +202,7 @@ impl Autocomplete for Rule34Client {
 
         Ok(items
             .into_iter()
+            .take(limit as usize)
             .map(|item| TagSuggestion {
                 name: item.value,
                 label: item.label.clone(),

@@ -11,7 +11,8 @@
 //!
 //! # async fn example() -> booru_rs::error::Result<()> {
 //! // Get tag suggestions starting with "cat_"
-//! let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
+//! let client = DanbooruClient::builder().build();
+//! let suggestions = client.autocomplete("cat_", 10).await?;
 //!
 //! for tag in suggestions {
 //!     println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
@@ -80,7 +81,8 @@ impl TagSuggestion {
 /// use booru_rs::autocomplete::Autocomplete;
 ///
 /// # async fn example() -> booru_rs::error::Result<()> {
-/// let suggestions = SafebooruClient::autocomplete("land", 5).await?;
+/// let client = SafebooruClient::builder().build();
+/// let suggestions = client.autocomplete("land", 5).await?;
 /// for tag in suggestions {
 ///     println!("{}", tag.name);
 /// }
@@ -99,6 +101,7 @@ pub trait Autocomplete {
     ///
     /// Returns an error if the request fails or the response cannot be parsed.
     fn autocomplete(
+        &self,
         query: &str,
         limit: u32,
     ) -> impl std::future::Future<Output = Result<Vec<TagSuggestion>>> + Send;

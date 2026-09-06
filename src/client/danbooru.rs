@@ -1,4 +1,4 @@
-use super::{Client, ClientBuilder, ensure_success, shared_client};
+use super::{Client, ClientBuilder, ensure_success};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::danbooru::*;
@@ -130,18 +130,22 @@ impl Autocomplete for DanbooruClient {
     /// ```no_run
     /// use booru_rs::danbooru::DanbooruClient;
     /// use booru_rs::autocomplete::Autocomplete;
+    /// use booru_rs::client::Client;
     ///
     /// # async fn example() -> booru_rs::error::Result<()> {
-    /// let suggestions = DanbooruClient::autocomplete("cat_", 10).await?;
+    /// let client = DanbooruClient::builder().build();
+    /// let suggestions = client.autocomplete("cat_", 10).await?;
     /// for tag in suggestions {
     ///     println!("{}: {} posts", tag.name, tag.post_count.unwrap_or(0));
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    async fn autocomplete(query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let response = shared_client()
-            .get(format!("{}/autocomplete.json", Self::URL))
+    async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        let builder = &self.0;
+        let response = builder
+            .client
+            .get(format!("{}/autocomplete.json", builder.url))
             .headers(get_headers())
             .query(&[
                 ("search[query]", query),

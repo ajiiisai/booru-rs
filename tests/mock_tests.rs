@@ -749,3 +749,127 @@ mod mock_rule34 {
         assert!(error.is_parse_error());
     }
 }
+
+mod mock_autocomplete {
+    use super::*;
+    use booru_rs::autocomplete::Autocomplete;
+    use booru_rs::prelude::*;
+
+    #[tokio::test]
+    async fn test_danbooru_uses_instance_endpoint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/autocomplete.json"))
+            .and(query_param("search[query]", "cat_"))
+            .and(query_param("limit", "3"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"[{"value":"cat_ears","label":"cat_ears (177448)","category":0,"post_count":177448}]"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
+        let client = DanbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .build();
+
+        let suggestions = client
+            .autocomplete("cat_", 3)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "cat_ears");
+        assert_eq!(suggestions[0].post_count, Some(177448));
+        assert_eq!(suggestions[0].category, Some(0));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "gelbooru")]
+    async fn test_gelbooru_uses_instance_endpoint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/index.php"))
+            .and(query_param("page", "autocomplete2"))
+            .and(query_param("term", "cat_"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(r#"[{"value":"cat_ears","label":"cat ears","post_count":"430787","category":"tag"},{"value":"cat_tail","label":"cat tail","post_count":"243121","category":"tag"},{"value":"cat_girl","label":"cat girl","post_count":"167612","category":"tag"}]"#),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = GelbooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .set_credentials("test_key", "test_user")
+            .build();
+
+        let suggestions = client
+            .autocomplete("cat_", 2)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0].name, "cat_ears");
+        assert_eq!(suggestions[0].post_count, Some(430787));
+        assert_eq!(suggestions[0].category, Some(0));
+    }
+
+    #[tokio::test]
+    async fn test_safebooru_uses_instance_endpoint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/autocomplete.php"))
+            .and(query_param("q", "land"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(r#"[{"value":"landscape","label":"landscape (123)"}]"#),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = SafebooruClient::builder()
+            .with_custom_url(&mock_server.uri())
+            .build();
+
+        let suggestions = client
+            .autocomplete("land", 5)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "landscape");
+        assert_eq!(suggestions[0].post_count, Some(123));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "rule34")]
+    async fn test_rule34_honors_limit() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/autocomplete.php"))
+            .and(query_param("q", "cat_"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"[{"value":"cat_ears","label":"cat_ears (1)"},{"value":"cat_girl","label":"cat_girl (2)"},{"value":"cat_tail","label":"cat_tail (3)"}]"#,
+            ))
+            .mount(&mock_server)
+            .await;
+
+        let client = Rule34Client::builder()
+            .with_custom_url(&mock_server.uri())
+            .set_credentials("test_key", "test_user")
+            .build();
+
+        let suggestions = client
+            .autocomplete("cat_", 2)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0].name, "cat_ears");
+        assert_eq!(suggestions[1].name, "cat_girl");
+    }
+}
