@@ -486,7 +486,7 @@ fn post_preserves_optional_metadata() {
 
     let mut value: serde_json::Value =
         serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
-    value["directory"] = 42.into();
+    value["directory"] = "42".into();
     value["change"] = 1700000000u64.into();
     value["owner"] = "owner".into();
     value["creator_id"] = 7.into();
@@ -506,7 +506,7 @@ fn post_preserves_optional_metadata() {
     value["has_children"] = true.into();
 
     let post: GelbooruPost = serde_json::from_value(value.clone()).unwrap();
-    assert_eq!(post.directory, Some(42));
+    assert_eq!(post.directory.as_deref(), Some("42"));
     assert_eq!(post.change, Some(1700000000));
     assert_eq!(post.owner.as_deref(), Some("owner"));
     assert_eq!(post.creator_id, Some(7));
@@ -531,6 +531,52 @@ fn post_preserves_optional_metadata() {
     assert_eq!(post.post_locked, Some(false));
     assert_eq!(post.has_children, Some(true));
     assert_eq!(serde_json::to_value(&post).unwrap(), value);
+}
+
+#[test]
+fn post_accepts_directory_paths() {
+    use booru_rs::gelbooru::GelbooruPost;
+
+    let mut value: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    value["directory"] = "49/c6".into();
+
+    let result: Result<GelbooruPost, _> = serde_json::from_value(value);
+    let post = result.expect("Gelbooru directory paths must decode");
+    assert_eq!(post.directory.as_deref(), Some("49/c6"));
+}
+
+#[test]
+fn post_accepts_numeric_directory_values() {
+    use booru_rs::gelbooru::GelbooruPost;
+
+    let mut value: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    value["directory"] = 42.into();
+
+    let post: GelbooruPost =
+        serde_json::from_value(value).expect("numeric directories must decode");
+    assert_eq!(post.directory.as_deref(), Some("42"));
+}
+
+#[test]
+fn post_accepts_gelbooru_boolean_encodings() {
+    use booru_rs::gelbooru::GelbooruPost;
+
+    let mut value: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    value["sample"] = 1.into();
+    value["has_notes"] = "false".into();
+    value["has_comments"] = "false".into();
+    value["post_locked"] = 0.into();
+    value["has_children"] = "false".into();
+
+    let post: GelbooruPost = serde_json::from_value(value).expect("Gelbooru booleans must decode");
+    assert_eq!(post.sample, Some(true));
+    assert_eq!(post.has_notes, Some(false));
+    assert_eq!(post.has_comments, Some(false));
+    assert_eq!(post.post_locked, Some(false));
+    assert_eq!(post.has_children, Some(false));
 }
 
 #[test]

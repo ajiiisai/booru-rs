@@ -4,7 +4,58 @@
 //! responses from the Gelbooru API.
 
 use core::fmt;
+use serde::de::{Deserializer, Error as DeError};
 use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StringOrNumber {
+    String(String),
+    Number(u64),
+}
+
+fn deserialize_optional_stringish<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<StringOrNumber>::deserialize(deserializer)?;
+    Ok(value.map(|value| match value {
+        StringOrNumber::String(value) => value,
+        StringOrNumber::Number(value) => value.to_string(),
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Boolish {
+    Bool(bool),
+    Number(u64),
+    String(String),
+}
+
+fn deserialize_optional_boolish<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<Boolish>::deserialize(deserializer)?;
+    value
+        .map(|value| match value {
+            Boolish::Bool(value) => Ok(value),
+            Boolish::Number(0) => Ok(false),
+            Boolish::Number(1) => Ok(true),
+            Boolish::Number(value) => Err(D::Error::custom(format!(
+                "expected a boolean or 0/1, got number {value}"
+            ))),
+            Boolish::String(value) => match value.trim().to_ascii_lowercase().as_str() {
+                "false" | "0" => Ok(false),
+                "true" | "1" => Ok(true),
+                _ => Err(D::Error::custom(format!(
+                    "expected a boolean or true/false, got string {value:?}"
+                ))),
+            },
+        })
+        .transpose()
+}
 
 /// A post from Gelbooru.
 ///
@@ -33,9 +84,9 @@ pub struct GelbooruPost {
     pub source: String,
     /// Post's rating
     pub rating: GelbooruPostRating,
-    /// Directory number, if supplied.
-    #[serde(default)]
-    pub directory: Option<u32>,
+    /// Directory path, if supplied.
+    #[serde(default, deserialize_with = "deserialize_optional_stringish")]
+    pub directory: Option<String>,
     /// Change timestamp, if supplied.
     #[serde(default)]
     pub change: Option<u64>,
@@ -49,7 +100,7 @@ pub struct GelbooruPost {
     #[serde(default)]
     pub parent_id: Option<u32>,
     /// Whether the post has a sample, if supplied.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_boolish")]
     pub sample: Option<bool>,
     /// Preview height in pixels, if supplied.
     #[serde(default)]
@@ -61,10 +112,10 @@ pub struct GelbooruPost {
     #[serde(default)]
     pub title: Option<String>,
     /// Whether the post has notes, if supplied.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_boolish")]
     pub has_notes: Option<bool>,
     /// Whether the post has comments, if supplied.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_boolish")]
     pub has_comments: Option<bool>,
     /// Preview URL, if supplied.
     #[serde(default)]
@@ -82,10 +133,10 @@ pub struct GelbooruPost {
     #[serde(default)]
     pub status: Option<String>,
     /// Whether the post is locked, if supplied.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_boolish")]
     pub post_locked: Option<bool>,
     /// Whether the post has children, if supplied.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_boolish")]
     pub has_children: Option<bool>,
 }
 
