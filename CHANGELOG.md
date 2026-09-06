@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.0](https://github.com/ajiiisai/booru-rs/compare/v0.3.2...v0.4.0) - 2026-09-06
+## [1.0.0](https://github.com/ajiiisai/booru-rs/compare/v0.3.2...v1.0.0) - 2026-09-06
 
 ### Added
 
