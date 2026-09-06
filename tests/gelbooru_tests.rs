@@ -32,6 +32,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
         let builder = skip_without_credentials!();
         let posts = builder.tag("kafuu_chino").unwrap().build().get().await;
@@ -41,6 +42,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -56,6 +58,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -71,6 +74,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_blacklist_tag() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -86,6 +90,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -102,6 +107,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_multiple_tags() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -119,6 +125,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_random_posts() {
         let builder = skip_without_credentials!();
         let posts = builder
@@ -134,6 +141,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
         let builder = skip_without_credentials!();
         let post = builder.build().get_by_id(7898595).await;
@@ -143,6 +151,7 @@ mod gelbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
         let builder = skip_without_credentials!();
         let builder2 = builder_with_credentials().unwrap();

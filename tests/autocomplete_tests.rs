@@ -10,6 +10,7 @@ mod autocomplete {
         use booru_rs::danbooru::DanbooruClient;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             let suggestions = DanbooruClient::autocomplete("cat_", 10).await;
 
@@ -22,6 +23,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
             let suggestions = DanbooruClient::autocomplete("a", 5).await;
 
@@ -31,6 +33,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_has_tag_names() {
             let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
 
@@ -44,6 +47,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_post_counts() {
             let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
 
@@ -59,6 +63,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_categories() {
             let suggestions = DanbooruClient::autocomplete("cat_ears", 5).await;
 
@@ -74,6 +79,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_empty_query() {
             // Empty query should still work (returns popular tags or empty)
             let suggestions = DanbooruClient::autocomplete("", 5).await;
@@ -87,6 +93,7 @@ mod autocomplete {
         use booru_rs::safebooru::SafebooruClient;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             let suggestions = SafebooruClient::autocomplete("cat_", 10).await;
 
@@ -99,6 +106,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
             let suggestions = SafebooruClient::autocomplete("a", 5).await;
 
@@ -108,6 +116,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count_from_label() {
             let suggestions = SafebooruClient::autocomplete("cat_ears", 5).await;
 
@@ -133,6 +142,7 @@ mod autocomplete {
         use booru_rs::gelbooru::GelbooruClient;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             // Gelbooru autocomplete may work without auth
             let suggestions = GelbooruClient::autocomplete("cat_", 10).await;
@@ -147,6 +157,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_respects_limit() {
             let suggestions = GelbooruClient::autocomplete("a", 5).await;
 
@@ -162,6 +173,7 @@ mod autocomplete {
         use booru_rs::rule34::Rule34Client;
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_returns_suggestions() {
             let suggestions = Rule34Client::autocomplete("cat_", 10).await;
 
@@ -174,6 +186,7 @@ mod autocomplete {
         }
 
         #[tokio::test]
+        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
         async fn autocomplete_parses_post_count() {
             let suggestions = Rule34Client::autocomplete("cat_ears", 5).await;
 

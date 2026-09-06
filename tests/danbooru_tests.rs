@@ -6,6 +6,7 @@ mod danbooru {
     };
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -19,6 +20,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -33,6 +35,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -47,6 +50,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_blacklist_tag() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -61,6 +65,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -75,6 +80,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_multiple_tags() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -91,6 +97,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_random_posts() {
         let posts = DanbooruClient::builder()
             .tag("kafuu_chino")
@@ -105,6 +112,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
         let post = DanbooruClient::builder().build().get_by_id(7452417).await;
 
@@ -116,6 +124,7 @@ mod danbooru {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
         let post_from_first_page = DanbooruClient::builder().build().get().await;
 

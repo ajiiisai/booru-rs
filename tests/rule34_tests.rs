@@ -17,6 +17,7 @@ mod rule34 {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_tag() {
         let Some((key, user)) = get_credentials() else {
             eprintln!("Skipping test: RULE34_API_KEY and RULE34_USER_ID not set");
@@ -38,6 +39,7 @@ mod rule34 {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_limit() {
         let Some((key, user)) = get_credentials() else {
             eprintln!("Skipping test: RULE34_API_KEY and RULE34_USER_ID not set");
@@ -57,6 +59,7 @@ mod rule34 {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_rating() {
         let Some((key, user)) = get_credentials() else {
             eprintln!("Skipping test: RULE34_API_KEY and RULE34_USER_ID not set");
@@ -75,6 +78,7 @@ mod rule34 {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_with_sort() {
         let Some((key, user)) = get_credentials() else {
             eprintln!("Skipping test: RULE34_API_KEY and RULE34_USER_ID not set");
@@ -93,6 +97,7 @@ mod rule34 {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_posts_from_page() {
         let Some((key, user)) = get_credentials() else {
             eprintln!("Skipping test: RULE34_API_KEY and RULE34_USER_ID not set");
@@ -111,6 +116,7 @@ mod rule34 {
     }
 
     #[tokio::test]
+    #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn unauthorized_without_credentials() {
         let result = Rule34Client::builder()
             .tag("cat")
