@@ -1,4 +1,4 @@
-use booru_rs::error::BooruError;
+use booru_rs::error::{BooruError, ErrorContext, Operation, Provider};
 use booru_rs::model::safebooru::SafebooruRating;
 use booru_rs::retry::RetryConfig;
 use booru_rs::safebooru::{Client, Query};
@@ -126,7 +126,7 @@ async fn post_missing_maps_to_not_found() {
     let result = client.post(99999).await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::PostNotFound(99999)
     ));
 }
@@ -332,7 +332,10 @@ async fn whitespace_tag_rejected_before_request() {
 
     let result = client.search().tag("cat ears").send().await;
 
-    assert!(matches!(result.unwrap_err(), BooruError::InvalidTag { .. }));
+    assert!(matches!(
+        result.unwrap_err().source_error(),
+        BooruError::InvalidTag { .. }
+    ));
 }
 
 #[tokio::test]
@@ -342,7 +345,10 @@ async fn empty_tag_rejected_before_request() {
 
     let result = client.search().tag("").send().await;
 
-    assert!(matches!(result.unwrap_err(), BooruError::InvalidTag { .. }));
+    assert!(matches!(
+        result.unwrap_err().source_error(),
+        BooruError::InvalidTag { .. }
+    ));
 }
 
 #[test]
@@ -389,8 +395,13 @@ async fn stream_yields_invalid_once_then_ends() {
     let mut stream = client.search().tag("cat ears").posts();
 
     assert!(matches!(
-        stream.next().await.expect("stream must yield"),
-        Err(BooruError::InvalidTag { .. })
+        stream
+            .next()
+            .await
+            .expect("stream must yield")
+            .unwrap_err()
+            .source_error(),
+        BooruError::InvalidTag { .. }
     ));
     assert!(stream.next().await.is_none());
 }
@@ -530,7 +541,7 @@ async fn error_status_despite_decodable_body() {
     let result = client.search().send().await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::HttpStatus { status: 500, .. }
     ));
     assert_eq!(mock_server.received_requests().await.unwrap().len(), 1);
@@ -561,8 +572,8 @@ async fn request_policy_retries_transient_statuses() {
     let result = client.search().send().await;
 
     assert!(matches!(
-        result,
-        Err(BooruError::HttpStatus { status: 503, .. })
+        result.unwrap_err().source_error(),
+        BooruError::HttpStatus { status: 503, .. }
     ));
     assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
@@ -582,7 +593,7 @@ async fn error_status_malformed_body() {
     let result = client.search().send().await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::HttpStatus { status: 503, .. }
     ));
 }
@@ -604,7 +615,16 @@ async fn invalid_json_is_parse_error() {
     let error = result.unwrap_err();
     assert!(error.is_parse_error());
     assert!(!error.is_network_error());
+    assert_eq!(
+        error.context(),
+        Some(ErrorContext {
+            provider: Provider::Safebooru,
+            operation: Operation::Search,
+        })
+    );
+    assert!(error.to_string().starts_with("Safebooru search failed:"));
 }
+
 #[test]
 fn common_score_preserves_provider_range() {
     use booru_rs::model::Post;

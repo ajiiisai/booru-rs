@@ -8,7 +8,7 @@ use serde::Deserialize;
 use super::{RequestPolicy, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
-use crate::error::{BooruError, Result};
+use crate::error::{BooruError, Operation, Provider, Result, ResultContext};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
 use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
@@ -76,6 +76,12 @@ impl Client {
     }
 
     pub async fn post(&self, id: u32) -> Result<SafebooruPost> {
+        self.post_inner(id)
+            .await
+            .with_context(Provider::Safebooru, Operation::Post)
+    }
+
+    async fn post_inner(&self, id: u32) -> Result<SafebooruPost> {
         let response = match execute_with_policy(&self.policy, || async {
             Ok(self
                 .http
@@ -104,6 +110,12 @@ impl Client {
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        self.autocomplete_inner(query, limit)
+            .await
+            .with_context(Provider::Safebooru, Operation::Autocomplete)
+    }
+
+    async fn autocomplete_inner(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
         let response = execute_with_policy(&self.policy, || async {
             Ok(self
                 .http
@@ -294,6 +306,12 @@ impl Search {
     }
 
     async fn fetch(&self) -> Result<Vec<SafebooruPost>> {
+        self.fetch_inner()
+            .await
+            .with_context(Provider::Safebooru, Operation::Search)
+    }
+
+    async fn fetch_inner(&self) -> Result<Vec<SafebooruPost>> {
         self.query.validate()?;
         let mut tags = self.query.tags.clone();
         if let Some(rating) = &self.query.rating {

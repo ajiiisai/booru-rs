@@ -104,7 +104,10 @@ async fn auth_body_reports_unauthorized() {
 
     let result = client.search().send().await;
 
-    assert!(matches!(result.unwrap_err(), BooruError::Unauthorized(_)));
+    assert!(matches!(
+        result.unwrap_err().source_error(),
+        BooruError::Unauthorized(_)
+    ));
 }
 
 #[tokio::test]
@@ -132,8 +135,8 @@ async fn request_policy_retries_transient_statuses() {
     let result = client.search().send().await;
 
     assert!(matches!(
-        result,
-        Err(BooruError::HttpStatus { status: 503, .. })
+        result.unwrap_err().source_error(),
+        BooruError::HttpStatus { status: 503, .. }
     ));
     assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
@@ -174,7 +177,7 @@ async fn post_missing_maps_to_not_found() {
     let result = client.post(99999).await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::PostNotFound(99999)
     ));
 }
@@ -431,7 +434,7 @@ async fn malformed_body_reports_parse_error() {
     let result = client.search().send().await;
 
     let error = result.unwrap_err();
-    assert!(matches!(error, BooruError::Parse(_)));
+    assert!(matches!(error.source_error(), BooruError::Parse(_)));
     assert!(error.is_parse_error());
 }
 

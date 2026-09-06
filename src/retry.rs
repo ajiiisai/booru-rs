@@ -107,6 +107,7 @@ impl RetryConfig {
 /// authentication errors, and not-found errors are not retryable.
 pub fn is_retryable(error: &BooruError) -> bool {
     match error {
+        BooruError::Context { source, .. } => is_retryable(source),
         BooruError::Request(e) => {
             // Retry on timeout, connection errors, but not on HTTP 4xx errors
             if e.is_timeout() || e.is_connect() {

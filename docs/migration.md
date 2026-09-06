@@ -141,18 +141,31 @@ The stream yields one terminal error for an invalid query and does not send a re
 `BooruError` is non-exhaustive. Add a wildcard arm when you match variants:
 
 ```rust
-use booru_rs::BooruError;
+use booru_rs::{BooruError, Operation, Provider};
 
 match client.post(12345).await {
     Ok(post) => use_post(post),
-    Err(BooruError::PostNotFound(id)) => eprintln!("post {id} is missing"),
+    Err(error) if matches!(error.source_error(), BooruError::PostNotFound(_)) => {
+        eprintln!("the post is missing")
+    }
     Err(error) if error.is_network_error() => retry_later(error),
     Err(error) if error.is_parse_error() => report_bad_response(error),
     Err(error) => report_failure(error),
 }
 ```
 
-Use `is_not_found()`, `is_network_error()`, and `is_parse_error()` when the application does not need provider-specific detail. HTTP failures use `HttpStatus`, authentication failures use `Unauthorized`, and download failures use the download-specific variants.
+Provider operations attach machine-readable context. Use `error.context()` to inspect its
+`Provider` and `Operation`:
+
+```rust
+if let Some(context) = error.context() {
+    if context.provider == Provider::Safebooru && context.operation == Operation::Search {
+        report_safebooru_search_failure(&error);
+    }
+}
+```
+
+Use `is_not_found()`, `is_network_error()`, and `is_parse_error()` when the application does not need provider-specific detail. These helpers inspect the underlying error through its provider context. Use `source_error()` before matching `HttpStatus`, `Unauthorized`, or another concrete variant. Download failures do not have provider context.
 
 ## Update model access
 

@@ -8,7 +8,7 @@ use serde::Deserialize;
 use super::{RequestPolicy, Secret, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
-use crate::error::{BooruError, Result};
+use crate::error::{BooruError, Operation, Provider, Result, ResultContext};
 use crate::model::rule34::*;
 use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
@@ -97,6 +97,12 @@ impl Client {
     }
 
     pub async fn post(&self, id: u32) -> Result<Rule34Post> {
+        self.post_inner(id)
+            .await
+            .with_context(Provider::Rule34, Operation::Post)
+    }
+
+    async fn post_inner(&self, id: u32) -> Result<Rule34Post> {
         let response = match execute_with_policy(&self.policy, || async {
             Ok(self
                 .http
@@ -128,6 +134,12 @@ impl Client {
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        self.autocomplete_inner(query, limit)
+            .await
+            .with_context(Provider::Rule34, Operation::Autocomplete)
+    }
+
+    async fn autocomplete_inner(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
         let response = match execute_with_policy(&self.policy, || async {
             Ok(self
                 .http
@@ -328,6 +340,12 @@ impl Search {
     }
 
     async fn fetch(&self) -> Result<Vec<Rule34Post>> {
+        self.fetch_inner()
+            .await
+            .with_context(Provider::Rule34, Operation::Search)
+    }
+
+    async fn fetch_inner(&self) -> Result<Vec<Rule34Post>> {
         self.query.validate()?;
         let mut tags = self.query.tags.clone();
         if let Some(rating) = &self.query.rating {

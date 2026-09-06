@@ -116,7 +116,7 @@ pub use autocomplete::TagSuggestion;
 pub use cache::{CacheKey, CacheOperation};
 pub use client::RequestPolicy;
 pub use client::generic::Sort;
-pub use error::{BooruError, Result};
+pub use error::{BooruError, ErrorContext, Operation, Provider, Result};
 pub use model::Post;
 
 /// Danbooru client and model types.

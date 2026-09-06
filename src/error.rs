@@ -3,6 +3,62 @@
 /// A specialized `Result` type for booru-rs operations.
 pub type Result<T> = std::result::Result<T, BooruError>;
 
+/// Provider that produced an API operation error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Provider {
+    /// Danbooru.
+    Danbooru,
+    /// Gelbooru.
+    Gelbooru,
+    /// Rule34.
+    Rule34,
+    /// Safebooru.
+    Safebooru,
+}
+
+impl std::fmt::Display for Provider {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Danbooru => "Danbooru",
+            Self::Gelbooru => "Gelbooru",
+            Self::Rule34 => "Rule34",
+            Self::Safebooru => "Safebooru",
+        })
+    }
+}
+
+/// API operation that failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Operation {
+    /// A post search or page fetch.
+    Search,
+    /// A single-post lookup.
+    Post,
+    /// A tag autocomplete request.
+    Autocomplete,
+}
+
+impl std::fmt::Display for Operation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Search => "search",
+            Self::Post => "post lookup",
+            Self::Autocomplete => "autocomplete",
+        })
+    }
+}
+
+/// Machine-readable context for a provider API failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ErrorContext {
+    /// Provider whose operation failed.
+    pub provider: Provider,
+    /// Operation that failed.
+    pub operation: Operation,
+}
+
 /// Errors that can occur when interacting with booru APIs.
 ///
 /// This enum is marked `#[non_exhaustive]` to allow adding new variants
@@ -10,6 +66,18 @@ pub type Result<T> = std::result::Result<T, BooruError>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum BooruError {
+    /// An error from a provider API operation.
+    #[error("{provider} {operation} failed: {source}")]
+    Context {
+        /// Provider whose operation failed.
+        provider: Provider,
+        /// Operation that failed.
+        operation: Operation,
+        /// Underlying classified error.
+        #[source]
+        source: Box<BooruError>,
+    },
+
     /// HTTP request failed.
     #[error("HTTP request failed: {0}")]
     Request(reqwest::Error),
@@ -116,6 +184,49 @@ impl BooruError {
         feature = "rule34",
         feature = "safebooru"
     ))]
+    pub(crate) fn with_context(self, provider: Provider, operation: Operation) -> Self {
+        if matches!(self, Self::Context { .. }) {
+            self
+        } else {
+            Self::Context {
+                provider,
+                operation,
+                source: Box::new(self),
+            }
+        }
+    }
+
+    /// Returns the provider and operation associated with this error.
+    #[must_use]
+    pub fn context(&self) -> Option<ErrorContext> {
+        match self {
+            Self::Context {
+                provider,
+                operation,
+                ..
+            } => Some(ErrorContext {
+                provider: *provider,
+                operation: *operation,
+            }),
+            _ => None,
+        }
+    }
+
+    /// Returns the underlying error without provider context.
+    #[must_use]
+    pub fn source_error(&self) -> &Self {
+        match self {
+            Self::Context { source, .. } => source.source_error(),
+            _ => self,
+        }
+    }
+
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "safebooru"
+    ))]
     pub(crate) fn http_status(status: reqwest::StatusCode, body: &str) -> Self {
         const LIMIT: usize = 300;
         let single_line = body.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -136,13 +247,18 @@ impl BooruError {
     /// them through its general error type.
     #[must_use]
     pub fn is_network_error(&self) -> bool {
-        matches!(self, Self::Request(error) if !error.is_decode())
+        match self {
+            Self::Context { source, .. } => source.is_network_error(),
+            Self::Request(error) => !error.is_decode(),
+            _ => false,
+        }
     }
 
     /// Returns `true` if this error is a parse/deserialization error.
     #[must_use]
     pub fn is_parse_error(&self) -> bool {
         match self {
+            Self::Context { source, .. } => source.is_parse_error(),
             Self::Parse(_) => true,
             Self::Request(error) => error.is_decode(),
             _ => false,
@@ -152,6 +268,32 @@ impl BooruError {
     /// Returns `true` if this error indicates the resource was not found.
     #[must_use]
     pub fn is_not_found(&self) -> bool {
-        matches!(self, Self::PostNotFound(_) | Self::EmptyResponse)
+        match self {
+            Self::Context { source, .. } => source.is_not_found(),
+            Self::PostNotFound(_) | Self::EmptyResponse => true,
+            _ => false,
+        }
+    }
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) trait ResultContext<T> {
+    fn with_context(self, provider: Provider, operation: Operation) -> Result<T>;
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+impl<T> ResultContext<T> for Result<T> {
+    fn with_context(self, provider: Provider, operation: Operation) -> Result<T> {
+        self.map_err(|error| error.with_context(provider, operation))
     }
 }

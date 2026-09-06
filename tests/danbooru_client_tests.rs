@@ -108,7 +108,7 @@ async fn third_tag_rejected_before_request() {
         .await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::TagLimitExceeded {
             max: 2,
             actual: 3,
@@ -176,7 +176,7 @@ async fn post_missing_maps_to_not_found() {
     let result = client.post(99999).await;
 
     assert!(matches!(
-        result.unwrap_err(),
+        result.unwrap_err().source_error(),
         BooruError::PostNotFound(99999)
     ));
 }
@@ -206,8 +206,8 @@ async fn request_policy_retries_transient_statuses() {
     let result = client.search().send().await;
 
     assert!(matches!(
-        result,
-        Err(BooruError::HttpStatus { status: 503, .. })
+        result.unwrap_err().source_error(),
+        BooruError::HttpStatus { status: 503, .. }
     ));
     assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
