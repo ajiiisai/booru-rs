@@ -192,7 +192,6 @@ impl Autocomplete for GelbooruClient {
 
         Ok(items
             .into_iter()
-            .take(limit as usize) // API doesn't respect limit
             .map(|item| {
                 // Try to parse post count from label if not provided directly
                 let post_count = item
