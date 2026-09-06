@@ -415,3 +415,16 @@ async fn post_trait_methods() {
     assert_eq!(post.md5(), Some("rule34hash123"));
     assert_eq!(post.source(), Some("https://pixiv.net/artworks/789"));
 }
+#[test]
+fn common_score_preserves_provider_range() {
+    use booru_rs::model::Post;
+
+    let mut post: booru_rs::model::rule34::Rule34Post =
+        serde_json::from_str::<Vec<_>>(include_str!("fixtures/rule34/posts.json"))
+            .unwrap()
+            .remove(0);
+    for score in [i32::MIN, -1, 0, i32::MAX] {
+        post.score = score;
+        assert_eq!(post.score(), Some(i64::from(score)));
+    }
+}

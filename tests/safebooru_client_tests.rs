@@ -545,3 +545,18 @@ async fn invalid_json_is_parse_error() {
 
     assert!(result.unwrap_err().is_parse_error());
 }
+#[test]
+fn common_score_preserves_provider_range() {
+    use booru_rs::model::Post;
+
+    let mut post: booru_rs::model::safebooru::SafebooruPost =
+        serde_json::from_str::<Vec<_>>(include_str!("fixtures/safebooru/post.json"))
+            .unwrap()
+            .remove(0);
+    for score in [0, i32::MAX as u32, i32::MAX as u32 + 1, u32::MAX] {
+        post.score = Some(score);
+        assert_eq!(post.score(), Some(i64::from(score)));
+    }
+    post.score = None;
+    assert_eq!(post.score(), None);
+}

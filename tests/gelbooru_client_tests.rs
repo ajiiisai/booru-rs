@@ -390,3 +390,16 @@ async fn present_empty_post_list_is_empty() {
 
     assert!(posts.is_empty());
 }
+#[test]
+fn common_score_preserves_provider_range() {
+    use booru_rs::model::Post;
+
+    let mut post: booru_rs::model::gelbooru::GelbooruPost = serde_json::from_value(
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone(),
+    )
+    .unwrap();
+    for score in [0, i32::MAX as u32, i32::MAX as u32 + 1, u32::MAX] {
+        post.score = score;
+        assert_eq!(post.score(), Some(i64::from(score)));
+    }
+}

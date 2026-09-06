@@ -47,7 +47,7 @@ pub trait Post {
     fn tags(&self) -> &str;
 
     /// Returns the post's score/rating value, if available.
-    fn score(&self) -> Option<i32>;
+    fn score(&self) -> Option<i64>;
 
     /// Returns the MD5 hash of the image, if available.
     fn md5(&self) -> Option<&str>;
@@ -79,8 +79,8 @@ impl Post for danbooru::DanbooruPost {
         &self.tag_string
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {
@@ -118,8 +118,8 @@ impl Post for gelbooru::GelbooruPost {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score as i32)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {
@@ -157,8 +157,8 @@ impl Post for safebooru::SafebooruPost {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        self.score.map(|s| s as i32)
+    fn score(&self) -> Option<i64> {
+        self.score.map(i64::from)
     }
 
     fn md5(&self) -> Option<&str> {
@@ -196,8 +196,8 @@ impl Post for rule34::Rule34Post {
         &self.tags
     }
 
-    fn score(&self) -> Option<i32> {
-        Some(self.score)
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
     }
 
     fn md5(&self) -> Option<&str> {

@@ -405,3 +405,14 @@ async fn pages_max_pages_caps_fetching() {
     assert_eq!(ids(&page.expect("page must succeed").posts), vec![1, 2]);
     assert!(pages.next().await.is_none());
 }
+#[test]
+fn common_score_preserves_provider_range() {
+    use booru_rs::model::Post;
+
+    let mut post: booru_rs::model::danbooru::DanbooruPost =
+        serde_json::from_str(&single_post_json(1)).unwrap();
+    for score in [i32::MIN, -1, 0, i32::MAX] {
+        post.score = score;
+        assert_eq!(post.score(), Some(i64::from(score)));
+    }
+}
