@@ -1,5 +1,7 @@
 use booru_rs::danbooru::{Client, Query};
 use booru_rs::error::BooruError;
+use booru_rs::retry::RetryConfig;
+use std::time::Duration;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -177,6 +179,37 @@ async fn post_missing_maps_to_not_found() {
         result.unwrap_err(),
         BooruError::PostNotFound(99999)
     ));
+}
+
+#[tokio::test]
+async fn request_policy_retries_transient_statuses() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .respond_with(ResponseTemplate::new(503).set_body_string("temporary outage"))
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .retry_config(
+            RetryConfig::new(1)
+                .with_initial_delay(Duration::ZERO)
+                .with_max_delay(Duration::ZERO),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let result = client.search().send().await;
+
+    assert!(matches!(
+        result,
+        Err(BooruError::HttpStatus { status: 503, .. })
+    ));
+    assert_eq!(mock_server.received_requests().await.unwrap().len(), 2);
 }
 
 #[tokio::test]

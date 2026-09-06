@@ -6,11 +6,13 @@ use futures_core::Stream;
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::Deserialize;
 
-use super::ensure_success;
+use super::{RequestPolicy, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
 use crate::client::generic::Sort;
 use crate::error::{BooruError, Result};
 use crate::model::danbooru::*;
+use crate::ratelimit::RateLimiter;
+use crate::retry::RetryConfig;
 
 /// Danbooru requires a User-Agent header for requests.
 fn get_headers() -> HeaderMap {
@@ -44,6 +46,7 @@ pub struct Client {
     endpoint: String,
     key: Option<String>,
     user: Option<String>,
+    policy: RequestPolicy,
 }
 
 impl Client {
@@ -64,6 +67,7 @@ impl Client {
             endpoint: DEFAULT_ENDPOINT.to_string(),
             key: None,
             user: None,
+            policy: RequestPolicy::default(),
         })
     }
 
@@ -90,38 +94,45 @@ impl Client {
             query.push(("api_key", key.clone()));
         }
 
-        let response = self
-            .http
-            .get(format!("{}/posts/{id}.json", self.endpoint))
-            .headers(get_headers())
-            .query(&query)
-            .send()
-            .await?;
-
-        let status = response.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
-            return Err(BooruError::PostNotFound(id));
-        }
-        let response = ensure_success(response).await?;
+        let response = match execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/posts/{id}.json", self.endpoint))
+                .headers(get_headers())
+                .query(&query)
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(BooruError::HttpStatus { status: 404, .. }) => {
+                return Err(BooruError::PostNotFound(id));
+            }
+            Err(error) => return Err(error),
+        };
 
         let post = response.json::<DanbooruPost>().await?;
         Ok(post)
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
-        let response = self
-            .http
-            .get(format!("{}/autocomplete.json", self.endpoint))
-            .headers(get_headers())
-            .query(&[
-                ("search[query]", query),
-                ("search[type]", "tag_query"),
-                ("limit", &limit.to_string()),
-            ])
-            .send()
-            .await?
-            .json::<Vec<DanbooruAutocompleteItem>>()
-            .await?;
+        let response = execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/autocomplete.json", self.endpoint))
+                .headers(get_headers())
+                .query(&[
+                    ("search[query]", query),
+                    ("search[type]", "tag_query"),
+                    ("limit", &limit.to_string()),
+                ])
+                .send()
+                .await?)
+        })
+        .await?
+        .json::<Vec<DanbooruAutocompleteItem>>()
+        .await?;
 
         Ok(response
             .into_iter()
@@ -327,16 +338,17 @@ impl Search {
             query.push(("api_key", key.clone()));
         }
 
-        let response = self
-            .client
-            .http
-            .get(format!("{}/posts.json", self.client.endpoint))
-            .headers(get_headers())
-            .query(&query)
-            .send()
-            .await?;
-
-        let response = ensure_success(response).await?;
+        let response = execute_with_policy(&self.client.policy, || async {
+            Ok(self
+                .client
+                .http
+                .get(format!("{}/posts.json", self.client.endpoint))
+                .headers(get_headers())
+                .query(&query)
+                .send()
+                .await?)
+        })
+        .await?;
 
         let posts = response.json::<Vec<DanbooruPost>>().await?;
         Ok(posts)
@@ -471,6 +483,7 @@ pub struct ClientBuilder {
     endpoint: Option<String>,
     key: Option<String>,
     user: Option<String>,
+    policy: Option<RequestPolicy>,
 }
 
 impl ClientBuilder {
@@ -493,6 +506,28 @@ impl ClientBuilder {
         self
     }
 
+    /// Sets the request retry and rate-limit policy.
+    #[must_use]
+    pub fn request_policy(mut self, policy: RequestPolicy) -> Self {
+        self.policy = Some(policy);
+        self
+    }
+
+    /// Sets the retry configuration for requests made by this client.
+    pub fn retry_config(mut self, config: RetryConfig) -> Result<Self> {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_retry_config(config)?);
+        Ok(self)
+    }
+
+    /// Sets the rate limiter for requests made by this client.
+    #[must_use]
+    pub fn rate_limiter(mut self, limiter: RateLimiter) -> Self {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_rate_limiter(limiter));
+        self
+    }
+
     pub fn build(self) -> Result<Client> {
         Ok(Client {
             http: self.http.unwrap_or_else(|| super::shared_client().clone()),
@@ -501,6 +536,7 @@ impl ClientBuilder {
                 .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
             key: self.key,
             user: self.user,
+            policy: self.policy.unwrap_or_default(),
         })
     }
 }
