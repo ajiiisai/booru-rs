@@ -1,6 +1,4 @@
-//! Safebooru API client implementation.
-
-use super::{Client, ClientBuilder, shared_client};
+use super::{Client, ClientBuilder, ensure_success, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::safebooru::{SafebooruPost, SafebooruRating};
@@ -47,8 +45,6 @@ impl Client for SafebooruClient {
     const SORT: &'static str = "sort:";
     const MAX_TAGS: Option<usize> = None;
 
-    /// Retrieves a single post by its unique ID.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
@@ -74,21 +70,13 @@ impl Client for SafebooruClient {
         if status == reqwest::StatusCode::NOT_FOUND {
             return Err(BooruError::PostNotFound(id));
         }
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let posts = response.json::<Vec<SafebooruPost>>().await?;
 
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
-    /// Retrieves posts matching the configured query.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or if the response cannot be parsed.
     async fn get(&self) -> Result<Vec<Self::Post>> {
         let builder = &self.0;
         let url = &builder.url;
@@ -109,11 +97,7 @@ impl Client for SafebooruClient {
             .send()
             .await?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let posts = response.json::<Vec<SafebooruPost>>().await?;
 
@@ -121,7 +105,6 @@ impl Client for SafebooruClient {
     }
 }
 
-/// Safebooru autocomplete API response item.
 #[derive(Debug, Deserialize)]
 struct SafebooruAutocompleteItem {
     value: String,
@@ -129,8 +112,6 @@ struct SafebooruAutocompleteItem {
 }
 
 impl Autocomplete for SafebooruClient {
-    /// Returns tag suggestions from Safebooru's autocomplete API.
-    ///
     /// # Example
     ///
     /// ```no_run
@@ -154,8 +135,7 @@ impl Autocomplete for SafebooruClient {
             .json::<Vec<SafebooruAutocompleteItem>>()
             .await?;
 
-        // Safebooru includes post count in the label like "cat_ears (177448)"
-        // Parse it out if present
+        // Safebooru folds the post count into the label: "cat_ears (177448)".
         Ok(response
             .into_iter()
             .take(limit as usize)

@@ -1,6 +1,4 @@
-//! Danbooru API client implementation.
-
-use super::{Client, ClientBuilder, shared_client};
+use super::{Client, ClientBuilder, ensure_success, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::danbooru::*;
@@ -8,8 +6,6 @@ use crate::model::danbooru::*;
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::Deserialize;
 
-/// Returns headers required for Danbooru API requests.
-///
 /// Danbooru requires a User-Agent header for requests.
 fn get_headers() -> HeaderMap {
     let mut headers = HeaderMap::with_capacity(1);
@@ -22,7 +18,7 @@ fn get_headers() -> HeaderMap {
 
 /// Client for interacting with the Danbooru API.
 ///
-/// Danbooru has a limit of 2 tags per query for non-authenticated users.
+/// Danbooru allows 2 tags per query without authentication.
 ///
 /// # Example
 ///
@@ -60,11 +56,6 @@ impl Client for DanbooruClient {
     const SORT: &'static str = "order:";
     const MAX_TAGS: Option<usize> = Some(2);
 
-    /// Retrieves a single post by its unique ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or if the response cannot be parsed.
     async fn get_by_id(&self, id: u32) -> Result<Self::Post> {
         let builder = &self.0;
         let url = &builder.url;
@@ -80,21 +71,13 @@ impl Client for DanbooruClient {
         if status == reqwest::StatusCode::NOT_FOUND {
             return Err(BooruError::PostNotFound(id));
         }
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let post = response.json::<DanbooruPost>().await?;
 
         Ok(post)
     }
 
-    /// Retrieves posts matching the configured query.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or if the response cannot be parsed.
     async fn get(&self) -> Result<Vec<Self::Post>> {
         let builder = &self.0;
         let tag_string = builder.tags.join(" ");
@@ -112,11 +95,7 @@ impl Client for DanbooruClient {
             .send()
             .await?;
 
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let posts = response.json::<Vec<DanbooruPost>>().await?;
 
@@ -124,7 +103,6 @@ impl Client for DanbooruClient {
     }
 }
 
-/// Danbooru autocomplete API response item.
 #[derive(Debug, Deserialize)]
 struct DanbooruAutocompleteItem {
     value: String,
@@ -134,8 +112,6 @@ struct DanbooruAutocompleteItem {
 }
 
 impl Autocomplete for DanbooruClient {
-    /// Returns tag suggestions from Danbooru's autocomplete API.
-    ///
     /// # Example
     ///
     /// ```no_run

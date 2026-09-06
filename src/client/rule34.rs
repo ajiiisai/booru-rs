@@ -1,6 +1,6 @@
 //! Rule34 API client implementation.
 
-use super::{Client, ClientBuilder, shared_client};
+use super::{Client, ClientBuilder, ensure_success, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::rule34::*;
@@ -14,8 +14,6 @@ use serde::Deserialize;
 ///
 /// Rule34 **requires API credentials** for API access. You can obtain your
 /// API key and user ID from your [Rule34 account settings](https://rule34.xxx/index.php?page=account&s=options).
-///
-/// Use [`ClientBuilder::set_credentials`] to provide your API key and user ID:
 ///
 /// ```no_run
 /// use booru_rs::rule34::{Rule34Client, Rule34Rating};
@@ -43,7 +41,6 @@ use serde::Deserialize;
 /// Rule34 is an adult (NSFW) image board. Content is not filtered by default.
 /// Use rating filters appropriately.
 ///
-/// [`ClientBuilder::set_credentials`]: super::ClientBuilder::set_credentials
 /// [`BooruError::Unauthorized`]: crate::error::BooruError::Unauthorized
 #[derive(Debug)]
 pub struct Rule34Client(ClientBuilder<Self>);
@@ -62,8 +59,6 @@ impl Client for Rule34Client {
     const SORT: &'static str = "sort:";
     const MAX_TAGS: Option<usize> = None;
 
-    /// Retrieves a single post by its unique ID.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
@@ -81,7 +76,6 @@ impl Client for Rule34Client {
             ("json", "1".to_string()),
         ];
 
-        // Add API credentials if provided
         if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
             query.push(("api_key", key.clone()));
             query.push(("user_id", user.clone()));
@@ -94,7 +88,6 @@ impl Client for Rule34Client {
             .send()
             .await?;
 
-        // Check for authentication errors (some APIs may return 401)
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(BooruError::Unauthorized(
                 "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
@@ -105,10 +98,7 @@ impl Client for Rule34Client {
         if status == reqwest::StatusCode::NOT_FOUND {
             return Err(BooruError::PostNotFound(id));
         }
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
         // Example: "Missing authentication. Go to api.rule34.xxx for more information"
@@ -118,8 +108,6 @@ impl Client for Rule34Client {
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
-    /// Retrieves posts matching the configured query.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
@@ -139,7 +127,6 @@ impl Client for Rule34Client {
             ("json", "1".to_string()),
         ];
 
-        // Add API credentials if provided
         if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
             query.push(("api_key", key.clone()));
             query.push(("user_id", user.clone()));
@@ -152,24 +139,18 @@ impl Client for Rule34Client {
             .send()
             .await?;
 
-        // Check for authentication errors (some APIs may return 401)
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(BooruError::Unauthorized(
                 "Rule34 requires API credentials. Use set_credentials(api_key, user_id)".into(),
             ));
         }
 
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         // Rule34 API quirk: returns HTTP 200 OK with error message in body instead of 401
         // Example: "Missing authentication. Go to api.rule34.xxx for more information"
         let text = response.text().await?;
 
-        // Handle empty response (no results)
         if text.is_empty() || text == "[]" {
             return Ok(Vec::new());
         }
@@ -193,12 +174,9 @@ fn decode_posts(text: &str) -> Result<Vec<Rule34Post>> {
     }
 }
 
-/// Internal response type for Rule34 autocomplete.
 #[derive(Debug, Deserialize)]
 struct Rule34AutocompleteItem {
-    /// The tag name.
     value: String,
-    /// Display label (includes post count).
     label: String,
 }
 

@@ -1,6 +1,4 @@
-//! Gelbooru API client implementation.
-
-use super::{Client, ClientBuilder, shared_client};
+use super::{Client, ClientBuilder, ensure_success, shared_client};
 use crate::autocomplete::{Autocomplete, TagSuggestion};
 use crate::error::{BooruError, Result};
 use crate::model::gelbooru::*;
@@ -14,8 +12,6 @@ use serde::Deserialize;
 ///
 /// Gelbooru **requires API credentials** for API access. You can obtain your
 /// API key and user ID from your [Gelbooru account settings](https://gelbooru.com/index.php?page=account&s=options).
-///
-/// Use [`ClientBuilder::set_credentials`] to provide your API key and user ID:
 ///
 /// ```no_run
 /// use booru_rs::gelbooru::{GelbooruClient, GelbooruRating};
@@ -38,7 +34,6 @@ use serde::Deserialize;
 ///
 /// Without credentials, requests will fail with [`BooruError::Unauthorized`].
 ///
-/// [`ClientBuilder::set_credentials`]: super::ClientBuilder::set_credentials
 /// [`BooruError::Unauthorized`]: crate::error::BooruError::Unauthorized
 #[derive(Debug)]
 pub struct GelbooruClient(ClientBuilder<Self>);
@@ -57,8 +52,6 @@ impl Client for GelbooruClient {
     const SORT: &'static str = "sort:";
     const MAX_TAGS: Option<usize> = None;
 
-    /// Retrieves a single post by its unique ID.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::PostNotFound`] if no post exists with the given ID.
@@ -76,7 +69,6 @@ impl Client for GelbooruClient {
             ("json", "1".to_string()),
         ];
 
-        // Add API credentials if provided
         if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
             query.push(("api_key", key.clone()));
             query.push(("user_id", user.clone()));
@@ -89,7 +81,6 @@ impl Client for GelbooruClient {
             .send()
             .await?;
 
-        // Check for authentication errors
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(BooruError::Unauthorized(
                 "Gelbooru requires API credentials. Use set_credentials(api_key, user_id)".into(),
@@ -100,10 +91,7 @@ impl Client for GelbooruClient {
         if status == reqwest::StatusCode::NOT_FOUND {
             return Err(BooruError::PostNotFound(id));
         }
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let data = response.json::<GelbooruResponse>().await?;
 
@@ -113,8 +101,6 @@ impl Client for GelbooruClient {
             .ok_or(BooruError::PostNotFound(id))
     }
 
-    /// Retrieves posts matching the configured query.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::Unauthorized`] if API credentials are missing or invalid.
@@ -134,7 +120,6 @@ impl Client for GelbooruClient {
             ("json", "1".to_string()),
         ];
 
-        // Add API credentials if provided
         if let (Some(key), Some(user)) = (&builder.key, &builder.user) {
             query.push(("api_key", key.clone()));
             query.push(("user_id", user.clone()));
@@ -147,18 +132,13 @@ impl Client for GelbooruClient {
             .send()
             .await?;
 
-        // Check for authentication errors
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return Err(BooruError::Unauthorized(
                 "Gelbooru requires API credentials. Use set_credentials(api_key, user_id)".into(),
             ));
         }
 
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            return Err(BooruError::http_status(status, &body));
-        }
+        let response = ensure_success(response).await?;
 
         let data = response.json::<GelbooruResponse>().await?;
 
@@ -166,7 +146,6 @@ impl Client for GelbooruClient {
     }
 }
 
-/// Internal response type for Gelbooru autocomplete.
 #[derive(Debug, Deserialize)]
 struct GelbooruAutocompleteItem {
     /// The tag name.
@@ -208,12 +187,10 @@ impl Autocomplete for GelbooruClient {
         Ok(items
             .into_iter()
             .map(|item| {
-                // Try to parse post count from label if not provided directly
                 let post_count = item
                     .post_count
                     .or_else(|| parse_post_count_from_label(&item.label));
 
-                // Convert category string to numeric ID if present
                 let category = item.category.as_deref().and_then(parse_category);
 
                 TagSuggestion {
@@ -227,7 +204,6 @@ impl Autocomplete for GelbooruClient {
     }
 }
 
-/// Parses category string to numeric ID.
 fn parse_category(cat: &str) -> Option<u8> {
     match cat.to_lowercase().as_str() {
         "general" | "tag" => Some(0),

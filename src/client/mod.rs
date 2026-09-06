@@ -5,9 +5,10 @@
 //!
 //! # Available Clients
 //!
-//! - [`DanbooruClient`] — For [danbooru.donmai.us](https://danbooru.donmai.us) (2 tag limit)
-//! - [`GelbooruClient`] — For [gelbooru.com](https://gelbooru.com) (unlimited tags)
-//! - [`SafebooruClient`] — For [safebooru.org](https://safebooru.org) (unlimited tags, SFW only)
+//! - [`DanbooruClient`] for danbooru.donmai.us, 2 tag limit
+//! - [`GelbooruClient`] for gelbooru.com, unlimited tags
+//! - [`SafebooruClient`] for safebooru.org, unlimited tags, SFW only
+//! - [`Rule34Client`] for api.rule34.xxx, unlimited tags
 //!
 //! # Example
 //!
@@ -36,8 +37,7 @@
 //!
 //! # Custom HTTP Client
 //!
-//! By default, all clients share a connection-pooled HTTP client. You can provide
-//! your own client for custom configuration:
+//! By default, all clients share a connection-pooled HTTP client.
 //!
 //! ```no_run
 //! use booru_rs::prelude::*;
@@ -74,9 +74,6 @@ pub mod rule34;
 pub mod safebooru;
 
 /// Shared HTTP client with connection pooling and timeouts.
-///
-/// This client is lazily initialized and reused across all requests
-/// for better performance.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -93,10 +90,20 @@ pub fn shared_client() -> &'static reqwest::Client {
     &SHARED_CLIENT
 }
 
-/// Builder for constructing booru API clients.
+/// Rejects an API response with an unsuccessful status before decoding.
 ///
-/// This builder allows you to configure various options before
-/// creating a client to query a booru site.
+/// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.
+/// Callers map endpoint-specific statuses such as missing posts first.
+pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwest::Response> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+    let body = response.text().await.unwrap_or_default();
+    Err(BooruError::http_status(status, &body))
+}
+
+/// Builder for constructing booru API clients.
 ///
 /// # Example
 ///
@@ -143,21 +150,6 @@ impl<T: Client> Clone for ClientBuilder<T> {
 }
 
 /// Core trait for booru API clients.
-///
-/// This trait defines the interface that all booru clients must implement.
-/// It provides compile-time type safety for client-specific features like
-/// ratings and tag limits.
-///
-/// # Associated Types
-///
-/// - `Post`: The post type returned by this client
-/// - `Rating`: The rating type specific to this booru site
-///
-/// # Associated Constants
-///
-/// - `URL`: The base URL for the API
-/// - `SORT`: The prefix for sort/order tags
-/// - `MAX_TAGS`: Optional limit on the number of tags per query
 pub trait Client: From<ClientBuilder<Self>> + Sized + Send + Sync {
     /// The post type returned by this client.
     type Post: Send;
@@ -196,8 +188,6 @@ pub trait Client: From<ClientBuilder<Self>> + Sized + Send + Sync {
 }
 
 impl<T: Client> ClientBuilder<T> {
-    /// Creates a new builder with default settings.
-    ///
     /// Uses the shared HTTP client for connection pooling.
     #[must_use]
     pub fn new() -> Self {
@@ -213,8 +203,6 @@ impl<T: Client> ClientBuilder<T> {
         }
     }
 
-    /// Creates a new builder with a custom HTTP client.
-    ///
     /// Use this when you need custom HTTP configuration (e.g., proxy, custom TLS).
     #[must_use]
     pub fn with_client(client: reqwest::Client) -> Self {
@@ -230,8 +218,6 @@ impl<T: Client> ClientBuilder<T> {
         }
     }
 
-    /// Sets a custom base URL for the API.
-    ///
     /// This is primarily useful for testing with mock servers.
     #[must_use]
     pub fn with_custom_url(mut self, url: &str) -> Self {
@@ -239,8 +225,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Sets the API key and username for authenticated requests.
-    ///
     /// Some booru sites require or benefit from authentication.
     #[must_use]
     pub fn set_credentials(mut self, key: impl Into<String>, user: impl Into<String>) -> Self {
@@ -249,8 +233,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Adds a tag to the search query.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::TagLimitExceeded`] if adding this tag would exceed
@@ -287,11 +269,6 @@ impl<T: Client> ClientBuilder<T> {
         Ok(self)
     }
 
-    /// Adds a rating filter to the search query.
-    ///
-    /// The rating type is specific to each booru site, ensuring
-    /// compile-time type safety.
-    ///
     /// # Example
     ///
     /// ```no_run
@@ -308,9 +285,7 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Sets the maximum number of posts to retrieve.
-    ///
-    /// Default is 100, which is also typically the maximum allowed by most APIs.
+    /// Default is 100.
     #[must_use]
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = limit;
@@ -331,8 +306,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Excludes posts with the specified tag.
-    ///
     /// Multiple blacklist tags can be added by calling this method multiple times.
     #[must_use]
     pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
@@ -340,8 +313,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Overrides the default API URL.
-    ///
     /// Useful for testing or accessing mirror sites.
     #[must_use]
     pub fn default_url(mut self, url: impl Into<String>) -> Self {
@@ -349,8 +320,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Sets the page number for pagination.
-    ///
     /// Page numbering starts at 0.
     #[must_use]
     pub fn page(mut self, page: u32) -> Self {
@@ -358,8 +327,6 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Adds multiple tags to the search query at once.
-    ///
     /// # Errors
     ///
     /// Returns [`BooruError::TagLimitExceeded`] if adding these tags would exceed
@@ -388,8 +355,6 @@ impl<T: Client> ClientBuilder<T> {
         Ok(self)
     }
 
-    /// Excludes multiple tags from the search query at once.
-    ///
     /// # Example
     ///
     /// ```no_run
@@ -415,19 +380,16 @@ impl<T: Client> ClientBuilder<T> {
         self
     }
 
-    /// Returns the current number of tags in the query.
     #[must_use]
     pub fn tag_count(&self) -> usize {
         self.tags.len()
     }
 
-    /// Returns `true` if the builder has any tags configured.
     #[must_use]
     pub fn has_tags(&self) -> bool {
         !self.tags.is_empty()
     }
 
-    /// Builds the client with the configured options.
     #[must_use]
     pub fn build(self) -> T {
         T::from(self)
@@ -440,7 +402,6 @@ impl<T: Client> Default for ClientBuilder<T> {
     }
 }
 
-// Re-exports for convenience
 #[cfg(feature = "danbooru")]
 pub use danbooru::DanbooruClient;
 #[cfg(feature = "gelbooru")]
