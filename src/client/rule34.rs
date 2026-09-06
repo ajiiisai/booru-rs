@@ -388,6 +388,28 @@ impl Query {
         self
     }
 
+    pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(format!("-{}", tag.into()));
+        self
+    }
+
+    pub fn blacklist_tags<I, S>(mut self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        for tag in tags {
+            self = self.blacklist_tag(tag);
+        }
+        self
+    }
+
+    pub fn random(mut self) -> Self {
+        self.tags
+            .push(format!("{}random", <Rule34Client as ClientTrait>::SORT));
+        self
+    }
+
     pub fn validate(&self) -> Result<()> {
         super::validate_tags(&self.tags)
     }
@@ -421,6 +443,30 @@ impl Search {
         self
     }
 
+    pub fn blacklist_tag(mut self, tag: impl Into<String>) -> Self {
+        self.query = self.query.blacklist_tag(tag);
+        self
+    }
+
+    pub fn blacklist_tags<I, S>(mut self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.query = self.query.blacklist_tags(tags);
+        self
+    }
+
+    pub fn random(mut self) -> Self {
+        self.query = self.query.random();
+        self
+    }
+
+    pub fn start_page(mut self, page: u32) -> Self {
+        self.page = page;
+        self
+    }
+
     pub fn query(&self) -> &Query {
         &self.query
     }
@@ -446,6 +492,8 @@ impl Search {
         PageStream {
             search: Some(self),
             pending: None,
+            fetched: 0,
+            max_pages: None,
         }
     }
 
@@ -453,6 +501,8 @@ impl Search {
         PostStream {
             pages: self.pages(),
             buffer: Vec::new().into_iter(),
+            yielded: 0,
+            max_posts: None,
         }
     }
 
@@ -514,11 +564,18 @@ pub struct Page {
 pub struct PageStream {
     search: Option<Search>,
     pending: Option<Pin<Box<dyn Future<Output = Result<Page>> + Send>>>,
+    fetched: u32,
+    max_pages: Option<u32>,
 }
 
 impl PageStream {
     pub async fn next(&mut self) -> Option<Result<Page>> {
         std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
+    }
+
+    pub fn max_pages(mut self, max: u32) -> Self {
+        self.max_pages = Some(max);
+        self
     }
 }
 
@@ -527,11 +584,19 @@ impl Stream for PageStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.as_mut().get_mut();
+        if let Some(max) = this.max_pages
+            && this.fetched >= max
+        {
+            this.search = None;
+            this.pending = None;
+            return Poll::Ready(None);
+        }
         loop {
             if let Some(mut pending) = this.pending.take() {
                 match pending.as_mut().poll(cx) {
                     Poll::Ready(result) => match result {
                         Ok(page) => {
+                            this.fetched = this.fetched.saturating_add(1);
                             if page.posts.is_empty() {
                                 this.search = None;
                                 return Poll::Ready(None);
@@ -562,11 +627,18 @@ impl Stream for PageStream {
 pub struct PostStream {
     pages: PageStream,
     buffer: std::vec::IntoIter<Rule34Post>,
+    yielded: u32,
+    max_posts: Option<u32>,
 }
 
 impl PostStream {
     pub async fn next(&mut self) -> Option<Result<Rule34Post>> {
         std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
+    }
+
+    pub fn max_posts(mut self, max: u32) -> Self {
+        self.max_posts = Some(max);
+        self
     }
 
     pub async fn collect(mut self) -> Result<Vec<Rule34Post>> {
@@ -583,8 +655,14 @@ impl Stream for PostStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.as_mut().get_mut();
+        if let Some(max) = this.max_posts
+            && this.yielded >= max
+        {
+            return Poll::Ready(None);
+        }
         loop {
             if let Some(post) = this.buffer.next() {
+                this.yielded = this.yielded.saturating_add(1);
                 return Poll::Ready(Some(Ok(post)));
             }
             match Pin::new(&mut this.pages).poll_next(cx) {
