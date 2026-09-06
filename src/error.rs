@@ -73,6 +73,10 @@ pub enum BooruError {
     /// I/O error occurred.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Download concurrency must be greater than zero.
+    #[error("Download concurrency must be greater than zero")]
+    InvalidConcurrency,
 }
 
 impl BooruError {

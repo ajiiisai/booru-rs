@@ -361,6 +361,12 @@ impl Downloader {
         use std::sync::Arc;
         use tokio::sync::Semaphore;
 
+        if concurrency == 0 {
+            return (0..posts.len())
+                .map(|_| Err(BooruError::InvalidConcurrency))
+                .collect();
+        }
+
         let semaphore = Arc::new(Semaphore::new(concurrency));
         let mut handles = Vec::with_capacity(posts.len());
 
@@ -467,5 +473,49 @@ mod tests {
 
         assert!(opts.overwrite);
         assert!(opts.filename_template.is_some());
+    }
+
+    #[tokio::test]
+    async fn zero_concurrency_returns_errors_without_waiting() {
+        struct TestPost;
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                1
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/1.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                Some(0)
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let posts = [TestPost, TestPost];
+        let results = Downloader::new()
+            .download_posts(&posts, Path::new("unused"), 0)
+            .await;
+
+        assert_eq!(results.len(), 2);
+        assert!(
+            results
+                .iter()
+                .all(|result| matches!(result, Err(BooruError::InvalidConcurrency)))
+        );
     }
 }
