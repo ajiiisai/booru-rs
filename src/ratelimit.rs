@@ -250,6 +250,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn clones_share_token_state() {
+        let limiter = RateLimiter::new(2, Duration::from_secs(1)).unwrap();
+        let clone = limiter.clone();
+
+        assert!(limiter.try_acquire().await);
+        assert!(clone.try_acquire().await);
+        assert!(!limiter.try_acquire().await);
+    }
+
+    #[tokio::test]
     async fn test_available() {
         let limiter = RateLimiter::new(5, Duration::from_secs(1)).unwrap();
 
