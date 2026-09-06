@@ -30,7 +30,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
@@ -42,6 +44,100 @@ pub struct CacheConfig {
     pub ttl: Duration,
     /// Maximum number of entries in the cache.
     pub max_entries: usize,
+}
+
+/// The operation represented by a cache entry.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CacheOperation {
+    /// A single-post lookup.
+    Post,
+    /// A post search.
+    Search,
+    /// A tag autocomplete request.
+    Autocomplete,
+    /// A provider-specific operation.
+    Custom(String),
+}
+
+/// A structured cache key scoped to one provider request.
+///
+/// Query terms retain their input order. Authentication identity is stored as
+/// a one-way fingerprint so raw credentials never appear in the key or its
+/// debug output.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct CacheKey {
+    endpoint: String,
+    operation: CacheOperation,
+    auth_fingerprint: Option<u64>,
+    query: Vec<String>,
+    continuation: Option<String>,
+}
+
+impl CacheKey {
+    /// Creates a key for a provider request.
+    #[must_use]
+    pub fn new<I, S>(
+        endpoint: impl Into<String>,
+        operation: CacheOperation,
+        auth_identity: Option<&str>,
+        query: I,
+        continuation: Option<String>,
+    ) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self {
+            endpoint: endpoint.into(),
+            operation,
+            auth_fingerprint: auth_identity.map(auth_fingerprint),
+            query: query.into_iter().map(Into::into).collect(),
+            continuation,
+        }
+    }
+
+    /// Returns the configured endpoint.
+    #[must_use]
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    /// Returns the operation represented by this key.
+    #[must_use]
+    pub fn operation(&self) -> &CacheOperation {
+        &self.operation
+    }
+
+    /// Returns the query terms in their original order.
+    #[must_use]
+    pub fn query(&self) -> &[String] {
+        &self.query
+    }
+
+    /// Returns the continuation token, if present.
+    #[must_use]
+    pub fn continuation(&self) -> Option<&str> {
+        self.continuation.as_deref()
+    }
+}
+
+impl std::fmt::Debug for CacheKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CacheKey")
+            .field("endpoint", &self.endpoint)
+            .field("operation", &self.operation)
+            .field("auth_fingerprint", &self.auth_fingerprint)
+            .field("query", &self.query)
+            .field("continuation", &self.continuation)
+            .finish()
+    }
+}
+
+fn auth_fingerprint(identity: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    identity.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl Default for CacheConfig {
@@ -401,5 +497,40 @@ mod tests {
         assert!(key.starts_with("danbooru:"));
         assert!(key.contains("limit=10"));
         assert!(key.contains("page=0"));
+    }
+
+    #[test]
+    fn scoped_cache_key_preserves_query_order() {
+        let first = CacheKey::new(
+            "https://example.test",
+            CacheOperation::Search,
+            Some("user-1"),
+            ["raw:a", "raw:b"],
+            Some("page-2".to_string()),
+        );
+        let second = CacheKey::new(
+            "https://example.test",
+            CacheOperation::Search,
+            Some("user-1"),
+            ["raw:b", "raw:a"],
+            Some("page-2".to_string()),
+        );
+
+        assert_ne!(first, second);
+        assert_eq!(first.query(), &["raw:a", "raw:b"]);
+        assert_eq!(first.continuation(), Some("page-2"));
+    }
+
+    #[test]
+    fn scoped_cache_key_debug_omits_auth_identity() {
+        let key = CacheKey::new(
+            "https://example.test",
+            CacheOperation::Post,
+            Some("secret-api-key"),
+            ["id=42"],
+            None,
+        );
+
+        assert!(!format!("{key:?}").contains("secret-api-key"));
     }
 }
