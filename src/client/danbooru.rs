@@ -164,6 +164,7 @@ impl Client {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Query {
     tags: Vec<String>,
+    raw_queries: Vec<String>,
     rating: Option<String>,
     sort: Option<String>,
     limit: u32,
@@ -179,6 +180,7 @@ impl Query {
     pub fn new() -> Self {
         Self {
             tags: Vec::new(),
+            raw_queries: Vec::new(),
             rating: None,
             sort: None,
             limit: 100,
@@ -187,6 +189,12 @@ impl Query {
 
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.tags.push(tag.into());
+        self
+    }
+
+    /// Adds a provider query expression without literal-tag validation.
+    pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
+        self.raw_queries.push(expression.into());
         self
     }
 
@@ -233,6 +241,11 @@ impl Query {
 
     pub fn validate(&self) -> Result<()> {
         super::validate_tags(&self.tags)?;
+        super::validate_raw_queries(
+            &self.raw_queries,
+            self.rating.is_some(),
+            self.sort.is_some(),
+        )?;
         if self.tags.len() > MAX_TAGS {
             return Err(BooruError::TagLimitExceeded {
                 client: "DanbooruClient",
@@ -254,6 +267,11 @@ pub struct Search {
 impl Search {
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.query = self.query.tag(tag);
+        self
+    }
+
+    pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
+        self.query = self.query.raw_query(expression);
         self
     }
 
@@ -357,6 +375,7 @@ impl Search {
         if let Some(sort) = &self.query.sort {
             tags.push(format!("{SORT_PREFIX}{sort}"));
         }
+        tags.extend(self.query.raw_queries.iter().cloned());
         let tags = tags.join(" ");
 
         let mut query = vec![

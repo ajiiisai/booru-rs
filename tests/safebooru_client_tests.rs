@@ -25,7 +25,7 @@ async fn search_sends_tags_and_limit_in_order() {
         .and(query_param("q", "index"))
         .and(query_param("pid", "0"))
         .and(query_param("limit", "2"))
-        .and(query_param("tags", "cat_ears"))
+        .and(query_param("tags", "cat_ears artist:foo bar"))
         .and(query_param("json", "1"))
         .respond_with(ResponseTemplate::new(200).set_body_string(posts_fixture()))
         .mount(&mock_server)
@@ -40,6 +40,7 @@ async fn search_sends_tags_and_limit_in_order() {
     let posts = client
         .search()
         .tag("cat_ears")
+        .raw_query("artist:foo bar")
         .limit(2)
         .send()
         .await
@@ -356,6 +357,23 @@ fn validate_preflight() {
     assert!(Query::new().tag("cat_ears").limit(5).validate().is_ok());
     assert!(Query::new().tag("cat ears").validate().is_err());
     assert!(Query::new().tag("").validate().is_err());
+}
+
+#[test]
+fn raw_query_allows_spaces_but_rejects_empty_expressions() {
+    assert!(Query::new().raw_query("artist:foo bar").validate().is_ok());
+    assert!(matches!(
+        Query::new().raw_query(" ").validate().unwrap_err(),
+        BooruError::InvalidQuery(_)
+    ));
+    assert!(matches!(
+        Query::new()
+            .rating(SafebooruRating::Safe)
+            .raw_query("rating:explicit")
+            .validate()
+            .unwrap_err(),
+        BooruError::InvalidQuery(_)
+    ));
 }
 
 #[tokio::test]

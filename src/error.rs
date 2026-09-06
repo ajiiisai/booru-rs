@@ -150,6 +150,10 @@ pub enum BooruError {
         reason: String,
     },
 
+    /// Query configuration is invalid.
+    #[error("Invalid query: {0}")]
+    InvalidQuery(String),
+
     /// Rate limit exceeded.
     #[error("Rate limit exceeded, please wait before making more requests")]
     RateLimited,

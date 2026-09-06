@@ -67,7 +67,7 @@ async fn search_sends_tags_limit_and_credentials() {
         .and(query_param("q", "index"))
         .and(query_param("pid", "0"))
         .and(query_param("limit", "10"))
-        .and(query_param("tags", "cat_ears"))
+        .and(query_param("tags", "cat_ears artist:foo bar"))
         .and(query_param("json", "1"))
         .and(query_param("api_key", "test_key"))
         .and(query_param("user_id", "test_user"))
@@ -80,6 +80,7 @@ async fn search_sends_tags_limit_and_credentials() {
     let posts = client
         .search()
         .tag("cat_ears")
+        .raw_query("artist:foo bar")
         .limit(10)
         .send()
         .await

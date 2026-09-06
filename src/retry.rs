@@ -128,6 +128,7 @@ pub fn is_retryable(error: &BooruError) -> bool {
         BooruError::InvalidUrl(_) => false,
         BooruError::Unauthorized(_) => false,
         BooruError::InvalidTag { .. } => false,
+        BooruError::InvalidQuery(_) => false,
         BooruError::RateLimited => true, // Rate limit errors can be retried after waiting
         BooruError::HttpStatus { status, .. } => *status == 429 || (500..600).contains(status),
         BooruError::Io(_) => false, // I/O errors are generally not retryable

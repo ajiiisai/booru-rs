@@ -96,6 +96,9 @@ let second = client.search_with(query).send().await?;
 
 Use `blacklist_tag("tag")` for a literal excluded tag and
 `exclude_rating(SafebooruRating::Explicit)` for a typed rating exclusion.
+Use `raw_query("artist:foo bar")` when a provider expression contains syntax
+that the typed query does not model. Raw rating and sort filters cannot be
+combined with their typed counterparts.
 
 ### Fetch a post
 

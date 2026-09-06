@@ -207,6 +207,49 @@ pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn validate_raw_queries(
+    expressions: &[String],
+    has_rating: bool,
+    has_sort: bool,
+) -> Result<()> {
+    if expressions
+        .iter()
+        .any(|expression| expression.trim().is_empty())
+    {
+        return Err(BooruError::InvalidQuery(
+            "raw query expressions must not be empty".to_string(),
+        ));
+    }
+    let contains_rating = expressions.iter().any(|expression| {
+        expression
+            .split_whitespace()
+            .any(|term| term.trim_start_matches('-').starts_with("rating:"))
+    });
+    if has_rating && contains_rating {
+        return Err(BooruError::InvalidQuery(
+            "raw rating filters cannot be combined with rating()".to_string(),
+        ));
+    }
+    let contains_sort = expressions.iter().any(|expression| {
+        expression.split_whitespace().any(|term| {
+            let term = term.trim_start_matches('-');
+            term.starts_with("sort:") || term.starts_with("order:")
+        })
+    });
+    if has_sort && contains_sort {
+        return Err(BooruError::InvalidQuery(
+            "raw sort filters cannot be combined with sort()".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Rejects an API response with an unsuccessful status before decoding.
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.

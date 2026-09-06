@@ -73,7 +73,7 @@ async fn search_sends_tags_limit_and_credentials() {
         .and(path("/posts.json"))
         .and(query_param("limit", "10"))
         .and(query_param("page", "1"))
-        .and(query_param("tags", "cat_ears"))
+        .and(query_param("tags", "cat_ears artist:foo bar"))
         .and(query_param("login", "test_user"))
         .and(query_param("api_key", "test_key"))
         .and(header("User-Agent", "booru-rs/0.3.0"))
@@ -86,6 +86,7 @@ async fn search_sends_tags_limit_and_credentials() {
     let posts = client
         .search()
         .tag("cat_ears")
+        .raw_query("artist:foo bar")
         .limit(10)
         .send()
         .await
