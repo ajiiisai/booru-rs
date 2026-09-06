@@ -116,6 +116,10 @@ impl Client {
     }
 
     async fn autocomplete_inner(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+
         let response = execute_with_policy(&self.policy, || async {
             Ok(self
                 .http

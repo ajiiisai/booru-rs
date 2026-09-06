@@ -84,6 +84,64 @@ mod mock_autocomplete {
     use super::*;
 
     #[tokio::test]
+    #[cfg(feature = "danbooru")]
+    async fn zero_limit_skips_danbooru_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::danbooru::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "gelbooru")]
+    async fn zero_limit_skips_gelbooru_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::gelbooru::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .set_credentials("test_key", "test_user")
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "rule34")]
+    async fn zero_limit_skips_rule34_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::rule34::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .set_credentials("test_key", "test_user")
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "safebooru")]
+    async fn zero_limit_skips_safebooru_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::safebooru::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
     async fn test_danbooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
