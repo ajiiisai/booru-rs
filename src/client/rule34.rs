@@ -93,22 +93,13 @@ impl Client {
     }
 
     pub async fn post(&self, id: u32) -> Result<Rule34Post> {
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("id", id.to_string()),
-            ("json", "1".to_string()),
-        ];
-        if let (Some(key), Some(user)) = (&self.key, &self.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
-
         let response = self
             .http
-            .get(format!("{}/index.php", self.endpoint))
-            .query(&query)
+            .get(super::dapi_url(&self.endpoint))
+            .query(&super::dapi_query(
+                &[("id", id.to_string())],
+                super::dapi_credentials(&self.key, &self.user),
+            ))
             .send()
             .await?;
 
@@ -330,24 +321,19 @@ impl Search {
         }
         let tags = tags.join(" ");
 
-        let mut query = vec![
-            ("page", "dapi".to_string()),
-            ("s", "post".to_string()),
-            ("q", "index".to_string()),
-            ("pid", self.page.to_string()),
-            ("limit", self.query.limit.to_string()),
-            ("tags", tags),
-            ("json", "1".to_string()),
-        ];
-        if let (Some(key), Some(user)) = (&self.client.key, &self.client.user) {
-            query.push(("api_key", key.clone()));
-            query.push(("user_id", user.clone()));
-        }
+        let query = super::dapi_query(
+            &[
+                ("pid", self.page.to_string()),
+                ("limit", self.query.limit.to_string()),
+                ("tags", tags),
+            ],
+            super::dapi_credentials(&self.client.key, &self.client.user),
+        );
 
         let response = self
             .client
             .http
-            .get(format!("{}/index.php", self.client.endpoint))
+            .get(super::dapi_url(&self.client.endpoint))
             .query(&query)
             .send()
             .await?;

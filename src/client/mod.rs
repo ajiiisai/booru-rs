@@ -91,6 +91,40 @@ pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
     Ok(trimmed.to_string())
 }
 
+pub(crate) fn dapi_url(endpoint: &str) -> String {
+    format!("{endpoint}/index.php")
+}
+
+pub(crate) fn dapi_credentials<'a>(
+    key: &'a Option<String>,
+    user: &'a Option<String>,
+) -> Option<(&'a String, &'a String)> {
+    match (key, user) {
+        (Some(key), Some(user)) => Some((key, user)),
+        _ => None,
+    }
+}
+
+pub(crate) fn dapi_query(
+    params: &[(&'static str, String)],
+    credentials: Option<(&String, &String)>,
+) -> Vec<(String, String)> {
+    let mut query: Vec<(String, String)> = vec![
+        ("page".to_string(), "dapi".to_string()),
+        ("s".to_string(), "post".to_string()),
+        ("q".to_string(), "index".to_string()),
+        ("json".to_string(), "1".to_string()),
+    ];
+    for (key, value) in params {
+        query.push(((*key).to_string(), value.clone()));
+    }
+    if let Some((key, user)) = credentials {
+        query.push(("api_key".to_string(), key.clone()));
+        query.push(("user_id".to_string(), user.clone()));
+    }
+    query
+}
+
 pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     for tag in tags {
         if tag.is_empty() {
