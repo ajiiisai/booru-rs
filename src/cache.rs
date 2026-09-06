@@ -156,6 +156,10 @@ where
     where
         V: Serialize,
     {
+        if self.config.max_entries == 0 {
+            return;
+        }
+
         let data = match serde_json::to_vec(value) {
             Ok(d) => d,
             Err(_) => return,
@@ -184,32 +188,29 @@ where
     where
         V: for<'de> Deserialize<'de>,
     {
-        // First check with read lock
-        {
+        let data = {
             let entries = self.entries.read().await;
-            if let Some(entry) = entries.get(key) {
-                if entry.is_expired() {
-                    drop(entries);
-                    self.remove(key).await;
-                    return None;
+            let entry = entries.get(key)?;
+            if entry.is_expired() {
+                drop(entries);
+                let mut entries = self.entries.write().await;
+                if entries.get(key).is_some_and(CacheEntry::is_expired) {
+                    entries.remove(key);
                 }
-
-                if let Ok(value) = serde_json::from_slice(&entry.data) {
-                    // We need to update last_accessed, so we'll do that below
-                    drop(entries);
-
-                    // Update last_accessed
-                    let mut entries = self.entries.write().await;
-                    if let Some(entry) = entries.get_mut(key) {
-                        entry.last_accessed = Instant::now();
-                    }
-
-                    return Some(value);
-                }
+                return None;
             }
-        }
+            entry.data.clone()
+        };
 
-        None
+        let value = serde_json::from_slice(&data).ok()?;
+        let mut entries = self.entries.write().await;
+        if let Some(entry) = entries.get_mut(key)
+            && !entry.is_expired()
+            && entry.data == data
+        {
+            entry.last_accessed = Instant::now();
+        }
+        Some(value)
     }
 
     /// Removes an entry from the cache.
@@ -364,6 +365,20 @@ mod tests {
         assert!(cache.contains_key(&"a".to_string()).await);
         assert!(!cache.contains_key(&"b".to_string()).await);
         assert!(cache.contains_key(&"c".to_string()).await);
+    }
+
+    #[tokio::test]
+    async fn zero_capacity_disables_cache() {
+        let cache = Cache::<String>::with_config(CacheConfig {
+            ttl: Duration::from_secs(60),
+            max_entries: 0,
+        });
+
+        cache.insert("key".to_string(), &"value").await;
+
+        assert!(cache.is_empty().await);
+        let value: Option<String> = cache.get(&"key".to_string()).await;
+        assert_eq!(value, None);
     }
 
     #[test]
