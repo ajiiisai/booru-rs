@@ -100,7 +100,8 @@ let second = client.search_with(query).send().await?;
 let post = client.post(12345).await?;
 ```
 
-A missing post returns `BooruError::PostNotFound`.
+A missing post has `BooruError::PostNotFound` as its source error. Provider
+operations add context around the source.
 
 ### Autocomplete
 
@@ -151,14 +152,20 @@ let result = Client::new()?
     .await;
 
 match result {
-    Err(BooruError::TagLimitExceeded { max, actual, .. }) => {
-        eprintln!("the query has {actual} tags, but the provider allows {max}");
+    Err(error) => match error.source_error() {
+        BooruError::TagLimitExceeded { max, actual, .. } => {
+            eprintln!("the query has {actual} tags, but the provider allows {max}");
+        }
+        _ if error.is_not_found() => eprintln!("post not found"),
+        _ => eprintln!("request failed: {error}"),
     }
-    Err(error) if error.is_not_found() => eprintln!("post not found"),
-    Err(error) => eprintln!("request failed: {error}"),
     Ok(_) => unreachable!(),
 }
 ```
+
+Provider errors include machine-readable provider and operation context. Use
+`context()` for that metadata, category helpers such as `is_not_found()` for
+common handling, and `source_error()` when matching a concrete error variant.
 
 ### Use common post accessors
 

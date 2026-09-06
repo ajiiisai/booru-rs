@@ -22,17 +22,19 @@ async fn main() {
 
     match result {
         Ok(_) => println!("Unexpected success"),
-        Err(BooruError::TagLimitExceeded {
-            client,
-            max,
-            actual,
-        }) => {
-            println!("✓ Caught TagLimitExceeded error:");
-            println!("  Client: {}", client);
-            println!("  Max allowed: {}", max);
-            println!("  Attempted: {}", actual);
-        }
-        Err(e) => println!("Unexpected error: {}", e),
+        Err(error) => match error.source_error() {
+            BooruError::TagLimitExceeded {
+                client,
+                max,
+                actual,
+            } => {
+                println!("Caught TagLimitExceeded error:");
+                println!("  Client: {client}");
+                println!("  Max allowed: {max}");
+                println!("  Attempted: {actual}");
+            }
+            _ => println!("Unexpected error: {error}"),
+        },
     }
 
     println!("\n=== Post Not Found ===\n");
@@ -42,11 +44,17 @@ async fn main() {
 
     match result {
         Ok(_) => println!("Unexpected success"),
-        Err(BooruError::PostNotFound(id)) => {
-            println!("✓ Caught PostNotFound error:");
-            println!("  Post ID: {}", id);
-        }
-        Err(e) => println!("Other error (API might return 404 differently): {}", e),
+        Err(error) => match error.source_error() {
+            BooruError::PostNotFound(id) => {
+                println!("Caught PostNotFound error:");
+                println!("  Post ID: {id}");
+                if let Some(context) = error.context() {
+                    println!("  Provider: {}", context.provider);
+                    println!("  Operation: {}", context.operation);
+                }
+            }
+            _ => println!("Other error: {error}"),
+        },
     }
 
     println!("\n=== Error Inspection Methods ===\n");
