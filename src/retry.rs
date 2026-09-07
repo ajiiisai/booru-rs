@@ -14,7 +14,11 @@ pub const DEFAULT_INITIAL_DELAY_MS: u64 = 100;
 pub const DEFAULT_MAX_DELAY_MS: u64 = 5000;
 
 /// Configuration for retry behavior.
+///
+/// New fields may be added in minor releases. Prefer the constructors and
+/// `with_*` methods instead of a literal.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct RetryConfig {
     /// Maximum number of retry attempts (0 = no retries).
     pub max_retries: u32,

@@ -25,7 +25,11 @@
 use serde::{Deserialize, Serialize};
 
 /// A tag suggestion from autocomplete.
+///
+/// New fields may be added in minor releases. Prefer `new` and `with_count`
+/// over a literal. Patterns can ignore the rest with `..`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TagSuggestion {
     /// The tag name (with underscores).
     pub name: String,

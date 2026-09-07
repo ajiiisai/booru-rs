@@ -1,4 +1,4 @@
-use booru_rs::error::{BooruError, ErrorContext, Operation, Provider};
+use booru_rs::error::{BooruError, Operation, Provider};
 use booru_rs::model::safebooru::SafebooruRating;
 use booru_rs::retry::RetryConfig;
 use booru_rs::safebooru::{Client, Query};
@@ -654,13 +654,9 @@ async fn invalid_json_is_parse_error() {
     let error = result.unwrap_err();
     assert!(error.is_parse_error());
     assert!(!error.is_network_error());
-    assert_eq!(
-        error.context(),
-        Some(ErrorContext {
-            provider: Provider::Safebooru,
-            operation: Operation::Search,
-        })
-    );
+    let context = error.context().expect("error must carry context");
+    assert_eq!(context.provider, Provider::Safebooru);
+    assert_eq!(context.operation, Operation::Search);
     assert!(error.to_string().starts_with("Safebooru search failed:"));
 }
 
@@ -809,13 +805,9 @@ async fn trait_post_preserves_error_context() {
         .unwrap_err();
 
     for error in [inherent_error, trait_error] {
-        assert_eq!(
-            error.context(),
-            Some(booru_rs::error::ErrorContext {
-                provider: booru_rs::error::Provider::Safebooru,
-                operation: booru_rs::error::Operation::Post,
-            })
-        );
+        let context = error.context().expect("error must carry context");
+        assert_eq!(context.provider, booru_rs::error::Provider::Safebooru);
+        assert_eq!(context.operation, booru_rs::error::Operation::Post);
         assert!(error.is_not_found());
         assert!(matches!(error.source_error(), BooruError::PostNotFound(42)));
     }

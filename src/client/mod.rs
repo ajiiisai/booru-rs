@@ -116,12 +116,23 @@ pub mod safebooru;
 pub mod stream;
 
 /// Result of one page fetched through the provider operation interface.
+///
+/// New fields may be added in minor releases. Read the fields you need
+/// instead of destructuring exhaustively.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct PageResult<P, C> {
     /// Posts returned by the provider, in wire order.
     pub posts: Vec<P>,
     /// Continuation for the next page, if one exists.
     pub next: Option<C>,
+}
+
+impl<P, C> PageResult<P, C> {
+    /// Creates a page result from posts and an optional continuation.
+    pub fn new(posts: Vec<P>, next: Option<C>) -> Self {
+        Self { posts, next }
+    }
 }
 
 /// Operation interface for generic provider callers and external adapters.
