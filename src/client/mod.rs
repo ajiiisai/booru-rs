@@ -356,6 +356,10 @@ pub struct RequestPolicy {
 }
 
 impl Default for RequestPolicy {
+    /// Disabled policy: no retries and no rate limiter.
+    ///
+    /// Enable retries with
+    /// `RequestPolicy::new().with_retry_config(RetryConfig::default())`.
     fn default() -> Self {
         Self {
             retry: RetryConfig::no_retry(),
@@ -365,7 +369,10 @@ impl Default for RequestPolicy {
 }
 
 impl RequestPolicy {
-    /// Creates a policy with retries disabled and no rate limiter.
+    /// Creates a disabled policy with no retries and no rate limiter.
+    ///
+    /// Enable retries with
+    /// `RequestPolicy::new().with_retry_config(RetryConfig::default())`.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
