@@ -492,6 +492,49 @@ pub(crate) fn validate_random_conflict(
     Ok(())
 }
 
+/// Maps a failed single-post lookup to `PostNotFound` on HTTP 404.
+///
+/// Providers with credential endpoints match their 401 arm first and fall
+/// through to this helper for everything else.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn map_post_lookup_error(error: BooruError, id: u32) -> BooruError {
+    match error {
+        BooruError::HttpStatus { status: 404, .. } => BooruError::PostNotFound(id),
+        error => error,
+    }
+}
+
+/// Computes the continuation page for [`Search::page`]-style pagination.
+///
+/// Returns the next page number unless the fetched page came back empty.
+/// Providers map the number back onto their own search type.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn advance_page(current: u32, empty: bool) -> Option<u32> {
+    current.checked_add(1).filter(|_| !empty)
+}
+
+/// Parses a post count from a label like `"cat_ears (177448)"`.
+#[cfg(any(feature = "gelbooru", feature = "rule34", feature = "safebooru"))]
+pub(crate) fn parse_post_count_from_label(label: &str) -> Option<u32> {
+    let start = label.rfind('(')?;
+    let end = label.rfind(')')?;
+    if start < end {
+        label[start + 1..end].parse().ok()
+    } else {
+        None
+    }
+}
+
 /// Rejects an API response with an unsuccessful status before decoding.
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.

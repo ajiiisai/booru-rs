@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use super::{RequestPolicy, Secret, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
-use crate::client::generic::{QueryCore, Sort};
+use crate::client::generic::{BuilderCore, QueryCore, Sort};
 use crate::error::{BooruError, Operation, Provider, Result, ResultContext};
 use crate::model::danbooru::*;
 use crate::ratelimit::RateLimiter;
@@ -122,10 +122,7 @@ impl Client {
         .await
         {
             Ok(response) => response,
-            Err(BooruError::HttpStatus { status: 404, .. }) => {
-                return Err(BooruError::PostNotFound(id));
-            }
-            Err(error) => return Err(error),
+            Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
         let post = response.json::<DanbooruPost>().await?;
@@ -363,18 +360,14 @@ impl Search {
         self.fetch().await
     }
 
-    pub async fn page(self) -> Result<Page> {
+    pub async fn page(self) -> Result<super::PageResult<DanbooruPost, Search>> {
         let posts = self.fetch().await?;
-        let next = self
-            .page
-            .checked_add(1)
-            .filter(|_| !posts.is_empty())
-            .map(|page| {
-                let mut next = self.clone();
-                next.page = page;
-                next
-            });
-        Ok(Page { posts, next })
+        let next = super::advance_page(self.page, posts.is_empty()).map(|page| {
+            let mut next = self.clone();
+            next.page = page;
+            next
+        });
+        Ok(super::PageResult { posts, next })
     }
 
     pub fn pages(self) -> PageStream {
@@ -422,11 +415,11 @@ impl Search {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Page {
-    pub posts: Vec<DanbooruPost>,
-    pub next: Option<Search>,
-}
+/// One fetched page of results.
+///
+/// Alias for the shared [`super::PageResult`] over this provider's post and
+/// search types. Returned by [`Search::page`] and yielded by [`PageStream`].
+pub type Page = super::PageResult<DanbooruPost, Search>;
 
 impl super::Client for Client {
     type Query = Query;
@@ -438,14 +431,10 @@ impl super::Client for Client {
         query: Self::Query,
         continuation: Option<Self::Continuation>,
     ) -> Result<super::PageResult<Self::Post, Self::Continuation>> {
-        let page = match continuation {
-            Some(search) => search.page().await?,
-            None => self.search_with(query).page().await?,
-        };
-        Ok(super::PageResult {
-            posts: page.posts,
-            next: page.next,
-        })
+        match continuation {
+            Some(search) => search.page().await,
+            None => self.search_with(query).page().await,
+        }
     }
 
     async fn post(&self, id: u32) -> Result<Self::Post> {
@@ -468,11 +457,9 @@ pub type PostStream = super::stream::PostStream<Client>;
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientBuilder {
-    http: Option<reqwest::Client>,
-    endpoint: Option<String>,
+    core: BuilderCore,
     key: Option<Secret>,
     user: Option<Secret>,
-    policy: Option<RequestPolicy>,
 }
 
 impl ClientBuilder {
@@ -480,7 +467,7 @@ impl ClientBuilder {
     ///
     /// Returns [`BooruError::InvalidUrl`] for blank, unparsable, or non-HTTP(S) endpoints.
     pub fn endpoint(mut self, url: impl Into<String>) -> Result<Self> {
-        self.endpoint = Some(super::validate_endpoint(&url.into())?);
+        self.core = self.core.endpoint(url)?;
         Ok(self)
     }
 
@@ -491,41 +478,43 @@ impl ClientBuilder {
     }
 
     pub fn http_client(mut self, client: reqwest::Client) -> Self {
-        self.http = Some(client);
+        self.core = self.core.http_client(client);
         self
     }
 
     /// Sets the request retry and rate-limit policy.
     #[must_use]
     pub fn request_policy(mut self, policy: RequestPolicy) -> Self {
-        self.policy = Some(policy);
+        self.core = self.core.request_policy(policy);
         self
     }
 
     /// Sets the retry configuration for requests made by this client.
     pub fn retry_config(mut self, config: RetryConfig) -> Result<Self> {
-        let policy = self.policy.take().unwrap_or_default();
-        self.policy = Some(policy.with_retry_config(config)?);
+        self.core = self.core.retry_config(config)?;
         Ok(self)
     }
 
     /// Sets the rate limiter for requests made by this client.
     #[must_use]
     pub fn rate_limiter(mut self, limiter: RateLimiter) -> Self {
-        let policy = self.policy.take().unwrap_or_default();
-        self.policy = Some(policy.with_rate_limiter(limiter));
+        self.core = self.core.rate_limiter(limiter);
         self
     }
 
     pub fn build(self) -> Result<Client> {
         Ok(Client {
-            http: self.http.unwrap_or_else(|| super::shared_client().clone()),
+            http: self
+                .core
+                .http
+                .unwrap_or_else(|| super::shared_client().clone()),
             endpoint: self
+                .core
                 .endpoint
                 .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string()),
             key: self.key,
             user: self.user,
-            policy: self.policy.unwrap_or_default(),
+            policy: self.core.policy.unwrap_or_default(),
         })
     }
 }

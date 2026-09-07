@@ -182,4 +182,61 @@ impl QueryCore {
     }
 }
 
-// =============================================================================
+/// Shared builder state behind provider clients.
+///
+/// Holds the HTTP client, endpoint, and request policy. Providers wrap this in
+/// their `ClientBuilder` so the configuration methods live in one place while
+/// `build()` and credential methods keep provider-specific types.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BuilderCore {
+    pub(crate) http: Option<reqwest::Client>,
+    pub(crate) endpoint: Option<String>,
+    pub(crate) policy: Option<super::RequestPolicy>,
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+impl BuilderCore {
+    pub(crate) fn endpoint(mut self, url: impl Into<String>) -> crate::error::Result<Self> {
+        self.endpoint = Some(super::validate_endpoint(&url.into())?);
+        Ok(self)
+    }
+
+    pub(crate) fn http_client(mut self, client: reqwest::Client) -> Self {
+        self.http = Some(client);
+        self
+    }
+
+    /// Sets the request retry and rate-limit policy.
+    pub(crate) fn request_policy(mut self, policy: super::RequestPolicy) -> Self {
+        self.policy = Some(policy);
+        self
+    }
+
+    /// Sets the retry configuration for requests made by this client.
+    pub(crate) fn retry_config(
+        mut self,
+        config: crate::retry::RetryConfig,
+    ) -> crate::error::Result<Self> {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_retry_config(config)?);
+        Ok(self)
+    }
+
+    /// Sets the rate limiter for requests made by this client.
+    pub(crate) fn rate_limiter(mut self, limiter: crate::ratelimit::RateLimiter) -> Self {
+        let policy = self.policy.take().unwrap_or_default();
+        self.policy = Some(policy.with_rate_limiter(limiter));
+        self
+    }
+}
