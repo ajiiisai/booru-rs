@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use super::{RequestPolicy, Secret, execute_with_policy};
 use crate::autocomplete::TagSuggestion;
-use crate::client::generic::Sort;
+use crate::client::generic::{QueryCore, Sort};
 use crate::error::{BooruError, Operation, Provider, Result, ResultContext};
 use crate::model::rule34::*;
 use crate::ratelimit::RateLimiter;
@@ -177,11 +177,7 @@ impl Client {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Query {
-    tags: Vec<String>,
-    raw_queries: Vec<String>,
-    rating: Option<String>,
-    sort: Option<String>,
-    limit: u32,
+    core: QueryCore,
 }
 
 impl Default for Query {
@@ -193,16 +189,12 @@ impl Default for Query {
 impl Query {
     pub fn new() -> Self {
         Self {
-            tags: Vec::new(),
-            raw_queries: Vec::new(),
-            rating: None,
-            sort: None,
-            limit: 100,
+            core: QueryCore::new(),
         }
     }
 
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
-        self.tags.push(tag.into());
+        self.core = self.core.tag(tag);
         self
     }
 
@@ -211,35 +203,42 @@ impl Query {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        for tag in tags {
-            self = self.tag(tag);
-        }
+        self.core = self.core.tags(tags);
         self
     }
 
     /// Adds a provider query expression without literal-tag validation.
     pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
-        self.raw_queries.push(expression.into());
+        self.core = self.core.raw_query(expression);
+        self
+    }
+
+    pub fn raw_queries<I, S>(mut self, expressions: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.core = self.core.raw_queries(expressions);
         self
     }
 
     pub fn rating(mut self, rating: Rule34Rating) -> Self {
-        self.rating = Some(rating.into());
+        self.core = self.core.rating(rating);
         self
     }
 
     pub fn sort(mut self, order: Sort) -> Self {
-        self.sort = Some(order.to_string());
+        self.core = self.core.sort(order.to_string());
         self
     }
 
     pub fn limit(mut self, limit: u32) -> Self {
-        self.limit = limit;
+        self.core = self.core.limit(limit);
         self
     }
 
     pub fn blacklist_tag(mut self, tag: impl AsRef<str>) -> Self {
-        self.tags.push(format!("-{}", tag.as_ref()));
+        self.core = self.core.blacklist_tag(tag);
         self
     }
 
@@ -248,30 +247,22 @@ impl Query {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        for tag in tags {
-            self = self.blacklist_tag(tag);
-        }
+        self.core = self.core.blacklist_tags(tags);
         self
     }
 
     pub fn exclude_rating(mut self, rating: Rule34Rating) -> Self {
-        self.tags.push(format!("-rating:{rating}"));
+        self.core = self.core.exclude_rating(rating);
         self
     }
 
     pub fn random(mut self) -> Self {
-        self.tags.push(format!("{SORT_PREFIX}random"));
+        self.core = self.core.random(SORT_PREFIX);
         self
     }
 
     pub fn validate(&self) -> Result<()> {
-        super::validate_tags(&self.tags)?;
-        super::validate_raw_queries(
-            &self.raw_queries,
-            self.rating.is_some(),
-            self.sort.is_some(),
-        )?;
-        super::validate_random_conflict(&self.tags, &self.raw_queries, self.sort.is_some())
+        self.core.validate_common()
     }
 }
 
@@ -299,6 +290,15 @@ impl Search {
 
     pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
         self.query = self.query.raw_query(expression);
+        self
+    }
+
+    pub fn raw_queries<I, S>(mut self, expressions: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.query = self.query.raw_queries(expressions);
         self
     }
 
@@ -385,20 +385,12 @@ impl Search {
 
     async fn fetch_inner(&self) -> Result<Vec<Rule34Post>> {
         self.query.validate()?;
-        let mut tags = self.query.tags.clone();
-        if let Some(rating) = &self.query.rating {
-            tags.push(format!("rating:{rating}"));
-        }
-        if let Some(sort) = &self.query.sort {
-            tags.push(format!("{SORT_PREFIX}{sort}"));
-        }
-        tags.extend(self.query.raw_queries.iter().cloned());
-        let tags = tags.join(" ");
+        let tags = self.query.core.assemble_tags(SORT_PREFIX);
 
         let query = super::dapi_query(
             &[
                 ("pid", self.page.to_string()),
-                ("limit", self.query.limit.to_string()),
+                ("limit", self.query.core.limit.to_string()),
                 ("tags", tags),
             ],
             super::dapi_credentials(&self.client.key, &self.client.user),

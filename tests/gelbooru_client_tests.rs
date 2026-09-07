@@ -746,3 +746,20 @@ fn multiple_tags_are_apended() {
 
     assert_eq!(search.query(), &expected);
 }
+
+#[test]
+fn raw_queries_are_appended() {
+    let search = Client::builder()
+        .build()
+        .expect("builder must succeed")
+        .search()
+        .raw_query("artist:foo")
+        .raw_queries(["score:>10", "sort:score"]);
+
+    let expected = Query::new()
+        .raw_query("artist:foo")
+        .raw_query("score:>10")
+        .raw_query("sort:score");
+
+    assert_eq!(search.query(), &expected);
+}
