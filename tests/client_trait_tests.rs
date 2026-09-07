@@ -95,3 +95,70 @@ async fn external_style_client_implements_operation_interface() {
     assert_eq!(posts.iter().map(Post::id).collect::<Vec<_>>(), vec![1, 2]);
     assert_eq!(Client::post(&client, 42).await.unwrap().id(), 42);
 }
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+mod builder_tests {
+    use booru_rs::client::Builder;
+    use booru_rs::ratelimit::RateLimiter;
+    use booru_rs::retry::RetryConfig;
+    use std::time::Duration;
+
+    fn build_with_endpoint<B: Builder>(builder: B) -> B::Client {
+        builder
+            .endpoint("https://example.com")
+            .unwrap()
+            .build()
+            .unwrap()
+    }
+
+    fn reject_bad_endpoint<B: Builder>(builder: B) {
+        assert!(builder.endpoint("not a url").is_err());
+    }
+
+    fn apply_policy<B: Builder>(builder: B) -> B::Client {
+        builder
+            .retry_config(RetryConfig::new(1).with_initial_delay(Duration::ZERO))
+            .unwrap()
+            .rate_limiter(RateLimiter::new(10, Duration::from_secs(1)).unwrap())
+            .http_client(reqwest::Client::new())
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    #[cfg(feature = "danbooru")]
+    fn danbooru_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::danbooru::Client::builder());
+        reject_bad_endpoint(booru_rs::danbooru::Client::builder());
+        apply_policy(booru_rs::danbooru::Client::builder());
+    }
+
+    #[test]
+    #[cfg(feature = "gelbooru")]
+    fn gelbooru_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::gelbooru::Client::builder());
+        reject_bad_endpoint(booru_rs::gelbooru::Client::builder());
+        apply_policy(booru_rs::gelbooru::Client::builder());
+    }
+
+    #[test]
+    #[cfg(feature = "rule34")]
+    fn rule34_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::rule34::Client::builder());
+        reject_bad_endpoint(booru_rs::rule34::Client::builder());
+        apply_policy(booru_rs::rule34::Client::builder());
+    }
+
+    #[test]
+    #[cfg(feature = "safebooru")]
+    fn safebooru_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::safebooru::Client::builder());
+        reject_bad_endpoint(booru_rs::safebooru::Client::builder());
+        apply_policy(booru_rs::safebooru::Client::builder());
+    }
+}

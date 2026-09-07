@@ -148,6 +148,166 @@ pub trait Client {
     async fn post(&self, id: u32) -> Result<Self::Post>;
 }
 
+/// Shared builder interface for generic provider callers.
+///
+/// Each provider keeps its inherent `ClientBuilder` with the same fluent
+/// methods. Implementations of this trait expose the common subset so generic
+/// code can configure any provider without naming it. Credential methods stay
+/// provider specific and are not part of this trait.
+///
+/// # Example
+///
+/// ```no_run
+/// use booru_rs::client::Builder;
+///
+/// fn build<B: Builder>(builder: B) -> booru_rs::Result<B::Client> {
+///     builder.build()
+/// }
+/// ```
+pub trait Builder: Default + Sized {
+    /// Provider client produced by [`Builder::build`].
+    type Client: Client;
+
+    /// Sets a custom API endpoint after validating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BooruError::InvalidUrl`] for blank, unparsable, or
+    /// non-HTTP(S) endpoints.
+    fn endpoint(self, url: impl Into<String>) -> Result<Self>;
+
+    /// Uses a custom HTTP client instead of the shared one.
+    fn http_client(self, client: reqwest::Client) -> Self;
+
+    /// Sets the request retry and rate-limit policy.
+    fn request_policy(self, policy: RequestPolicy) -> Self;
+
+    /// Sets the retry configuration for requests made by this client.
+    fn retry_config(self, config: RetryConfig) -> Result<Self>;
+
+    /// Sets the rate limiter for requests made by this client.
+    fn rate_limiter(self, limiter: RateLimiter) -> Self;
+
+    /// Builds the configured client.
+    fn build(self) -> Result<Self::Client>;
+}
+
+#[cfg(feature = "danbooru")]
+impl Builder for danbooru::ClientBuilder {
+    type Client = danbooru::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
+#[cfg(feature = "gelbooru")]
+impl Builder for gelbooru::ClientBuilder {
+    type Client = gelbooru::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
+#[cfg(feature = "rule34")]
+impl Builder for rule34::ClientBuilder {
+    type Client = rule34::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
+#[cfg(feature = "safebooru")]
+impl Builder for safebooru::ClientBuilder {
+    type Client = safebooru::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
 /// Shared HTTP client with connection pooling and timeouts.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
