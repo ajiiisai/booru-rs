@@ -285,6 +285,50 @@ pub(crate) fn validate_raw_queries(
     Ok(())
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+pub(crate) fn validate_random_conflict(
+    tags: &[String],
+    expressions: &[String],
+    has_sort: bool,
+) -> Result<()> {
+    let random_count = tags
+        .iter()
+        .filter(|tag| {
+            let term = tag.trim();
+            term == "order:random" || term == "sort:random"
+        })
+        .count();
+    if random_count > 1 {
+        return Err(BooruError::InvalidQuery(
+            "random() must not be repeated".to_string(),
+        ));
+    }
+    if random_count == 1 {
+        if has_sort {
+            return Err(BooruError::InvalidQuery(
+                "random() cannot be combined with sort()".to_string(),
+            ));
+        }
+        let raw_contains_sort = expressions.iter().any(|expression| {
+            expression.split_whitespace().any(|term| {
+                let term = term.trim_start_matches('-');
+                term.starts_with("sort:") || term.starts_with("order:")
+            })
+        });
+        if raw_contains_sort {
+            return Err(BooruError::InvalidQuery(
+                "random() cannot be combined with raw sort filters".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Rejects an API response with an unsuccessful status before decoding.
 ///
 /// Failures become [`BooruError::HttpStatus`] with a bounded body excerpt.
@@ -409,7 +453,7 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     feature = "safebooru"
 ))]
 mod tests {
-    use super::parse_retry_after;
+    use super::{parse_retry_after, validate_random_conflict};
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
     use std::time::Duration;
 
@@ -427,5 +471,29 @@ mod tests {
         headers.insert(RETRY_AFTER, HeaderValue::from_static("tomorrow"));
 
         assert_eq!(parse_retry_after(&headers), None);
+    }
+
+    #[test]
+    fn random_rejects_sort_and_repeats() {
+        assert!(validate_random_conflict(&["sort:random".to_string()], &[], false).is_ok());
+        assert!(validate_random_conflict(&["order:random".to_string()], &[], false).is_ok());
+        assert!(validate_random_conflict(&[], &[], false).is_ok());
+        assert!(validate_random_conflict(&["sort:random".to_string()], &[], true).is_err());
+        assert!(
+            validate_random_conflict(
+                &["sort:random".to_string()],
+                &["sort:score".to_string()],
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            validate_random_conflict(
+                &["sort:random".to_string(), "sort:random".to_string()],
+                &[],
+                false
+            )
+            .is_err()
+        );
     }
 }

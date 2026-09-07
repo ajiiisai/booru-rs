@@ -276,6 +276,7 @@ impl Query {
             self.rating.is_some(),
             self.sort.is_some(),
         )?;
+        super::validate_random_conflict(&self.tags, &self.raw_queries, self.sort.is_some())?;
         if self.tags.len() > MAX_TAGS {
             return Err(BooruError::TagLimitExceeded {
                 client: "DanbooruClient",
