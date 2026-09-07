@@ -770,3 +770,36 @@ fn post_serializes_and_round_trips() {
     let restored: SafebooruPost = serde_json::from_str(&json).unwrap();
     assert_eq!(restored, post);
 }
+
+#[tokio::test]
+async fn trait_post_preserves_error_context() {
+    let mock_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(2)
+        .mount(&mock_server)
+        .await;
+
+    let client = Client::builder()
+        .endpoint(mock_server.uri())
+        .unwrap()
+        .build()
+        .unwrap();
+    let inherent_error = client.post(42).await.unwrap_err();
+    let trait_error = booru_rs::client::Client::post(&client, 42)
+        .await
+        .unwrap_err();
+
+    for error in [inherent_error, trait_error] {
+        assert_eq!(
+            error.context(),
+            Some(booru_rs::error::ErrorContext {
+                provider: booru_rs::error::Provider::Safebooru,
+                operation: booru_rs::error::Operation::Post,
+            })
+        );
+        assert!(error.is_not_found());
+        assert!(matches!(error.source_error(), BooruError::PostNotFound(42)));
+    }
+}

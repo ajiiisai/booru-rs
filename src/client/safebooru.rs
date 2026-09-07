@@ -460,7 +460,7 @@ impl super::Client for Client {
     }
 
     async fn post(&self, id: u32) -> Result<Self::Post> {
-        self.post_inner(id).await
+        Client::post(self, id).await
     }
 }
 
