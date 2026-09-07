@@ -239,6 +239,17 @@ impl Query {
         self
     }
 
+    pub fn tags<I, S>(mut self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        for tag in tags {
+            self = self.tag(tag);
+        }
+        self
+    }
+
     /// Adds a provider query expression without literal-tag validation.
     pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
         self.raw_queries.push(expression.into());
@@ -306,6 +317,15 @@ pub struct Search {
 impl Search {
     pub fn tag(mut self, tag: impl Into<String>) -> Self {
         self.query = self.query.tag(tag);
+        self
+    }
+
+    pub fn tags<I, S>(mut self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.query = self.query.tags(tags);
         self
     }
 
