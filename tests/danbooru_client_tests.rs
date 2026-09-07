@@ -146,6 +146,23 @@ fn validate_preflight() {
     assert!(Query::new().tag("cat ears").validate().is_err());
 }
 
+#[test]
+fn random_rejects_sort_conflicts() {
+    use booru_rs::client::generic::Sort;
+
+    assert!(Query::new().random().validate().is_ok());
+    assert!(Query::new().sort(Sort::Score).validate().is_ok());
+    assert!(Query::new().random().sort(Sort::Score).validate().is_err());
+    assert!(Query::new().random().random().validate().is_err());
+    assert!(
+        Query::new()
+            .random()
+            .raw_query("order:score")
+            .validate()
+            .is_err()
+    );
+}
+
 #[tokio::test]
 async fn post_decodes_object_and_sends_credentials() {
     let mock_server = MockServer::start().await;

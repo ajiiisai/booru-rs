@@ -275,7 +275,8 @@ impl Query {
             &self.raw_queries,
             self.rating.is_some(),
             self.sort.is_some(),
-        )
+        )?;
+        super::validate_random_conflict(&self.tags, &self.raw_queries, self.sort.is_some())
     }
 }
 

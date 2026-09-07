@@ -315,6 +315,23 @@ fn validate_preflight() {
 }
 
 #[test]
+fn random_rejects_sort_conflicts() {
+    use booru_rs::client::generic::Sort;
+
+    assert!(Query::new().random().validate().is_ok());
+    assert!(Query::new().sort(Sort::Score).validate().is_ok());
+    assert!(Query::new().random().sort(Sort::Score).validate().is_err());
+    assert!(Query::new().random().random().validate().is_err());
+    assert!(
+        Query::new()
+            .random()
+            .raw_query("sort:score")
+            .validate()
+            .is_err()
+    );
+}
+
+#[test]
 fn default_client_builds() {
     assert!(Client::new().is_ok());
 }

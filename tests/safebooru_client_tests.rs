@@ -360,6 +360,23 @@ fn validate_preflight() {
 }
 
 #[test]
+fn random_rejects_sort_conflicts() {
+    use booru_rs::client::generic::Sort;
+
+    assert!(Query::new().random().validate().is_ok());
+    assert!(Query::new().sort(Sort::Score).validate().is_ok());
+    assert!(Query::new().random().sort(Sort::Score).validate().is_err());
+    assert!(Query::new().random().random().validate().is_err());
+    assert!(
+        Query::new()
+            .random()
+            .raw_query("sort:score")
+            .validate()
+            .is_err()
+    );
+}
+
+#[test]
 fn raw_query_allows_spaces_but_rejects_empty_expressions() {
     assert!(Query::new().raw_query("artist:foo bar").validate().is_ok());
     assert!(matches!(
