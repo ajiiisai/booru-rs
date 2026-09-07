@@ -207,7 +207,7 @@ let result = downloader.download_post(&post, Path::new("./downloads")).await?;
 println!("saved {} bytes to {}", result.size, result.path.display());
 ```
 
-`download_posts` accepts a concurrency limit and returns one result per input post in input order. Dropping the future or stream cancels in-flight work.
+`download_posts` accepts a concurrency limit and returns one result per input post in input order. Use `download_posts_with_progress` for per post progress updates with the same ordering. Dropping the future or stream cancels in-flight work.
 
 Gelbooru's image servers can redirect downloads to an HTML post page unless the
 request includes a `Referer` header. Configure a downloader for Gelbooru like this:

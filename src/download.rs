@@ -57,6 +57,35 @@ fn filename_from_url(url: &str) -> Result<String> {
     Ok(filename)
 }
 
+fn is_rejected_download_content_type(content_type: &str) -> bool {
+    let media_type = content_type.split(';').next().unwrap_or_default().trim();
+    if media_type.is_empty() || media_type.eq_ignore_ascii_case("image/svg+xml") {
+        return false;
+    }
+    let lower = media_type.to_ascii_lowercase();
+    lower.starts_with("text/")
+        || lower == "application/json"
+        || lower == "application/xml"
+        || lower == "application/xhtml+xml"
+        || lower.ends_with("+xml")
+        || lower.contains("html")
+}
+
+fn extension_from_url(url: &str) -> String {
+    if let Ok(parsed) = reqwest::Url::parse(url)
+        && let Some(mut segments) = parsed.path_segments()
+        && let Some(last) = segments.rfind(|segment| !segment.is_empty())
+        && let Some(dot) = last.rfind('.')
+    {
+        let ext = &last[dot + 1..];
+        if !ext.is_empty() && ext.len() <= 10 && ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return ext.to_string();
+        }
+        return "jpg".to_string();
+    }
+    "jpg".to_string()
+}
+
 async fn stream_response_to_file(
     response: reqwest::Response,
     dest_path: &Path,
@@ -70,15 +99,11 @@ async fn stream_response_to_file(
         .headers()
         .get(CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
+        && is_rejected_download_content_type(content_type)
     {
-        let media_type = content_type.split(';').next().unwrap_or_default().trim();
-        if media_type.eq_ignore_ascii_case("text/html")
-            || media_type.eq_ignore_ascii_case("application/xhtml+xml")
-        {
-            return Err(BooruError::UnexpectedDownloadContentType(
-                content_type.to_string(),
-            ));
-        }
+        return Err(BooruError::UnexpectedDownloadContentType(
+            content_type.to_string(),
+        ));
     }
 
     let parent = dest_path.parent().unwrap_or_else(|| Path::new("."));
@@ -438,6 +463,36 @@ impl Downloader {
         dest_dir: &Path,
         concurrency: usize,
     ) -> Vec<Result<DownloadResult>> {
+        self.download_posts_inner(posts, dest_dir, concurrency, None)
+            .await
+    }
+
+    /// Downloads multiple posts concurrently with progress updates.
+    ///
+    /// Returns results in the same order as the input posts.
+    pub async fn download_posts_with_progress<F>(
+        &self,
+        posts: &[impl Post + Sync],
+        dest_dir: &Path,
+        concurrency: usize,
+        on_progress: F,
+    ) -> Vec<Result<DownloadResult>>
+    where
+        F: Fn(DownloadProgress) + Send + Sync + 'static,
+    {
+        let progress: std::sync::Arc<dyn Fn(DownloadProgress) + Send + Sync> =
+            std::sync::Arc::new(on_progress);
+        self.download_posts_inner(posts, dest_dir, concurrency, Some(progress))
+            .await
+    }
+
+    async fn download_posts_inner(
+        &self,
+        posts: &[impl Post + Sync],
+        dest_dir: &Path,
+        concurrency: usize,
+        progress: Option<std::sync::Arc<dyn Fn(DownloadProgress) + Send + Sync>>,
+    ) -> Vec<Result<DownloadResult>> {
         use std::collections::HashMap;
         use std::sync::Arc;
         use tokio::sync::Semaphore;
@@ -489,12 +544,14 @@ impl Downloader {
             }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let url = post.file_url().unwrap().to_string();
+            let post_id = post.id();
             let filename = filenames[index].take().unwrap();
             let dest = dest_dir.to_path_buf();
             let client = self.client.clone();
             let options = self.options.clone();
             let timeout = self.timeout;
             let headers = self.headers.clone();
+            let progress = progress.clone();
 
             let task = tasks.spawn(async move {
                 let _permit = permit;
@@ -523,8 +580,14 @@ impl Downloader {
                         .error_for_status()
                         .map_err(BooruError::from)?;
 
-                    stream_response_to_file(response, &dest_path, options.overwrite, None, None)
-                        .await
+                    stream_response_to_file(
+                        response,
+                        &dest_path,
+                        options.overwrite,
+                        Some(post_id),
+                        progress.as_deref(),
+                    )
+                    .await
                 }
                 .await;
                 (index, result)
@@ -556,19 +619,13 @@ impl Downloader {
     }
 
     fn generate_filename(&self, post: &impl Post, url: &str) -> String {
-        let ext = url
-            .rsplit('.')
-            .next()
-            .unwrap_or("jpg")
-            .split('?')
-            .next()
-            .unwrap_or("jpg");
+        let ext = extension_from_url(url);
 
         if let Some(template) = &self.options.filename_template {
             let mut filename = template.clone();
             filename = filename.replace("{id}", &post.id().to_string());
             filename = filename.replace("{md5}", post.md5().unwrap_or("unknown"));
-            filename = filename.replace("{ext}", ext);
+            filename = filename.replace("{ext}", &ext);
             filename
         } else {
             format!("{}.{}", post.id(), ext)
@@ -626,6 +683,10 @@ mod tests {
                 .download_posts(&[DownloadPost(url.to_string())], dest, 1)
                 .await
                 .remove(0),
+            3 => downloader
+                .download_posts_with_progress(&[DownloadPost(url.to_string())], dest, 1, |_| {})
+                .await
+                .remove(0),
             _ => unreachable!(),
         }
     }
@@ -639,6 +700,8 @@ mod tests {
             "text/html",
             "Text/HTML; charset=UTF-8",
             "application/xhtml+xml",
+            "text/plain",
+            "application/json",
         ] {
             let server = MockServer::start().await;
             Mock::given(method("GET"))
@@ -647,7 +710,7 @@ mod tests {
                 )
                 .mount(&server)
                 .await;
-            for mode in 0..3 {
+            for mode in 0..4 {
                 let dest = tempfile::tempdir().unwrap();
                 let error = download_using(
                     &Downloader::new(),
@@ -678,7 +741,7 @@ mod tests {
             .respond_with(
                 ResponseTemplate::new(200).set_body_raw(b"image bytes".to_vec(), "image/jpeg"),
             )
-            .expect(3)
+            .expect(4)
             .mount(&server)
             .await;
         let mut defaults = HeaderMap::new();
@@ -693,7 +756,7 @@ mod tests {
         let downloader = Downloader::with_client(client)
             .with_headers(headers)
             .with_timeout(std::time::Duration::from_secs(7));
-        for mode in 0..3 {
+        for mode in 0..4 {
             let dest = tempfile::tempdir().unwrap();
             let result = download_using(
                 &downloader,
@@ -737,6 +800,50 @@ mod tests {
         ));
         assert_eq!(std::fs::read(target).unwrap(), b"existing image");
         assert_eq!(std::fs::read_dir(dest.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn rejected_content_types_cover_text_and_data() {
+        for content_type in [
+            "text/html",
+            "text/plain; charset=utf-8",
+            "application/json",
+            "application/xml",
+            "application/xhtml+xml",
+        ] {
+            assert!(
+                is_rejected_download_content_type(content_type),
+                "{content_type}"
+            );
+        }
+        for content_type in [
+            "image/jpeg",
+            "video/mp4",
+            "application/octet-stream",
+            "image/svg+xml; charset=utf-8",
+        ] {
+            assert!(
+                !is_rejected_download_content_type(content_type),
+                "{content_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn extension_falls_back_to_jpg_without_path_extension() {
+        assert_eq!(
+            extension_from_url("https://example.com/media/image.jpg"),
+            "jpg"
+        );
+        assert_eq!(
+            extension_from_url("https://example.com/media/image.png?token=secret"),
+            "png"
+        );
+        assert_eq!(extension_from_url("https://example.com/image"), "jpg");
+        assert_eq!(
+            extension_from_url("https://example.com/file?md5=abc"),
+            "jpg"
+        );
     }
 
     #[test]
@@ -1112,6 +1219,80 @@ mod tests {
 
         assert!(results[0].is_ok());
         assert!(matches!(results[1], Err(BooruError::MissingMediaUrl(2))));
+    }
+
+    #[tokio::test]
+    async fn batch_progress_reports_post_ids_in_input_order() {
+        use std::sync::{Arc, Mutex};
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct TestPost {
+            id: u32,
+            url: String,
+        }
+
+        impl Post for TestPost {
+            fn id(&self) -> u32 {
+                self.id
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.url)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/a.jpg"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1, 2, 3]))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/b.jpg"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![4, 5]))
+            .mount(&server)
+            .await;
+        let destination = tempfile::tempdir().unwrap();
+        let posts = [
+            TestPost {
+                id: 7,
+                url: format!("{}/a.jpg", server.uri()),
+            },
+            TestPost {
+                id: 9,
+                url: format!("{}/b.jpg", server.uri()),
+            },
+        ];
+        let seen: Arc<Mutex<Vec<u32>>> = Arc::new(Mutex::new(Vec::new()));
+        let seen_task = seen.clone();
+        let results = Downloader::new()
+            .download_posts_with_progress(&posts, destination.path(), 2, move |progress| {
+                seen_task.lock().unwrap().push(progress.post_id);
+            })
+            .await;
+
+        assert!(results.iter().all(|result| result.is_ok()));
+        let mut seen = seen.lock().unwrap().clone();
+        seen.sort_unstable();
+        assert_eq!(seen, vec![7, 9]);
     }
 
     #[tokio::test]
