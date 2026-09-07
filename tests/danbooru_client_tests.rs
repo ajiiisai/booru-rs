@@ -76,7 +76,7 @@ async fn search_sends_tags_limit_and_credentials() {
         .and(query_param("tags", "cat_ears artist:foo bar"))
         .and(query_param("login", "test_user"))
         .and(query_param("api_key", "test_key"))
-        .and(header("User-Agent", "booru-rs/0.3.0"))
+        .and(header("User-Agent", concat!("booru-rs/", env!("CARGO_PKG_VERSION"))))
         .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[7654321])))
         .mount(&mock_server)
         .await;

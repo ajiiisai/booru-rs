@@ -19,7 +19,7 @@ fn get_headers() -> HeaderMap {
     let mut headers = HeaderMap::with_capacity(1);
     headers.insert(
         header::USER_AGENT,
-        HeaderValue::from_static("booru-rs/0.3.0"),
+        HeaderValue::from_static(concat!("booru-rs/", env!("CARGO_PKG_VERSION"))),
     );
     headers
 }
