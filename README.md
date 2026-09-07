@@ -209,6 +209,27 @@ println!("saved {} bytes to {}", result.size, result.path.display());
 
 `download_posts` accepts a concurrency limit and returns one result per input post in input order. Dropping the future or stream cancels in-flight work.
 
+Gelbooru's image servers can redirect downloads to an HTML post page unless the
+request includes a `Referer` header. Configure a downloader for Gelbooru like this:
+
+```rust
+use booru_rs::download::Downloader;
+use reqwest::header::{HeaderMap, HeaderValue, REFERER};
+
+let mut headers = HeaderMap::new();
+headers.insert(REFERER, HeaderValue::from_static("https://gelbooru.com"));
+let downloader = Downloader::new().with_headers(headers);
+```
+
+These headers apply to every request from this downloader, including batch
+downloads. They override matching defaults from `Downloader::with_client`.
+Calling `with_headers` again replaces the previously configured headers.
+
+Downloads return `BooruError::UnexpectedDownloadContentType` when the response's
+`Content-Type` is `text/html` or `application/xhtml+xml`, including after a
+redirect. Rejected responses do not create or overwrite destination files.
+Other content types and responses without `Content-Type` remain accepted.
+
 ## Authentication
 
 Pass credentials to a provider builder. The builder validates the endpoint and returns a client from `build()`:
