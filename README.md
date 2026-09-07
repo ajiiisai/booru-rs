@@ -8,12 +8,11 @@ An async Rust client for Danbooru, Gelbooru, Safebooru, and Rule34.
 
 - Provider clients with typed ratings and provider-specific models
 - Fluent searches with preflight validation
-- Owned queries that you can save and run again
-- Single-post requests, autocomplete, page streams, and post streams
-- Shared HTTP clients with configurable retries and rate limits
-- Typed in-memory caching with expiration
-- Optional image downloads with bounded concurrency and progress callbacks
-- A common `Post` trait for code that handles more than one provider
+- Reusable owned queries, single post lookups, autocomplete, and async streams
+- Shared HTTP clients with opt-in retries and rate limits
+- Opt-in in-memory caching with expiration
+- Optional image downloads with concurrency limits, progress, and MD5 checks
+- `Post`, `Client`, and `Builder` traits for code that spans providers
 
 ## Supported sites
 
@@ -26,6 +25,8 @@ An async Rust client for Danbooru, Gelbooru, Safebooru, and Rule34.
 
 Gelbooru and Rule34 require API credentials for requests. See the [authentication section](#authentication).
 
+Adding a new provider? See the [new provider guide](docs/new-provider.md).
+
 ## Installation
 
 Add the crate and a Tokio runtime to your `Cargo.toml`:
@@ -36,14 +37,14 @@ booru-rs = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-The default feature set includes all four providers. Select only the providers you use when you want a smaller dependency tree:
+The default feature set includes all four providers. Pick providers to trim dependencies:
 
 ```toml
 [dependencies]
 booru-rs = { version = "1", default-features = false, features = ["danbooru"] }
 ```
 
-Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`, and `live-tests`. Enable `download` when you use `booru_rs::download`:
+Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`, and `live-tests`. For downloads:
 
 ```toml
 booru-rs = { version = "1", default-features = false, features = ["safebooru", "download"] }
@@ -55,7 +56,7 @@ The 1.x release changes the client, query, error, model, and download APIs. Foll
 
 ## Quick start
 
-Each provider has its own client and model types. A search keeps its filters separate from the reusable client:
+Each provider has its own client and models. Filters live on the search, not the client:
 
 ```rust
 use booru_rs::danbooru::{Client, DanbooruRating};
@@ -85,7 +86,7 @@ async fn main() -> booru_rs::Result<()> {
 
 ### Reuse a query
 
-`Query` is an owned value. Build it once when an application runs the same search more than once:
+`Query` is owned. Build it once, run it many times:
 
 ```rust
 use booru_rs::safebooru::{Client, Query};
@@ -108,12 +109,11 @@ combined with their typed counterparts.
 let post = client.post(12345).await?;
 ```
 
-A missing post has `BooruError::PostNotFound` as its source error. Provider
-operations add context around the source.
+A missing post surfaces as `BooruError::PostNotFound` through `source_error()`.
 
 ### Autocomplete
 
-Autocomplete uses the client endpoint and takes an explicit maximum result count:
+Autocomplete takes an explicit result limit:
 
 ```rust
 let suggestions = client.autocomplete("cat_", 10).await?;
@@ -135,7 +135,7 @@ if let Some(next_search) = page.next {
 }
 ```
 
-Use `pages()` or `posts()` when you want a stream. Both streams stop at an empty page and can enforce a bound:
+Use `pages()` or `posts()` for streams. Both stop at an empty page and accept a bound:
 
 ```rust
 let mut posts = client.search().tag("landscape").posts().max_posts(500);
@@ -171,13 +171,11 @@ match result {
 }
 ```
 
-Provider errors include machine-readable provider and operation context. Use
-`context()` for that metadata, category helpers such as `is_not_found()` for
-common handling, and `source_error()` when matching a concrete error variant.
+Use `context()` for provider and operation metadata, `is_not_found()` style helpers for common cases, and `source_error()` to match concrete variants.
 
 ### Use common post accessors
 
-Provider models keep their provider-specific fields. Implementations of `booru_rs::model::Post` expose the shared fields:
+Models keep provider-specific fields. `Post` exposes the shared ones:
 
 ```rust
 use booru_rs::model::Post;
@@ -187,6 +185,18 @@ fn print_post(post: &impl Post) {
     for tag in post.tags_iter() {
         println!("{tag}");
     }
+}
+```
+
+### Write generic code
+
+`Client` and `Builder` cover every provider, so one function can configure and query any of them:
+
+```rust
+use booru_rs::client::Builder;
+
+fn build<B: Builder>(builder: B) -> booru_rs::Result<B::Client> {
+    builder.build()
 }
 ```
 
@@ -207,10 +217,9 @@ let result = downloader.download_post(&post, Path::new("./downloads")).await?;
 println!("saved {} bytes to {}", result.size, result.path.display());
 ```
 
-`download_posts` accepts a concurrency limit and returns one result per input post in input order. Use `download_posts_with_progress` for per post progress updates with the same ordering. Dropping the future or stream cancels in-flight work.
+`download_posts` takes a concurrency limit and returns one result per post in input order. `download_posts_with_progress` adds per post progress. Dropping either future cancels in-flight work.
 
-Gelbooru's image servers can redirect downloads to an HTML post page unless the
-request includes a `Referer` header. Configure a downloader for Gelbooru like this:
+Gelbooru image servers may redirect to an HTML post page without a `Referer` header:
 
 ```rust
 use booru_rs::download::Downloader;
@@ -221,22 +230,15 @@ headers.insert(REFERER, HeaderValue::from_static("https://gelbooru.com"));
 let downloader = Downloader::new().with_headers(headers);
 ```
 
-These headers apply to every request from this downloader, including batch
-downloads. They override matching defaults from `Downloader::with_client`.
-Calling `with_headers` again replaces the previously configured headers.
+These headers apply to every request from this downloader and override matching client defaults. Calling `with_headers` again replaces them.
 
-Downloads return `BooruError::UnexpectedDownloadContentType` when the response's
-`Content-Type` looks like an error page instead of media, including after a
-redirect. Rejected responses do not create or overwrite destination files.
-Responses without `Content-Type` remain accepted.
+Error pages are rejected as `UnexpectedDownloadContentType` without creating files. Responses without a header are accepted.
 
-Use `DownloadOptions::default().verify_md5()` to check downloaded bytes
-against the post MD5 when available. Mismatched files are removed and reported
-as `BooruError::Md5Mismatch`.
+Pass `DownloadOptions::default().verify_md5()` to check bytes against the post hash. Mismatches are removed and reported as `Md5Mismatch`.
 
 ## Authentication
 
-Pass credentials to a provider builder. The builder validates the endpoint and returns a client from `build()`:
+Pass credentials to a provider builder:
 
 ```rust
 use booru_rs::gelbooru::Client;
@@ -250,7 +252,7 @@ Use `Rule34` in the same way. Keep credentials in application configuration and 
 
 ## Test against live APIs
 
-The live contract tests are ignored by default. Run them when you want to check the provider adapters against their current APIs:
+Live contract tests are ignored by default. Run them to check the adapters against current APIs:
 
 ```sh
 export BOORU_RS_LIVE_GELBOORU_API_KEY="your_gelbooru_api_key"
