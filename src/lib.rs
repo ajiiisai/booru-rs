@@ -14,9 +14,9 @@
 //! - **Common trait**: Use the [`Post`] trait for generic code across booru sites
 //! - **Async streams**: Paginate through results with async iterators
 //! - **Image downloads**: Download images with progress tracking and concurrent downloads
-//! - **Automatic retries**: Transient failures are retried with exponential backoff
+//! - **Opt-in retries**: Retry transient failures with exponential backoff via `RequestPolicy`
 //! - **Rate limiting**: Protect against API throttling
-//! - **Response caching**: Reduce redundant API calls
+//! - **Opt-in response caching**: Reduce redundant API calls with `Cache`
 //! - **Tag validation**: Catch common mistakes before making requests
 //! - **Tag autocomplete**: Get tag suggestions as users type
 //!

@@ -154,7 +154,9 @@ fn auth_fingerprint(identity: &str) -> u64 {
 }
 
 impl Default for CacheConfig {
-    /// Default configuration: caching disabled.
+    /// Disabled configuration: `Cache` stores nothing.
+    ///
+    /// Use `CacheConfig::short_lived` or `CacheConfig::long_lived` to enable it.
     fn default() -> Self {
         Self {
             ttl: Duration::from_secs(300),
@@ -164,6 +166,12 @@ impl Default for CacheConfig {
 }
 
 impl CacheConfig {
+    /// Creates a disabled cache that stores nothing.
+    #[must_use]
+    pub fn disabled() -> Self {
+        Self::default()
+    }
+
     /// Creates a short-lived cache suitable for real-time data.
     #[must_use]
     pub fn short_lived() -> Self {
@@ -243,7 +251,10 @@ impl<K> Cache<K>
 where
     K: Eq + Hash + Clone + Send + Sync,
 {
-    /// Creates a new cache with default configuration.
+    /// Creates a disabled cache that stores nothing.
+    ///
+    /// Use `Cache::with_config` with `CacheConfig::short_lived` or
+    /// `CacheConfig::long_lived` to enable storage.
     #[must_use]
     pub fn new() -> Self {
         Self::with_config(CacheConfig::default())
@@ -524,11 +535,14 @@ mod tests {
 
     #[tokio::test]
     async fn default_cache_is_disabled() {
-        let cache = Cache::<String>::new();
+        for cache in [
+            Cache::<String>::new(),
+            Cache::with_config(CacheConfig::disabled()),
+        ] {
+            cache.insert("key".to_string(), &"value").await.unwrap();
 
-        cache.insert("key".to_string(), &"value").await.unwrap();
-
-        assert!(cache.is_empty().await);
+            assert!(cache.is_empty().await);
+        }
     }
 
     #[test]
