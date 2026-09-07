@@ -227,6 +227,7 @@ fn describe(post: &impl Post) {
 Several provider fields now preserve missing or unknown wire values:
 
 - `SafebooruPost::height` is `Option<u32>`. Use `unwrap_or(0)` or handle `None` explicitly.
+- `GelbooruPost::file_url` and `SafebooruPost::file_url`, `preview_url`, and `sample_url` are `Option<String>`. Check the value before building a download request.
 - `Rule34Post::file_url`, `preview_url`, and `sample_url` are `Option<String>`. Check the value before building a download request.
 - Danbooru, Gelbooru, and Rule34 post ratings use provider post-rating enums that preserve unknown response values. Match the known variant or use `Display` when the exact classification is not required.
 - `Rule34Post::parent_id` maps the provider's `0` sentinel to `None`.
