@@ -162,3 +162,121 @@ mod builder_tests {
         apply_policy(booru_rs::safebooru::Client::builder());
     }
 }
+
+/// Proves every provider exposes the same query and search surface.
+///
+/// Copy one block per new provider following `docs/new-provider.md`. A
+/// missing method fails to compile, which is the point. No block sends a
+/// request: futures are built and dropped without polling.
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru"
+))]
+mod surface_tests {
+    use booru_rs::client::generic::Sort;
+
+    #[test]
+    #[cfg(feature = "danbooru")]
+    fn danbooru_matches_provider_surface() {
+        use booru_rs::danbooru::{Client, DanbooruRating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("cat")
+            .tags(["pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(DanbooruRating::General)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(DanbooruRating::Explicit);
+        // Danbooru allows 2 tags including negations, so validate the
+        // chain shape on a query inside the limit instead.
+        let query = booru_rs::danbooru::Query::new()
+            .tag("cat")
+            .rating(DanbooruRating::General)
+            .sort(Sort::Score)
+            .limit(10);
+        assert!(query.validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
+
+    #[test]
+    #[cfg(feature = "gelbooru")]
+    fn gelbooru_matches_provider_surface() {
+        use booru_rs::gelbooru::{Client, GelbooruRating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("cat")
+            .tags(["smile", "pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(GelbooruRating::General)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(GelbooruRating::Explicit);
+        assert!(search.query().validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
+
+    #[test]
+    #[cfg(feature = "safebooru")]
+    fn safebooru_matches_provider_surface() {
+        use booru_rs::safebooru::{Client, SafebooruRating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("cat")
+            .tags(["smile", "pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(SafebooruRating::Safe)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(SafebooruRating::Explicit);
+        assert!(search.query().validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
+
+    #[test]
+    #[cfg(feature = "rule34")]
+    fn rule34_matches_provider_surface() {
+        use booru_rs::rule34::{Client, Rule34Rating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("1girl")
+            .tags(["smile", "pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(Rule34Rating::General)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(Rule34Rating::Explicit);
+        assert!(search.query().validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
+}
