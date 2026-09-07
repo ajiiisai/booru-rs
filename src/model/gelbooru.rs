@@ -74,8 +74,9 @@ pub struct GelbooruPost {
     pub height: u32,
     /// Post's image md5
     pub md5: String,
-    /// Post's image file url
-    pub file_url: String,
+    /// Post's image file url, if available.
+    #[serde(default)]
+    pub file_url: Option<String>,
     /// Post's tags
     pub tags: String,
     /// Post's image name (with extension)

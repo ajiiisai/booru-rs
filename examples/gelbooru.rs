@@ -58,7 +58,11 @@ async fn main() -> Result<()> {
     for post in &posts {
         println!(
             "  #{}: {}x{} - score:{} - {}",
-            post.id, post.width, post.height, post.score, post.file_url
+            post.id,
+            post.width,
+            post.height,
+            post.score,
+            post.file_url.as_deref().unwrap_or("(no url)")
         );
     }
 
@@ -75,7 +79,11 @@ async fn main() -> Result<()> {
 
     println!("Random posts:");
     for post in &random_posts {
-        println!("  #{}: {}", post.id, post.file_url);
+        println!(
+            "  #{}: {}",
+            post.id,
+            post.file_url.as_deref().unwrap_or("(no url)")
+        );
     }
 
     Ok(())

@@ -119,7 +119,7 @@ impl Post for gelbooru::GelbooruPost {
     }
 
     fn file_url(&self) -> Option<&str> {
-        Some(&self.file_url)
+        self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
     fn tags(&self) -> &str {
@@ -158,7 +158,7 @@ impl Post for safebooru::SafebooruPost {
     }
 
     fn file_url(&self) -> Option<&str> {
-        Some(&self.file_url)
+        self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
     fn tags(&self) -> &str {

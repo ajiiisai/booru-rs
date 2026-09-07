@@ -22,12 +22,15 @@ pub struct SafebooruPost {
     pub image: String,
     /// Directory number where the image is stored
     pub directory: u32,
-    /// Full URL to the image file
-    pub file_url: String,
-    /// URL to the preview/thumbnail image
-    pub preview_url: String,
-    /// URL to the sample (resized) image
-    pub sample_url: String,
+    /// Full URL to the image file, if available.
+    #[serde(default)]
+    pub file_url: Option<String>,
+    /// URL to the preview/thumbnail image, if available.
+    #[serde(default)]
+    pub preview_url: Option<String>,
+    /// URL to the sample (resized) image, if available.
+    #[serde(default)]
+    pub sample_url: Option<String>,
     /// Source URL for the original artwork
     #[serde(default)]
     pub source: String,

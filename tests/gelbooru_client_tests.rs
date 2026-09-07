@@ -670,6 +670,31 @@ async fn trait_post_preserves_error_context() {
 }
 
 #[test]
+fn post_allows_missing_file_url() {
+    use booru_rs::gelbooru::GelbooruPost;
+    use booru_rs::model::Post;
+
+    let fixture: serde_json::Value =
+        serde_json::from_str::<serde_json::Value>(&posts_json(&[1])).unwrap()["post"][0].clone();
+    for null_value in [false, true] {
+        let mut value = fixture.clone();
+        if null_value {
+            value["file_url"] = serde_json::Value::Null;
+        } else {
+            value.as_object_mut().unwrap().remove("file_url");
+        }
+        let post: GelbooruPost = serde_json::from_value(value).unwrap();
+        assert_eq!(post.file_url, None);
+        assert_eq!(post.file_url(), None);
+    }
+
+    let mut value = fixture.clone();
+    value["file_url"] = "".into();
+    let post: GelbooruPost = serde_json::from_value(value).unwrap();
+    assert_eq!(post.file_url(), None);
+}
+
+#[test]
 fn multiple_tags_validation_succeeds() {
     let search = Client::builder()
         .build()

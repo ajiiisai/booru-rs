@@ -805,6 +805,34 @@ async fn trait_post_preserves_error_context() {
 }
 
 #[test]
+fn post_allows_missing_media_urls() {
+    use booru_rs::model::Post;
+    use booru_rs::safebooru::SafebooruPost;
+
+    let fixture: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    for null_value in [false, true] {
+        let mut value = fixture[0].clone();
+        for field in ["file_url", "preview_url", "sample_url"] {
+            if null_value {
+                value[field] = serde_json::Value::Null;
+            } else {
+                value.as_object_mut().unwrap().remove(field);
+            }
+        }
+        let post: SafebooruPost = serde_json::from_value(value).unwrap();
+        assert_eq!(post.file_url, None);
+        assert_eq!(post.preview_url, None);
+        assert_eq!(post.sample_url, None);
+        assert_eq!(post.file_url(), None);
+    }
+
+    let mut value = fixture[0].clone();
+    value["file_url"] = "".into();
+    let post: SafebooruPost = serde_json::from_value(value).unwrap();
+    assert_eq!(post.file_url(), None);
+}
+
+#[test]
 fn multiple_tags_validation_succeeds() {
     let search = Client::builder()
         .build()
