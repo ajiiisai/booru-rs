@@ -1,8 +1,3 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-use futures_core::Stream;
 use serde::Deserialize;
 
 use super::{RequestPolicy, Secret, execute_with_policy};
@@ -403,21 +398,11 @@ impl Search {
     }
 
     pub fn pages(self) -> PageStream {
-        PageStream {
-            search: Some(self),
-            pending: None,
-            fetched: 0,
-            max_pages: None,
-        }
+        PageStream::new(self.client.clone(), self.query.clone(), Some(self))
     }
 
     pub fn posts(self) -> PostStream {
-        PostStream {
-            pages: self.pages(),
-            buffer: Vec::new().into_iter(),
-            yielded: 0,
-            max_posts: None,
-        }
+        PostStream::new(self.pages())
     }
 
     async fn fetch(&self) -> Result<Vec<GelbooruPost>> {
@@ -504,121 +489,18 @@ impl super::Client for Client {
     }
 }
 
-pub struct PageStream {
-    search: Option<Search>,
-    pending: Option<Pin<Box<dyn Future<Output = Result<Page>> + Send>>>,
-    fetched: u32,
-    max_pages: Option<u32>,
-}
+/// Stream of result pages for [`Search::pages`].
+///
+/// Alias for the shared [`super::stream::PageStream`] over this provider. Pages
+/// stop at an empty page and can be bounded with `max_pages`.
+pub type PageStream = super::stream::PageStream<Client>;
 
-impl PageStream {
-    pub async fn next(&mut self) -> Option<Result<Page>> {
-        std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
-    }
-
-    pub fn max_pages(mut self, max: u32) -> Self {
-        self.max_pages = Some(max);
-        self
-    }
-}
-
-impl Stream for PageStream {
-    type Item = Result<Page>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.as_mut().get_mut();
-        if let Some(max) = this.max_pages
-            && this.fetched >= max
-        {
-            this.search = None;
-            this.pending = None;
-            return Poll::Ready(None);
-        }
-        loop {
-            if let Some(mut pending) = this.pending.take() {
-                match pending.as_mut().poll(cx) {
-                    Poll::Ready(result) => match result {
-                        Ok(page) => {
-                            this.fetched = this.fetched.saturating_add(1);
-                            if page.posts.is_empty() {
-                                this.search = None;
-                                return Poll::Ready(None);
-                            }
-                            this.search = page.next.clone();
-                            return Poll::Ready(Some(Ok(page)));
-                        }
-                        Err(error) => {
-                            this.search = None;
-                            return Poll::Ready(Some(Err(error)));
-                        }
-                    },
-                    Poll::Pending => {
-                        this.pending = Some(pending);
-                        return Poll::Pending;
-                    }
-                }
-            }
-
-            let Some(search) = this.search.take() else {
-                return Poll::Ready(None);
-            };
-            this.pending = Some(Box::pin(async move { search.page().await }));
-        }
-    }
-}
-
-pub struct PostStream {
-    pages: PageStream,
-    buffer: std::vec::IntoIter<GelbooruPost>,
-    yielded: u32,
-    max_posts: Option<u32>,
-}
-
-impl PostStream {
-    pub async fn next(&mut self) -> Option<Result<GelbooruPost>> {
-        std::future::poll_fn(|cx| Pin::new(&mut *self).poll_next(cx)).await
-    }
-
-    pub fn max_posts(mut self, max: u32) -> Self {
-        self.max_posts = Some(max);
-        self
-    }
-
-    pub async fn collect(mut self) -> Result<Vec<GelbooruPost>> {
-        let mut posts = Vec::new();
-        while let Some(result) = self.next().await {
-            posts.push(result?);
-        }
-        Ok(posts)
-    }
-}
-
-impl Stream for PostStream {
-    type Item = Result<GelbooruPost>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.as_mut().get_mut();
-        if let Some(max) = this.max_posts
-            && this.yielded >= max
-        {
-            return Poll::Ready(None);
-        }
-        loop {
-            if let Some(post) = this.buffer.next() {
-                this.yielded = this.yielded.saturating_add(1);
-                return Poll::Ready(Some(Ok(post)));
-            }
-            match Pin::new(&mut this.pages).poll_next(cx) {
-                Poll::Ready(Some(Ok(page))) => {
-                    this.buffer = page.posts.into_iter();
-                }
-                Poll::Ready(Some(Err(error))) => return Poll::Ready(Some(Err(error))),
-                Poll::Ready(None) => return Poll::Ready(None),
-                Poll::Pending => return Poll::Pending,
-            }
-        }
-    }
-}
+/// Stream of individual posts for [`Search::posts`].
+///
+/// Alias for the shared [`super::stream::PostStream`] over this provider.
+/// Yields posts across pages and can be bounded with `max_posts` or collected
+/// with `collect`.
+pub type PostStream = super::stream::PostStream<Client>;
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientBuilder {
