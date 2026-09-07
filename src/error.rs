@@ -123,6 +123,17 @@ pub enum BooruError {
     #[error("Download returned HTML instead of media (Content-Type: {0})")]
     UnexpectedDownloadContentType(String),
 
+    /// A downloaded file failed MD5 verification.
+    #[error("MD5 mismatch for post {id}: expected {expected}, got {actual}")]
+    Md5Mismatch {
+        /// Post whose file failed verification.
+        id: u32,
+        /// Expected MD5 hex from the post metadata.
+        expected: String,
+        /// Actual MD5 hex of the downloaded bytes.
+        actual: String,
+    },
+
     /// A spawned download task failed before returning its result.
     #[error("Download task failed: {0}")]
     DownloadTaskFailed(String),

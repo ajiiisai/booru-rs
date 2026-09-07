@@ -164,6 +164,26 @@ pub struct DownloadOptions {
     pub overwrite: bool,
     /// Custom filename template. Use `{id}`, `{md5}`, `{ext}` as placeholders.
     pub filename_template: Option<String>,
+    /// Whether to verify downloaded bytes against the post MD5.
+    ///
+    /// Disabled by default. When enabled, posts without MD5 metadata still
+    /// download without verification, and already skipped files are not read.
+    pub verify_md5: bool,
+}
+
+async fn verify_download_md5(path: &Path, id: u32, expected: &str) -> Result<()> {
+    let bytes = tokio::fs::read(path).await?;
+    let actual = format!("{:x}", md5::compute(&bytes));
+    if actual.eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        let _ = tokio::fs::remove_file(path).await;
+        Err(BooruError::Md5Mismatch {
+            id,
+            expected: expected.to_string(),
+            actual,
+        })
+    }
 }
 
 impl DownloadOptions {
@@ -183,6 +203,17 @@ impl DownloadOptions {
     #[must_use]
     pub fn filename(mut self, template: impl Into<String>) -> Self {
         self.filename_template = Some(template.into());
+        self
+    }
+
+    /// Verify downloaded bytes against the post MD5 hash when available.
+    ///
+    /// Mismatched files are removed and reported as
+    /// `BooruError::Md5Mismatch`. Files that already existed and were
+    /// skipped are not read.
+    #[must_use]
+    pub fn verify_md5(mut self) -> Self {
+        self.verify_md5 = true;
         self
     }
 }
@@ -432,7 +463,14 @@ impl Downloader {
             .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
-        self.download_url(url, dest_dir, Some(&filename)).await
+        let result = self.download_url(url, dest_dir, Some(&filename)).await?;
+        if self.options.verify_md5
+            && !result.skipped
+            && let Some(expected) = post.md5()
+        {
+            verify_download_md5(&result.path, post.id(), expected).await?;
+        }
+        Ok(result)
     }
 
     /// Downloads an image from a post with progress updates.
@@ -450,8 +488,16 @@ impl Downloader {
             .ok_or_else(|| BooruError::MissingMediaUrl(post.id()))?;
 
         let filename = self.generate_filename(post, url);
-        self.download_url_with_progress(url, dest_dir, Some(&filename), post.id(), on_progress)
-            .await
+        let result = self
+            .download_url_with_progress(url, dest_dir, Some(&filename), post.id(), on_progress)
+            .await?;
+        if self.options.verify_md5
+            && !result.skipped
+            && let Some(expected) = post.md5()
+        {
+            verify_download_md5(&result.path, post.id(), expected).await?;
+        }
+        Ok(result)
     }
 
     /// Downloads multiple posts concurrently.
@@ -545,6 +591,7 @@ impl Downloader {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let url = post.file_url().unwrap().to_string();
             let post_id = post.id();
+            let expected_md5 = post.md5().map(str::to_string);
             let filename = filenames[index].take().unwrap();
             let dest = dest_dir.to_path_buf();
             let client = self.client.clone();
@@ -580,14 +627,21 @@ impl Downloader {
                         .error_for_status()
                         .map_err(BooruError::from)?;
 
-                    stream_response_to_file(
+                    let result = stream_response_to_file(
                         response,
                         &dest_path,
                         options.overwrite,
                         Some(post_id),
                         progress.as_deref(),
                     )
-                    .await
+                    .await?;
+                    if options.verify_md5
+                        && !result.skipped
+                        && let Some(expected) = &expected_md5
+                    {
+                        verify_download_md5(&result.path, post_id, expected).await?;
+                    }
+                    Ok(result)
                 }
                 .await;
                 (index, result)
@@ -851,16 +905,19 @@ mod tests {
         let opts = DownloadOptions::default();
         assert!(!opts.overwrite);
         assert!(opts.filename_template.is_none());
+        assert!(!opts.verify_md5);
     }
 
     #[test]
     fn test_download_options_builder() {
         let opts = DownloadOptions::default()
             .overwrite()
-            .filename("{id}_{md5}.{ext}".to_string());
+            .filename("{id}_{md5}.{ext}".to_string())
+            .verify_md5();
 
         assert!(opts.overwrite);
         assert!(opts.filename_template.is_some());
+        assert!(opts.verify_md5);
     }
 
     #[test]
@@ -1293,6 +1350,113 @@ mod tests {
         let mut seen = seen.lock().unwrap().clone();
         seen.sort_unstable();
         assert_eq!(seen, vec![7, 9]);
+    }
+
+    #[tokio::test]
+    async fn md5_verification_accepts_match_and_rejects_mismatch() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        struct Md5Post {
+            id: u32,
+            url: String,
+            md5: Option<String>,
+        }
+
+        impl Post for Md5Post {
+            fn id(&self) -> u32 {
+                self.id
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.url)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                self.md5.as_deref()
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(b"image bytes".to_vec(), "image/jpeg"),
+            )
+            .mount(&server)
+            .await;
+        let matching = "bebb32c1d5592c44df47d1826cacc09b".to_string();
+
+        let dest = tempfile::tempdir().unwrap();
+        let post = Md5Post {
+            id: 1,
+            url: format!("{}/a.jpg", server.uri()),
+            md5: Some(matching.clone()),
+        };
+        let result = Downloader::new()
+            .options(DownloadOptions::default().verify_md5())
+            .download_post(&post, dest.path())
+            .await
+            .unwrap();
+        assert!(!result.skipped);
+        assert_eq!(std::fs::read(&result.path).unwrap(), b"image bytes");
+
+        let dest = tempfile::tempdir().unwrap();
+        let post = Md5Post {
+            id: 2,
+            url: format!("{}/b.jpg", server.uri()),
+            md5: Some("00000000000000000000000000000000".to_string()),
+        };
+        let error = Downloader::new()
+            .options(DownloadOptions::default().verify_md5())
+            .download_post(&post, dest.path())
+            .await
+            .unwrap_err();
+        assert!(matches!(error, BooruError::Md5Mismatch { id: 2, .. }));
+        assert_eq!(std::fs::read_dir(dest.path()).unwrap().count(), 0);
+
+        let dest = tempfile::tempdir().unwrap();
+        let post = Md5Post {
+            id: 3,
+            url: format!("{}/c.jpg", server.uri()),
+            md5: Some("00000000000000000000000000000000".to_string()),
+        };
+        let result = Downloader::new()
+            .download_post(&post, dest.path())
+            .await
+            .unwrap();
+        assert!(!result.skipped);
+
+        let dest = tempfile::tempdir().unwrap();
+        let posts = [
+            Md5Post {
+                id: 4,
+                url: format!("{}/d.jpg", server.uri()),
+                md5: Some(matching),
+            },
+            Md5Post {
+                id: 5,
+                url: format!("{}/e.jpg", server.uri()),
+                md5: None,
+            },
+        ];
+        let results = Downloader::new()
+            .options(DownloadOptions::default().verify_md5())
+            .download_posts(&posts, dest.path(), 2)
+            .await;
+        assert!(results.iter().all(|result| result.is_ok()));
     }
 
     #[tokio::test]

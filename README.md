@@ -226,9 +226,13 @@ downloads. They override matching defaults from `Downloader::with_client`.
 Calling `with_headers` again replaces the previously configured headers.
 
 Downloads return `BooruError::UnexpectedDownloadContentType` when the response's
-`Content-Type` is `text/html` or `application/xhtml+xml`, including after a
+`Content-Type` looks like an error page instead of media, including after a
 redirect. Rejected responses do not create or overwrite destination files.
-Other content types and responses without `Content-Type` remain accepted.
+Responses without `Content-Type` remain accepted.
+
+Use `DownloadOptions::default().verify_md5()` to check downloaded bytes
+against the post MD5 when available. Mismatched files are removed and reported
+as `BooruError::Md5Mismatch`.
 
 ## Authentication
 
