@@ -58,14 +58,11 @@ impl Client for FakeClient {
         continuation: Option<Self::Continuation>,
     ) -> booru_rs::Result<PageResult<Self::Post, Self::Continuation>> {
         match continuation {
-            None => Ok(PageResult {
-                posts: vec![FakePost { id: 1 }],
-                next: Some(FakeContinuation(1)),
-            }),
-            Some(FakeContinuation(1)) => Ok(PageResult {
-                posts: vec![FakePost { id: 2 }],
-                next: None,
-            }),
+            None => Ok(PageResult::new(
+                vec![FakePost { id: 1 }],
+                Some(FakeContinuation(1)),
+            )),
+            Some(FakeContinuation(1)) => Ok(PageResult::new(vec![FakePost { id: 2 }], None)),
             Some(FakeContinuation(_)) => unreachable!(),
         }
     }

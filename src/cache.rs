@@ -11,10 +11,7 @@
 //!
 //! # async fn example() -> Result<(), booru_rs::cache::CacheError> {
 //! // Create a cache with 5-minute TTL and 1000 max entries
-//! let cache: Cache<String> = Cache::with_config(CacheConfig {
-//!     ttl: Duration::from_secs(300),
-//!     max_entries: 1000,
-//! });
+//! let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
 //!
 //! // Check cache before making request
 //! let key = "danbooru:cat_ears:limit=10".to_string();
@@ -39,7 +36,11 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 /// Configuration for the cache.
+///
+/// New fields may be added in minor releases. Prefer the `short_lived`,
+/// `long_lived`, and `disabled` constructors instead of a literal.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct CacheConfig {
     /// Time-to-live for cache entries.
     pub ttl: Duration,

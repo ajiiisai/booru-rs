@@ -158,7 +158,11 @@ async fn stream_response_to_file(
 }
 
 /// Options for configuring downloads.
+///
+/// New fields may be added in minor releases. Use `DownloadOptions::default`
+/// with the builder methods instead of a literal.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct DownloadOptions {
     /// Whether to overwrite existing files.
     pub overwrite: bool,
@@ -219,7 +223,11 @@ impl DownloadOptions {
 }
 
 /// Result of a download operation.
+///
+/// New fields may be added in minor releases. Read the fields you need
+/// instead of destructuring exhaustively.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DownloadResult {
     /// Path where the file was saved.
     pub path: PathBuf,
@@ -230,7 +238,11 @@ pub struct DownloadResult {
 }
 
 /// Progress information for a download.
+///
+/// New fields may be added in minor releases. Read the fields you need
+/// instead of destructuring exhaustively.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct DownloadProgress {
     /// Total bytes to download (if known).
     pub total: Option<u64>,

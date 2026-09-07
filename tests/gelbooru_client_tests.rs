@@ -674,13 +674,9 @@ async fn trait_post_preserves_error_context() {
         .unwrap_err();
 
     for error in [inherent_error, trait_error] {
-        assert_eq!(
-            error.context(),
-            Some(booru_rs::error::ErrorContext {
-                provider: booru_rs::error::Provider::Gelbooru,
-                operation: booru_rs::error::Operation::Post,
-            })
-        );
+        let context = error.context().expect("error must carry context");
+        assert_eq!(context.provider, booru_rs::error::Provider::Gelbooru);
+        assert_eq!(context.operation, booru_rs::error::Operation::Post);
         assert!(error.is_not_found());
         assert!(matches!(error.source_error(), BooruError::PostNotFound(42)));
     }

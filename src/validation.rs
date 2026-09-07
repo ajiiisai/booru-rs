@@ -21,7 +21,11 @@ use crate::error::{BooruError, Result};
 use std::borrow::Cow;
 
 /// Result of validating a tag.
+///
+/// New fields may be added in minor releases. Read the fields you need
+/// instead of destructuring exhaustively.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TagValidation {
     /// The original tag.
     pub original: String,

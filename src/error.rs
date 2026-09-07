@@ -51,7 +51,11 @@ impl std::fmt::Display for Operation {
 }
 
 /// Machine-readable context for a provider API failure.
+///
+/// New fields may be added in minor releases. Read the fields you need
+/// instead of destructuring exhaustively.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ErrorContext {
     /// Provider whose operation failed.
     pub provider: Provider,
