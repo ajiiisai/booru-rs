@@ -2,6 +2,8 @@
 //!
 //! This module provides helpers for downloading images from booru posts,
 //! with support for progress tracking and concurrent downloads.
+//! Responses labeled `text/html` or `application/xhtml+xml` are rejected before
+//! writing a file. Other content types, including missing headers, are accepted.
 //!
 //! # Example
 //!
@@ -25,6 +27,7 @@
 
 use crate::error::{BooruError, Result};
 use crate::model::Post;
+use reqwest::header::{CONTENT_TYPE, HeaderMap};
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
@@ -62,6 +65,21 @@ async fn stream_response_to_file(
     on_progress: Option<&(dyn Fn(DownloadProgress) + Send + Sync)>,
 ) -> Result<DownloadResult> {
     use futures_core::Stream;
+
+    if let Some(content_type) = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+    {
+        let media_type = content_type.split(';').next().unwrap_or_default().trim();
+        if media_type.eq_ignore_ascii_case("text/html")
+            || media_type.eq_ignore_ascii_case("application/xhtml+xml")
+        {
+            return Err(BooruError::UnexpectedDownloadContentType(
+                content_type.to_string(),
+            ));
+        }
+    }
 
     let parent = dest_path.parent().unwrap_or_else(|| Path::new("."));
     let temp = tempfile::NamedTempFile::new_in(parent)?;
@@ -183,6 +201,7 @@ pub type ProgressCallback = Box<dyn Fn(DownloadProgress) + Send + Sync>;
 #[derive(Clone)]
 pub struct Downloader {
     client: reqwest::Client,
+    headers: HeaderMap,
     options: DownloadOptions,
     timeout: Option<std::time::Duration>,
 }
@@ -209,6 +228,7 @@ impl Downloader {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
+            headers: HeaderMap::new(),
             options: DownloadOptions::default(),
             timeout: Some(Self::DEFAULT_TIMEOUT),
         }
@@ -219,6 +239,7 @@ impl Downloader {
     pub fn with_client(client: reqwest::Client) -> Self {
         Self {
             client,
+            headers: HeaderMap::new(),
             options: DownloadOptions::default(),
             timeout: None,
         }
@@ -231,17 +252,42 @@ impl Downloader {
         self
     }
 
+    /// Sets headers for every download request, including batch downloads.
+    ///
+    /// Replaces headers set by a previous call to this method. These headers
+    /// override matching default headers on a custom HTTP client.
+    ///
+    /// # Example
+    ///
+    /// Gelbooru's image servers can require a Referer header:
+    ///
+    /// ```
+    /// use booru_rs::download::Downloader;
+    /// use reqwest::header::{HeaderMap, HeaderValue, REFERER};
+    ///
+    /// let mut headers = HeaderMap::new();
+    /// headers.insert(REFERER, HeaderValue::from_static("https://gelbooru.com"));
+    /// let downloader = Downloader::new().with_headers(headers);
+    /// ```
+    #[must_use]
+    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
+        self.headers = headers;
+        self
+    }
+
     /// Sets a custom timeout for downloads.
     #[must_use]
     pub fn with_timeout(self, timeout: std::time::Duration) -> Self {
         Self {
             client: self.client,
+            headers: self.headers,
             options: self.options,
             timeout: Some(timeout),
         }
     }
 
-    fn apply_timeout(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    fn configure_request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        let request = request.headers(self.headers.clone());
         match self.timeout {
             Some(timeout) => request.timeout(timeout),
             None => request,
@@ -287,7 +333,7 @@ impl Downloader {
 
         // Download the file
         let response = self
-            .apply_timeout(self.client.get(url))
+            .configure_request(self.client.get(url))
             .send()
             .await?
             .error_for_status()
@@ -332,7 +378,7 @@ impl Downloader {
         tokio::fs::create_dir_all(dest_dir).await?;
 
         let response = self
-            .apply_timeout(self.client.get(url))
+            .configure_request(self.client.get(url))
             .send()
             .await?
             .error_for_status()
@@ -448,6 +494,7 @@ impl Downloader {
             let client = self.client.clone();
             let options = self.options.clone();
             let timeout = self.timeout;
+            let headers = self.headers.clone();
 
             let task = tasks.spawn(async move {
                 let _permit = permit;
@@ -465,7 +512,7 @@ impl Downloader {
 
                     tokio::fs::create_dir_all(&dest).await?;
 
-                    let request = client.get(&url);
+                    let request = client.get(&url).headers(headers);
                     let request = match timeout {
                         Some(timeout) => request.timeout(timeout),
                         None => request,
@@ -532,6 +579,165 @@ impl Downloader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct DownloadPost(String);
+
+    impl Post for DownloadPost {
+        fn id(&self) -> u32 {
+            1
+        }
+        fn width(&self) -> u32 {
+            1
+        }
+        fn height(&self) -> Option<u32> {
+            Some(1)
+        }
+        fn file_url(&self) -> Option<&str> {
+            Some(&self.0)
+        }
+        fn tags(&self) -> &str {
+            ""
+        }
+        fn score(&self) -> Option<i64> {
+            None
+        }
+        fn md5(&self) -> Option<&str> {
+            None
+        }
+        fn source(&self) -> Option<&str> {
+            None
+        }
+    }
+
+    async fn download_using(
+        downloader: &Downloader,
+        url: &str,
+        dest: &Path,
+        mode: u8,
+    ) -> Result<DownloadResult> {
+        match mode {
+            0 => downloader.download_url(url, dest, None).await,
+            1 => {
+                downloader
+                    .download_url_with_progress(url, dest, None, 1, |_| {})
+                    .await
+            }
+            2 => downloader
+                .download_posts(&[DownloadPost(url.to_string())], dest, 1)
+                .await
+                .remove(0),
+            _ => unreachable!(),
+        }
+    }
+
+    #[tokio::test]
+    async fn all_download_paths_reject_html_without_creating_files() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        for content_type in [
+            "text/html",
+            "Text/HTML; charset=UTF-8",
+            "application/xhtml+xml",
+        ] {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_raw("<html>post page</html>", content_type),
+                )
+                .mount(&server)
+                .await;
+            for mode in 0..3 {
+                let dest = tempfile::tempdir().unwrap();
+                let error = download_using(
+                    &Downloader::new(),
+                    &format!("{}/image.jpg", server.uri()),
+                    dest.path(),
+                    mode,
+                )
+                .await
+                .unwrap_err();
+                assert!(
+                    matches!(error, BooruError::UnexpectedDownloadContentType(value) if value == content_type)
+                );
+                assert_eq!(std::fs::read_dir(dest.path()).unwrap().count(), 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn all_download_paths_send_headers_and_preserve_client_defaults() {
+        use reqwest::header::{HeaderValue, REFERER};
+        use wiremock::matchers::{header, method};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(header("referer", "https://gelbooru.com"))
+            .and(header("x-client-default", "kept"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(b"image bytes".to_vec(), "image/jpeg"),
+            )
+            .expect(3)
+            .mount(&server)
+            .await;
+        let mut defaults = HeaderMap::new();
+        defaults.insert("x-client-default", HeaderValue::from_static("kept"));
+        defaults.insert(REFERER, HeaderValue::from_static("https://example.com"));
+        let client = reqwest::Client::builder()
+            .default_headers(defaults)
+            .build()
+            .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(REFERER, HeaderValue::from_static("https://gelbooru.com"));
+        let downloader = Downloader::with_client(client)
+            .with_headers(headers)
+            .with_timeout(std::time::Duration::from_secs(7));
+        for mode in 0..3 {
+            let dest = tempfile::tempdir().unwrap();
+            let result = download_using(
+                &downloader,
+                &format!("{}/image.jpg", server.uri()),
+                dest.path(),
+                mode,
+            )
+            .await
+            .unwrap();
+            assert_eq!(std::fs::read(result.path).unwrap(), b"image bytes");
+        }
+    }
+
+    #[tokio::test]
+    async fn redirected_html_is_rejected_without_overwriting_file() {
+        use wiremock::matchers::path;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(path("/image.jpg"))
+            .respond_with(ResponseTemplate::new(302).insert_header("location", "/post"))
+            .mount(&server)
+            .await;
+        Mock::given(path("/post"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw("<html>post page</html>", "text/html; charset=utf-8"),
+            )
+            .mount(&server)
+            .await;
+        let dest = tempfile::tempdir().unwrap();
+        let target = dest.path().join("image.jpg");
+        std::fs::write(&target, b"existing image").unwrap();
+        let result = Downloader::new()
+            .options(DownloadOptions::default().overwrite())
+            .download_url(&format!("{}/image.jpg", server.uri()), dest.path(), None)
+            .await;
+        assert!(matches!(
+            result,
+            Err(BooruError::UnexpectedDownloadContentType(_))
+        ));
+        assert_eq!(std::fs::read(target).unwrap(), b"existing image");
+        assert_eq!(std::fs::read_dir(dest.path()).unwrap().count(), 1);
+    }
 
     #[test]
     fn test_download_options_default() {

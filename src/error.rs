@@ -119,6 +119,10 @@ pub enum BooruError {
     #[error("Post {0} has no media URL")]
     MissingMediaUrl(u32),
 
+    /// A download returned HTML instead of media.
+    #[error("Download returned HTML instead of media (Content-Type: {0})")]
+    UnexpectedDownloadContentType(String),
+
     /// A spawned download task failed before returning its result.
     #[error("Download task failed: {0}")]
     DownloadTaskFailed(String),
