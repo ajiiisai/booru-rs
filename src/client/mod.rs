@@ -113,6 +113,7 @@ pub mod generic;
 pub mod rule34;
 #[cfg(feature = "safebooru")]
 pub mod safebooru;
+pub mod stream;
 
 /// Result of one page fetched through the provider operation interface.
 #[derive(Debug, Clone)]
@@ -128,7 +129,9 @@ pub struct PageResult<P, C> {
 /// Provider clients retain their fluent, provider-specific inherent methods.
 /// Implementations of this trait expose the small common seam needed by
 /// generic pagination code without requiring access to client internals.
-#[allow(async_fn_in_trait)]
+///
+/// The returned futures are `Send` so generic streams stay `Send` and remain
+/// usable inside spawned tasks.
 pub trait Client {
     /// Owned query accepted by this provider.
     type Query: Clone;
@@ -138,14 +141,14 @@ pub trait Client {
     type Continuation: Clone;
 
     /// Fetches one page and returns its continuation.
-    async fn page(
+    fn page(
         &self,
         query: Self::Query,
         continuation: Option<Self::Continuation>,
-    ) -> Result<PageResult<Self::Post, Self::Continuation>>;
+    ) -> impl std::future::Future<Output = Result<PageResult<Self::Post, Self::Continuation>>> + Send;
 
     /// Fetches one post by ID.
-    async fn post(&self, id: u32) -> Result<Self::Post>;
+    fn post(&self, id: u32) -> impl std::future::Future<Output = Result<Self::Post>> + Send;
 }
 
 /// Shared builder interface for generic provider callers.
