@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0](https://github.com/ajiiisai/booru-rs/compare/v1.0.0...v1.1.0) - 2026-09-07
+
+### Added
+
+- add tags() to Search and Query builders ([#37](https://github.com/ajiiisai/booru-rs/pull/37))
+
+### Fixed
+
+- preserve error context in trait post lookups ([#35](https://github.com/ajiiisai/booru-rs/pull/35))
+
+### Other
+
+- bump dorny/paths-filter from 3 to 4 ([#39](https://github.com/ajiiisai/booru-rs/pull/39))
+- bump actions/checkout from 6 to 7 ([#38](https://github.com/ajiiisai/booru-rs/pull/38))
+- install cargo-hack for direct dependency checks
+- skip CI and release PRs for non-code changes
+- Update copyright year in LICENSE-MIT
+
 ## [1.0.0](https://github.com/ajiiisai/booru-rs/compare/v0.3.2...v1.0.0) - 2026-09-06
 
 ### Added
