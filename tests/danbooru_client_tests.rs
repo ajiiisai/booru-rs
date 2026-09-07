@@ -613,3 +613,39 @@ async fn trait_post_preserves_error_context() {
         assert!(matches!(error.source_error(), BooruError::PostNotFound(42)));
     }
 }
+
+#[test]
+fn multiple_tags_validation_succeeds() {
+    let search = Client::builder()
+        .build()
+        .expect("builder must succeed")
+        .search()
+        .tags(vec!["cat", "pink_hair"]);
+
+    assert!(search.query().validate().is_ok());
+}
+
+#[test]
+fn multiple_tags_validation_fails() {
+    let search = Client::builder()
+        .build()
+        .expect("builder must succeed")
+        .search()
+        .tags(vec!["cat", "pink hair"]);
+
+    assert!(search.query().validate().is_err());
+}
+
+#[test]
+fn multiple_tags_are_apended() {
+    let search = Client::builder()
+        .build()
+        .expect("builder must succeed")
+        .search()
+        .tag("cat")
+        .tags(["pink_hair"]);
+
+    let expected = Query::new().tag("cat").tag("pink_hair");
+
+    assert_eq!(search.query(), &expected);
+}
