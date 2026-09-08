@@ -10,11 +10,12 @@ repository = "https://github.com/ajiiisai/booru-rs"
 readme = "README.md"
 
 [features]
-default = ["danbooru", "gelbooru", "safebooru", "rule34"]
+default = ["danbooru", "gelbooru", "safebooru", "rule34", "konachan"]
 danbooru = []
 gelbooru = []
 safebooru = []
 rule34 = []
+konachan = []
 live-tests = []
 download = [
     "dep:tempfile",
