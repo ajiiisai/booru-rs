@@ -109,6 +109,8 @@ pub mod danbooru;
 #[cfg(feature = "gelbooru")]
 pub mod gelbooru;
 pub mod generic;
+#[cfg(feature = "konachan")]
+pub mod konachan;
 #[cfg(feature = "rule34")]
 pub mod rule34;
 #[cfg(feature = "safebooru")]
@@ -296,6 +298,35 @@ impl Builder for rule34::ClientBuilder {
 #[cfg(feature = "safebooru")]
 impl Builder for safebooru::ClientBuilder {
     type Client = safebooru::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
+#[cfg(feature = "konachan")]
+impl Builder for konachan::ClientBuilder {
+    type Client = konachan::Client;
 
     fn endpoint(self, url: impl Into<String>) -> Result<Self> {
         self.endpoint(url)

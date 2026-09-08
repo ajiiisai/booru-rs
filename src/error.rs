@@ -15,6 +15,8 @@ pub enum Provider {
     Rule34,
     /// Safebooru.
     Safebooru,
+    /// Konachan
+    Konachan,
 }
 
 impl std::fmt::Display for Provider {
@@ -24,6 +26,7 @@ impl std::fmt::Display for Provider {
             Self::Gelbooru => "Gelbooru",
             Self::Rule34 => "Rule34",
             Self::Safebooru => "Safebooru",
+            Self::Konachan => "Konachan",
         })
     }
 }
