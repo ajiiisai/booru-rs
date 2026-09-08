@@ -7,6 +7,8 @@
 pub mod danbooru;
 #[cfg(feature = "gelbooru")]
 pub mod gelbooru;
+#[cfg(feature = "konachan")]
+pub mod konachan;
 #[cfg(feature = "rule34")]
 pub mod rule34;
 #[cfg(feature = "safebooru")]
