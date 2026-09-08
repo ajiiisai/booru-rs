@@ -50,9 +50,9 @@ Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`
 booru-rs = { version = "1", default-features = false, features = ["safebooru", "download"] }
 ```
 
-## Migrate from 0.x to 1.x
+## Migrate between major versions
 
-The 1.x release changes the client, query, error, model, and download APIs. Follow the [migration guide](docs/migration.md) before upgrading an application from 0.x.
+The 2.x release tightens several types while keeping method names. Follow the [1.x to 2.x notes](docs/migration.md#migrate-from-1x-to-2x) when upgrading from 1.x. Coming from 0.x, read the [0.x to 1.x guide](docs/migration.md#migrate-from-0x-to-1x) first.
 
 ## Quick start
 
