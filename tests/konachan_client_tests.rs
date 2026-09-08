@@ -161,7 +161,7 @@ async fn autocomplete_uses_client_endpoint() {
 
     Mock::given(method("GET"))
         .and(path("/tag.json"))
-        .and(query_param("name_pattern", "land"))
+        .and(query_param("name", "land"))
         .respond_with(
             ResponseTemplate::new(200).set_body_string(r#"[{"name":"landscape","count":20}]"#),
         )

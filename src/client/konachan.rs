@@ -89,7 +89,7 @@ impl Client {
             Ok(self
                 .http
                 .get(format!("{}/tag.json", self.endpoint))
-                .query(&[("name_pattern", query), ("limit", &limit.to_string())])
+                .query(&[("name", query), ("limit", &limit.to_string()), ("order", "count")])
                 .send()
                 .await?)
         })
