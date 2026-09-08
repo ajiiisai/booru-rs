@@ -226,3 +226,46 @@ impl Post for rule34::Rule34Post {
         }
     }
 }
+
+#[cfg(feature = "konachan")]
+impl Post for konachan::KonachanPost {
+    fn id(&self) -> u32 {
+        self.id
+    }
+
+    fn width(&self) -> u32 {
+        self.width
+    }
+
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
+    }
+
+    fn file_url(&self) -> Option<&str> {
+        self.file_url.as_deref()
+    }
+
+    fn tags(&self) -> &str {
+        &self.tags
+    }
+
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
+    }
+
+    fn md5(&self) -> Option<&str> {
+        if self.md5.is_empty() {
+            None
+        } else {
+            Some(&self.md5)
+        }
+    }
+
+    fn source(&self) -> Option<&str> {
+        if self.source.is_empty() {
+            None
+        } else {
+            Some(&self.source)
+        }
+    }
+}
