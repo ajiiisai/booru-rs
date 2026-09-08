@@ -158,6 +158,14 @@ mod builder_tests {
         reject_bad_endpoint(booru_rs::safebooru::Client::builder());
         apply_policy(booru_rs::safebooru::Client::builder());
     }
+
+    #[test]
+    #[cfg(feature = "konachan")]
+    fn konachan_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::konachan::Client::builder());
+        reject_bad_endpoint(booru_rs::konachan::Client::builder());
+        apply_policy(booru_rs::konachan::Client::builder());
+    }
 }
 
 /// Proves every provider exposes the same query and search surface.
