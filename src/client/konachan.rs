@@ -60,7 +60,7 @@ impl Client {
         }
     }
 
-    /// Konachan doesn't provide direct id lookup
+    ///  Will always return `BooruError::PostNotFound` because Konachan doesn't provide direct id lookup
     pub async fn post(&self, id: u32) -> Result<KonachanPost> {
         self.post_inner(id)
             .await
