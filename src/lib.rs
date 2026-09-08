@@ -153,4 +153,3 @@ pub mod konachan {
     pub use crate::client::konachan::*;
     pub use crate::model::konachan::*;
 }
-
