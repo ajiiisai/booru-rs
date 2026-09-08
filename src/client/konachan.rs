@@ -13,8 +13,8 @@ const SORT_PREFIX: &str = "order:";
 
 #[derive(Debug, Deserialize)]
 struct KonachanAutocompleteItem {
-    value: String,
-    label: String,
+    name: String,
+    count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -100,9 +100,9 @@ impl Client {
             .into_iter()
             .take(limit as usize)
             .map(|item| TagSuggestion {
-                name: item.value,
-                label: item.label.clone(),
-                post_count: super::parse_post_count_from_label(&item.label),
+                name: item.name.clone(), // There is no clean name value in API response
+                label: item.name.clone(),
+                post_count: Some(item.count),
                 category: None,
                 tag: None,
                 suggestion_type: None,

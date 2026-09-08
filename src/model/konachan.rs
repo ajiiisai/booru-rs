@@ -30,10 +30,12 @@ pub struct KonachanPost {
     /// Post's image file url, if available.
     #[serde(default)]
     pub file_url: Option<String>,
-    /// File size in bytes
-    pub file_size: u32,
-    /// File extension
-    pub file_ext: String,
+    /// File size in bytes, if supplied
+    #[serde(default)]
+    pub file_size: Option<u32>,
+    /// File extension, if supplied
+    #[serde(default)]
+    pub file_ext: Option<String>,
     /// Preview URL, if supplied.
     #[serde(default)]
     pub preview_url: Option<String>,
@@ -70,7 +72,6 @@ pub struct KonachanPost {
     pub approver_id: Option<u32>,
     /// Name of the author
     pub author: String,
-    pub is_shown_in_index: bool,
     /// Whether the post has children
     pub has_children: bool,
     /// Parent post ID, if supplied.
