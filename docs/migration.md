@@ -1,6 +1,105 @@
 # Migrate to the current client API
 
-This guide moves an application from the pre-rework API to the current `0.3` API on the `1.0-rework` branch. The current API separates reusable provider clients from per-request search state.
+## Migrate from 1.x to 2.x
+
+Version 2.0 keeps every method name but tightens several types. Most call
+sites compile unchanged. Work through the items below only where the compiler
+complains.
+
+### Handle optional media URLs
+
+`GelbooruPost::file_url` and the Safebooru `file_url`, `preview_url`, and
+`sample_url` fields are now `Option<String>`. Deleted and restricted posts
+omit them instead of failing the whole page decode.
+
+Before:
+
+```rust
+println!("{}", post.file_url);
+```
+
+After:
+
+```rust
+println!("{}", post.file_url.as_deref().unwrap_or("(no url)"));
+```
+
+Generic code over `booru_rs::model::Post` is unaffected. Its `file_url()`
+already returned `Option<&str>` and now maps empty strings to `None` as well.
+
+### Expect `PageResult` from pages and streams
+
+Each provider `Page` is now an alias for the shared `PageResult` over that
+provider's post and search types. `Search::page` returns it directly, and page
+streams yield it instead of `Page`.
+
+```rust
+pub type Page = super::PageResult<DanbooruPost, Search>;
+```
+
+Field access is unchanged. `page.posts` and `page.next` keep working in
+single fetches, page streams, and generic code over the `Client` trait. Only
+struct literals break. Construct results with `PageResult::new` instead:
+
+```rust
+let page = PageResult::new(posts, next);
+```
+
+### Build option structs with builders and constructors
+
+`DownloadOptions` gained the `verify_md5` flag, and several option and result
+structs are now `#[non_exhaustive]` so future fields stay minor:
+`DownloadOptions`, `DownloadResult`, `DownloadProgress`, `CacheConfig`,
+`RetryConfig`, `TagValidation`, `TagSuggestion`, `PageResult`, and
+`ErrorContext`.
+
+Replace struct literals with the matching constructor. For example, before:
+
+```rust
+let options = DownloadOptions {
+    overwrite: true,
+    filename_template: None,
+};
+```
+
+After:
+
+```rust
+let options = DownloadOptions::default().overwrite();
+```
+
+Other swaps: `CacheConfig::long_lived` or `short_lived` instead of a literal,
+`TagSuggestion::new` and `with_count`, and `PageResult::new`. Read
+`ErrorContext` field by field instead of comparing against a literal:
+
+```rust
+let context = error.context().expect("error must carry context");
+assert_eq!(context.provider, Provider::Danbooru);
+```
+
+### Check custom `Client` implementations for `Send` futures
+
+The `Client` trait now declares its futures as `Send` so generic streams stay
+usable in spawned tasks. Existing `async fn` implementations satisfy the new
+bounds without changes as long as they hold no non-`Send` data across an
+await.
+
+### Expect rejected sort and random combinations
+
+`Query::validate` now rejects `random()` combined with `sort()`, raw sort
+filters, or a second `random()`. These combinations used to send conflicting
+order clauses to the API. Pick one ordering per search.
+
+### New in 2.0 without migration cost
+
+These additions need no changes: `download_posts_with_progress`,
+`DownloadOptions::verify_md5` with `BooruError::Md5Mismatch`,
+`raw_queries()` on every `Query` and `Search`, the shared `Builder` trait,
+`CacheConfig::disabled`, and the new provider guide in `docs/new-provider.md`.
+
+## Migrate from 0.x to 1.x
+
+This guide moves an application from the pre-rework API to the `1.0` API. The current API separates reusable provider clients from per-request search state.
 
 ## Update imports and features
 
