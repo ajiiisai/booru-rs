@@ -146,3 +146,11 @@ pub mod safebooru {
     pub use crate::client::safebooru::*;
     pub use crate::model::safebooru::*;
 }
+
+/// Konachan client and model types.
+#[cfg(feature = "konachan")]
+pub mod konachan {
+    pub use crate::client::konachan::*;
+    pub use crate::model::konachan::*;
+}
+
