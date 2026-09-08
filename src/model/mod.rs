@@ -242,7 +242,7 @@ impl Post for konachan::KonachanPost {
     }
 
     fn file_url(&self) -> Option<&str> {
-        self.file_url.as_deref()
+        self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
     fn tags(&self) -> &str {
