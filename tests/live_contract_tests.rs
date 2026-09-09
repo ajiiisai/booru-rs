@@ -184,3 +184,38 @@ async fn safebooru_contract() -> Result<()> {
     assert_eq!(fetched.id, post.id);
     Ok(())
 }
+
+#[tokio::test]
+#[ignore = "contacts the live Konachan API; opt in with --features live-tests -- --ignored"]
+async fn konachan_contract() -> Result<()> {
+    let _guard = live_test_guard().await;
+    let client = booru_rs::konachan::Client::builder()
+        .endpoint(endpoint("KONACHAN", "https://konachan.com"))?
+        .build()?;
+
+    let posts = client.search().tag("landscape").limit(3).send().await?;
+    assert!(
+        !posts.is_empty(),
+        "Konachan returned no posts for landscape"
+    );
+    assert_at_most(posts.len(), 3);
+
+    let page = client.search().tag("landscape").limit(2).page().await?;
+    assert_at_most(page.posts.len(), 2);
+    if let Some(next) = page.next {
+        let next_page = next.page().await?;
+        assert_at_most(next_page.posts.len(), 2);
+    }
+
+    let suggestions = client.autocomplete("cat_", 2).await?;
+    assert!(
+        !suggestions.is_empty(),
+        "Safebooru returned no autocomplete suggestions"
+    );
+    assert_at_most(suggestions.len(), 2);
+
+    let post = posts.first().expect("nonempty search result");
+    let fetched = client.post(post.id).await?;
+    assert_eq!(fetched.id, post.id);
+    Ok(())
+}
