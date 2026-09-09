@@ -142,6 +142,20 @@ mod mock_autocomplete {
     }
 
     #[tokio::test]
+    #[cfg(feature = "konachan")]
+    async fn zero_limit_skips_konachan_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::konachan::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
     async fn test_danbooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
@@ -265,6 +279,37 @@ mod mock_autocomplete {
         assert_eq!(suggestions.len(), 2);
         assert_eq!(suggestions[0].name, "cat_ears");
         assert_eq!(suggestions[1].name, "cat_girl");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "konachan")]
+    async fn test_konachan_uses_instance_endpoint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/tag.json"))
+            .and(query_param("name", "land"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(r#"[{"name":"landscape","count":123}]"#),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = booru_rs::konachan::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let suggestions = client
+            .autocomplete("land", 5)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "landscape");
+        assert_eq!(suggestions[0].post_count, Some(123));
     }
 }
 
