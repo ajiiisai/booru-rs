@@ -70,8 +70,24 @@ impl Client {
     /// Will always return an error because Konachan ignores the id parameter,
     /// and there is no documented way to fetch a post by id
     async fn post_inner(&self, id: u32) -> Result<KonachanPost> {
-        // This error might not be ideal
-        Err(BooruError::PostNotFound(id))
+        let response = match execute_with_policy(&self.policy, || async {
+            Ok(self
+                .http
+                .get(format!("{}/post.json", self.endpoint))
+                .query(&[
+                    ("tags", format!("id:{id}"))
+                ])
+                .send()
+                .await?)
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(error) => return Err(super::map_post_lookup_error(error, id)),
+        };
+
+        let posts = response.json::<Vec<KonachanPost>>().await?;
+        posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
     pub async fn autocomplete(&self, query: &str, limit: u32) -> Result<Vec<TagSuggestion>> {
@@ -89,7 +105,11 @@ impl Client {
             Ok(self
                 .http
                 .get(format!("{}/tag.json", self.endpoint))
-                .query(&[("name", query), ("limit", &limit.to_string()), ("order", "count")])
+                .query(&[
+                    ("name", query),
+                    ("limit", &limit.to_string()),
+                    ("order", "count"),
+                ])
                 .send()
                 .await?)
         })
