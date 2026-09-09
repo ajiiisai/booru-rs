@@ -30,11 +30,11 @@ already returned `Option<&str>` and now maps empty strings to `None` as well.
 ### Expect `PageResult` from pages and streams
 
 Each provider `Page` is now an alias for the shared `PageResult` over that
-provider's post and search types. `Search::page` returns it directly, and page
-streams yield it instead of `Page`.
+provider's post and continuation types. `Search::page` returns it directly,
+and page streams yield it instead of `Page`.
 
 ```rust
-pub type Page = super::PageResult<DanbooruPost, Search>;
+pub type Page = super::PageResult<DanbooruPost, Continuation>;
 ```
 
 Field access is unchanged. `page.posts` and `page.next` keep working in
@@ -248,7 +248,7 @@ Use an instance method for autocomplete. The `limit` argument is the requested m
 let suggestions = client.autocomplete("cat_", 10).await?;
 ```
 
-Use `page()` when the application needs the continuation search:
+Use `page()` when the application needs continuation metadata:
 
 ```rust
 let page = client.search().tag("landscape").page().await?;
@@ -256,6 +256,11 @@ for post in page.posts {
     println!("{}", post.id);
 }
 let next = page.next;
+
+if let Some(next) = next {
+    let next_page = client.search_from(next).page().await?;
+    println!("{} posts on the next page", next_page.posts.len());
+}
 ```
 
 Use `pages()` for page results or `posts()` for individual posts. Both streams own a client clone and can move into a spawned task:

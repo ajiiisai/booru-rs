@@ -60,6 +60,15 @@ impl Client {
         }
     }
 
+    pub fn search_from(&self, continuation: Continuation) -> Search {
+        let (query, page) = continuation.into_parts();
+        Search {
+            client: self.clone(),
+            query,
+            page,
+        }
+    }
+
     pub async fn post(&self, id: u32) -> Result<SafebooruPost> {
         self.post_inner(id)
             .await
@@ -219,6 +228,8 @@ impl Query {
     }
 }
 
+pub type Continuation = super::Continuation<Query>;
+
 #[derive(Debug, Clone)]
 pub struct Search {
     client: Client,
@@ -308,18 +319,16 @@ impl Search {
         self.fetch().await
     }
 
-    pub async fn page(self) -> Result<super::PageResult<SafebooruPost, Search>> {
+    pub async fn page(self) -> Result<super::PageResult<SafebooruPost, Continuation>> {
         let posts = self.fetch().await?;
-        let next = super::advance_page(self.page, posts.is_empty()).map(|page| {
-            let mut next = self.clone();
-            next.page = page;
-            next
-        });
+        let next = super::advance_page(self.page, posts.is_empty())
+            .map(|page| super::Continuation::new(self.query.clone(), page));
         Ok(super::PageResult { posts, next })
     }
 
     pub fn pages(self) -> PageStream {
-        PageStream::new(self.client.clone(), self.query.clone(), Some(self))
+        let continuation = super::Continuation::new(self.query.clone(), self.page);
+        PageStream::new(self.client.clone(), self.query.clone(), Some(continuation))
     }
 
     pub fn posts(self) -> PostStream {
@@ -417,13 +426,14 @@ impl ClientBuilder {
 /// One fetched page of results.
 ///
 /// Alias for the shared [`super::PageResult`] over this provider's post and
-/// search types. Returned by [`Search::page`] and yielded by [`PageStream`].
-pub type Page = super::PageResult<SafebooruPost, Search>;
+/// continuation types. Returned by [`Search::page`] and yielded by
+/// [`PageStream`].
+pub type Page = super::PageResult<SafebooruPost, Continuation>;
 
 impl super::Client for Client {
     type Query = Query;
     type Post = SafebooruPost;
-    type Continuation = Search;
+    type Continuation = Continuation;
 
     async fn page(
         &self,
@@ -431,7 +441,7 @@ impl super::Client for Client {
         continuation: Option<Self::Continuation>,
     ) -> Result<super::PageResult<Self::Post, Self::Continuation>> {
         match continuation {
-            Some(search) => search.page().await,
+            Some(continuation) => self.search_from(continuation).page().await,
             None => self.search_with(query).page().await,
         }
     }

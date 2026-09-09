@@ -130,8 +130,8 @@ Use `page()` when you need continuation metadata:
 ```rust
 let page = client.search().tag("landscape").limit(100).page().await?;
 println!("{} posts", page.posts.len());
-if let Some(next_search) = page.next {
-    let next_page = next_search.page().await?;
+if let Some(next) = page.next {
+    let next_page = client.search_from(next).page().await?;
     println!("{} posts on the next page", next_page.posts.len());
 }
 ```

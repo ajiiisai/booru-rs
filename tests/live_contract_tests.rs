@@ -75,7 +75,7 @@ async fn danbooru_contract() -> Result<()> {
     let page = client.search().tag("cat_ears").limit(2).page().await?;
     assert_at_most(page.posts.len(), 2);
     if let Some(next) = page.next {
-        let next_page = next.page().await?;
+        let next_page = client.search_from(next).page().await?;
         assert_at_most(next_page.posts.len(), 2);
     }
 
@@ -110,7 +110,7 @@ async fn gelbooru_contract() -> Result<()> {
     let page = client.search().tag("cat_ears").limit(2).page().await?;
     assert_at_most(page.posts.len(), 2);
     if let Some(next) = page.next {
-        let next_page = next.page().await?;
+        let next_page = client.search_from(next).page().await?;
         assert_at_most(next_page.posts.len(), 2);
     }
 
@@ -145,7 +145,7 @@ async fn rule34_contract() -> Result<()> {
     let page = client.search().tag("1girl").limit(2).page().await?;
     assert_at_most(page.posts.len(), 2);
     if let Some(next) = page.next {
-        let next_page = next.page().await?;
+        let next_page = client.search_from(next).page().await?;
         assert_at_most(next_page.posts.len(), 2);
     }
 
@@ -181,7 +181,7 @@ async fn safebooru_contract() -> Result<()> {
     let page = client.search().tag("landscape").limit(2).page().await?;
     assert_at_most(page.posts.len(), 2);
     if let Some(next) = page.next {
-        let next_page = next.page().await?;
+        let next_page = client.search_from(next).page().await?;
         assert_at_most(next_page.posts.len(), 2);
     }
 
@@ -217,7 +217,7 @@ async fn konachan_contract() -> Result<()> {
     let page = client.search().tag("landscape").limit(2).page().await?;
     assert_at_most(page.posts.len(), 2);
     if let Some(next) = page.next {
-        let next_page = next.page().await?;
+        let next_page = client.search_from(next).page().await?;
         assert_at_most(next_page.posts.len(), 2);
     }
 

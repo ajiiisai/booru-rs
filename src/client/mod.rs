@@ -140,6 +140,34 @@ impl<P, C> PageResult<P, C> {
     }
 }
 
+/// Client-independent state for resuming a paginated query.
+///
+/// A continuation stores the query and the next page position, but not the
+/// endpoint, credentials, HTTP client, or request policy. Resume it through
+/// the client that should perform the next request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Continuation<Q> {
+    query: Q,
+    page: u32,
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
+impl<Q> Continuation<Q> {
+    pub(crate) fn new(query: Q, page: u32) -> Self {
+        Self { query, page }
+    }
+
+    pub(crate) fn into_parts(self) -> (Q, u32) {
+        (self.query, self.page)
+    }
+}
+
 /// Operation interface for generic provider callers and external adapters.
 ///
 /// Provider clients retain their fluent, provider-specific inherent methods.
@@ -153,7 +181,7 @@ pub trait Client {
     type Query: Clone;
     /// Provider-specific post type.
     type Post: Post;
-    /// Provider-specific continuation for a subsequent page.
+    /// Client-independent state for a subsequent page.
     type Continuation: Clone;
 
     /// Creates an empty query for this client.
@@ -169,6 +197,10 @@ pub trait Client {
     }
 
     /// Fetches one page and returns its continuation.
+    ///
+    /// When `continuation` is present, it takes precedence over `query`. The
+    /// continuation contains the logical query state, while `self` supplies
+    /// the endpoint, credentials, HTTP client, and request policy.
     fn page(
         &self,
         query: Self::Query,

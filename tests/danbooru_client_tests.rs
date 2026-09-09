@@ -295,22 +295,156 @@ async fn page_returns_continuation_until_empty() {
     let page = client.search().page().await.expect("page must succeed");
     assert_eq!(ids(&page.posts), vec![1, 2]);
 
-    let page = page
-        .next
-        .expect("second page must follow")
+    let continuation = page.next.expect("second page must follow");
+    let page = client
+        .search_from(continuation)
         .page()
         .await
         .expect("page must succeed");
     assert_eq!(ids(&page.posts), vec![3, 4]);
 
-    let page = page
-        .next
-        .expect("terminal fetch must follow")
+    let continuation = page.next.expect("terminal fetch must follow");
+    let page = client
+        .search_from(continuation)
         .page()
         .await
         .expect("page must succeed");
     assert!(page.posts.is_empty());
     assert!(page.next.is_none());
+}
+
+#[tokio::test]
+async fn continuation_uses_resuming_client_and_preserves_query() {
+    let origin_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "1"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .and(query_param("login", "origin_user"))
+        .and(query_param("api_key", "origin_key"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1])))
+        .mount(&origin_server)
+        .await;
+
+    let resume_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "2"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .and(query_param("login", "resume_user"))
+        .and(query_param("api_key", "resume_key"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[2])))
+        .mount(&resume_server)
+        .await;
+
+    let origin = Client::builder()
+        .endpoint(origin_server.uri())
+        .unwrap()
+        .set_credentials("origin_key", "origin_user")
+        .build()
+        .unwrap();
+    let resume = Client::builder()
+        .endpoint(resume_server.uri())
+        .unwrap()
+        .set_credentials("resume_key", "resume_user")
+        .build()
+        .unwrap();
+
+    let first = origin
+        .search()
+        .tag("portable_tag")
+        .raw_query("artist:alice")
+        .limit(2)
+        .page()
+        .await
+        .expect("initial page must succeed");
+    assert_eq!(ids(&first.posts), vec![1]);
+
+    let second = resume
+        .search_from(first.next.expect("continuation must be present"))
+        .page()
+        .await
+        .expect("resumed page must succeed");
+    assert_eq!(ids(&second.posts), vec![2]);
+}
+
+#[tokio::test]
+async fn continuation_drives_generic_page_and_cross_client_stream() {
+    let origin_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "2"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .and(query_param("login", "origin_user"))
+        .and(query_param("api_key", "origin_key"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1])))
+        .mount(&origin_server)
+        .await;
+
+    let resume_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "3"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .and(query_param("login", "resume_user"))
+        .and(query_param("api_key", "resume_key"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[2])))
+        .mount(&resume_server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/posts.json"))
+        .and(query_param("page", "4"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .and(query_param("login", "resume_user"))
+        .and(query_param("api_key", "resume_key"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[])))
+        .mount(&resume_server)
+        .await;
+
+    let origin = Client::builder()
+        .endpoint(origin_server.uri())
+        .unwrap()
+        .set_credentials("origin_key", "origin_user")
+        .build()
+        .unwrap();
+    let resume = Client::builder()
+        .endpoint(resume_server.uri())
+        .unwrap()
+        .set_credentials("resume_key", "resume_user")
+        .build()
+        .unwrap();
+
+    let first = origin
+        .search()
+        .start_page(2)
+        .tag("portable_tag")
+        .raw_query("artist:alice")
+        .limit(2)
+        .page()
+        .await
+        .expect("initial page must succeed");
+
+    let conflicting_query = Query::new().tag("wrong_tag").limit(99);
+    let continuation = first.next.expect("continuation must be present");
+    let second = booru_rs::client::Client::page(
+        &resume,
+        conflicting_query.clone(),
+        Some(continuation.clone()),
+    )
+    .await
+    .expect("generic continuation page must succeed");
+    assert_eq!(ids(&second.posts), vec![2]);
+
+    let mut pages =
+        booru_rs::client::stream::PageStream::new(resume, conflicting_query, Some(continuation));
+    assert_eq!(ids(&pages.next().await.unwrap().unwrap().posts), vec![2]);
+    assert!(pages.next().await.is_none());
+    assert!(pages.next().await.is_none());
 }
 
 #[tokio::test]

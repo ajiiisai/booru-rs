@@ -210,22 +210,65 @@ async fn page_returns_continuation_until_empty() {
     let page = client.search().page().await.expect("page must succeed");
     assert_eq!(ids(&page.posts), vec![1, 2]);
 
-    let page = page
-        .next
-        .expect("second page must follow")
+    let continuation = page.next.expect("second page must follow");
+    let page = client
+        .search_from(continuation)
         .page()
         .await
         .expect("page must succeed");
     assert_eq!(ids(&page.posts), vec![3, 4]);
 
-    let page = page
-        .next
-        .expect("terminal fetch must follow")
+    let continuation = page.next.expect("terminal fetch must follow");
+    let page = client
+        .search_from(continuation)
         .page()
         .await
         .expect("page must succeed");
     assert!(page.posts.is_empty());
     assert!(page.next.is_none());
+}
+
+#[tokio::test]
+async fn continuation_uses_resuming_client_and_preserves_query() {
+    let origin_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/post.json"))
+        .and(query_param("page", "1"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1])))
+        .mount(&origin_server)
+        .await;
+
+    let resume_server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/post.json"))
+        .and(query_param("page", "2"))
+        .and(query_param("limit", "2"))
+        .and(query_param("tags", "portable_tag artist:alice"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[2])))
+        .mount(&resume_server)
+        .await;
+
+    let origin = test_client(&origin_server);
+    let resume = test_client(&resume_server);
+
+    let first = origin
+        .search()
+        .tag("portable_tag")
+        .raw_query("artist:alice")
+        .limit(2)
+        .page()
+        .await
+        .expect("initial page must succeed");
+    assert_eq!(ids(&first.posts), vec![1]);
+
+    let second = resume
+        .search_from(first.next.expect("continuation must be present"))
+        .page()
+        .await
+        .expect("resumed page must succeed");
+    assert_eq!(ids(&second.posts), vec![2]);
 }
 
 #[tokio::test]

@@ -50,8 +50,9 @@ where
 {
     /// Creates a stream starting from an optional continuation.
     ///
-    /// Pass the originating search as `continuation` to preserve details such
-    /// as a custom start page. Pass `None` to start from the first page.
+    /// A continuation preserves the query and page position. This stream uses
+    /// `client` for every request, including when it resumes from a
+    /// continuation. Pass `None` to start from the first page.
     pub fn new(client: C, query: C::Query, continuation: Option<C::Continuation>) -> Self {
         Self {
             client,
