@@ -103,7 +103,6 @@ impl QueryCore {
         self
     }
 
-    /// Adds a provider query expression without literal-tag validation.
     pub(crate) fn raw_query(mut self, expression: impl Into<String>) -> Self {
         self.raw_queries.push(expression.into());
         self

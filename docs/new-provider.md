@@ -27,10 +27,14 @@ when a surface item is missing, so they double as the definition of done.
   `rating`, `sort`, `limit`, `blacklist_tag`, `blacklist_tags`,
   `exclude_rating`, `random`, and `validate`.
 - Expose the same `Search` chain plus `start_page`, `send`, `page`, `pages`,
-  and `posts`. Alias `Page`, `PageStream`, and `PostStream` to the shared
+  and `posts`. Add `search_from` so a client can resume a client-independent
+  continuation. Alias `Page`, `PageStream`, and `PostStream` to the shared
   types instead of reimplementing them.
 - Implement the `Client` and `Builder` traits from `src/client/mod.rs` for
   the new types. Keep credential methods provider specific.
+- Store only query state and the next page position in `Continuation`; the
+  receiving client must supply the endpoint, credentials, HTTP client, and
+  request policy.
 - Document real API differences where they live: page numbering, sort
   prefixes, tag limits, auth params, and response envelopes.
 

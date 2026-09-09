@@ -32,7 +32,7 @@
 // Core traits and types
 pub use crate::client::RequestPolicy;
 pub use crate::client::generic::Sort;
-pub use crate::client::{Builder, Client};
+pub use crate::client::{Builder, Client, Continuation, Query};
 pub use crate::error::{BooruError, Result};
 
 // Autocomplete

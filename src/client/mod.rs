@@ -53,9 +53,6 @@
 //! # }
 //! ```
 
-use std::sync::LazyLock;
-use std::time::Duration;
-
 #[cfg(any(
     feature = "danbooru",
     feature = "gelbooru",
@@ -84,6 +81,8 @@ use crate::retry::is_retryable;
     feature = "konachan"
 ))]
 use reqwest::header::HeaderMap;
+use std::sync::LazyLock;
+use std::time::Duration;
 
 #[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 #[derive(Clone, Default)]
@@ -140,6 +139,34 @@ impl<P, C> PageResult<P, C> {
     }
 }
 
+/// Client-independent state for resuming a paginated query.
+///
+/// A continuation stores the query and the next page position, but not the
+/// endpoint, credentials, HTTP client, or request policy. Resume it through
+/// the client that should perform the next request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Continuation<Q> {
+    query: Q,
+    page: u32,
+}
+
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
+impl<Q> Continuation<Q> {
+    pub(crate) fn new(query: Q, page: u32) -> Self {
+        Self { query, page }
+    }
+
+    pub(crate) fn into_parts(self) -> (Q, u32) {
+        (self.query, self.page)
+    }
+}
+
 /// Operation interface for generic provider callers and external adapters.
 ///
 /// Provider clients retain their fluent, provider-specific inherent methods.
@@ -153,10 +180,26 @@ pub trait Client {
     type Query: Clone;
     /// Provider-specific post type.
     type Post: Post;
-    /// Provider-specific continuation for a subsequent page.
+    /// Client-independent state for a subsequent page.
     type Continuation: Clone;
 
+    /// Creates an empty query for this client.
+    ///
+    /// This method is available when the provider's query implements the
+    /// shared [`Query`] builder interface. Provider-specific filters remain
+    /// available on the concrete query type.
+    fn query(&self) -> Self::Query
+    where
+        Self::Query: Query,
+    {
+        <Self::Query as Query>::new()
+    }
+
     /// Fetches one page and returns its continuation.
+    ///
+    /// When `continuation` is present, it takes precedence over `query`. The
+    /// continuation contains the logical query state, while `self` supplies
+    /// the endpoint, credentials, HTTP client, and request policy.
     fn page(
         &self,
         query: Self::Query,
@@ -166,6 +209,114 @@ pub trait Client {
     /// Fetches one post by ID.
     fn post(&self, id: u32) -> impl std::future::Future<Output = Result<Self::Post>> + Send;
 }
+
+/// Shared query-builder interface for generic provider callers.
+pub trait Query: Clone + Default + Sized {
+    /// Creates an empty query.
+    fn new() -> Self;
+
+    /// Adds a literal tag to the query.
+    fn tag(self, tag: impl Into<String>) -> Self;
+
+    /// Adds literal tags to the query.
+    fn tags<I, S>(self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>;
+
+    /// Adds a raw provider expression; validation rejects empty expressions or
+    /// conflicts with typed rating and sort filters.
+    fn raw_query(self, expression: impl Into<String>) -> Self;
+
+    /// Adds provider query expressions without literal-tag validation.
+    fn raw_queries<I, S>(self, expressions: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>;
+
+    /// Sets the maximum number of posts to return.
+    fn limit(self, limit: u32) -> Self;
+
+    /// Adds a tag that must not match.
+    fn blacklist_tag(self, tag: impl AsRef<str>) -> Self;
+
+    /// Adds tags that must not match.
+    fn blacklist_tags<I, S>(self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>;
+
+    /// Requests randomized results.
+    fn random(self) -> Self;
+
+    /// Validates the configured query.
+    fn validate(&self) -> Result<()>;
+}
+
+macro_rules! impl_query {
+    ($module:ident, $feature:literal) => {
+        #[cfg(feature = $feature)]
+        impl Query for $module::Query {
+            fn new() -> Self {
+                $module::Query::new()
+            }
+
+            fn tag(self, tag: impl Into<String>) -> Self {
+                $module::Query::tag(self, tag)
+            }
+
+            fn tags<I, S>(self, tags: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: Into<String>,
+            {
+                $module::Query::tags(self, tags)
+            }
+
+            fn raw_query(self, expression: impl Into<String>) -> Self {
+                $module::Query::raw_query(self, expression)
+            }
+
+            fn raw_queries<I, S>(self, expressions: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: Into<String>,
+            {
+                $module::Query::raw_queries(self, expressions)
+            }
+
+            fn limit(self, limit: u32) -> Self {
+                $module::Query::limit(self, limit)
+            }
+
+            fn blacklist_tag(self, tag: impl AsRef<str>) -> Self {
+                $module::Query::blacklist_tag(self, tag)
+            }
+
+            fn blacklist_tags<I, S>(self, tags: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: AsRef<str>,
+            {
+                $module::Query::blacklist_tags(self, tags)
+            }
+
+            fn random(self) -> Self {
+                $module::Query::random(self)
+            }
+
+            fn validate(&self) -> Result<()> {
+                $module::Query::validate(self)
+            }
+        }
+    };
+}
+
+impl_query!(danbooru, "danbooru");
+impl_query!(gelbooru, "gelbooru");
+impl_query!(rule34, "rule34");
+impl_query!(safebooru, "safebooru");
+impl_query!(konachan, "konachan");
 
 /// Shared builder interface for generic provider callers.
 ///
@@ -727,7 +878,10 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     feature = "konachan"
 ))]
 mod tests {
-    use super::{RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict};
+    use super::{
+        RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict,
+        validate_raw_queries, validate_tags,
+    };
     use crate::error::BooruError;
     use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
@@ -816,5 +970,36 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn literal_tag_validation_reports_whitespace_without_normalizing() {
+        let error = validate_tags(&["cat ears".to_string()]).unwrap_err();
+        assert!(matches!(
+            error,
+            BooruError::InvalidTag { tag, reason }
+                if tag == "cat ears" && reason == "tag must not contain whitespace"
+        ));
+    }
+
+    #[test]
+    fn raw_query_validation_preserves_spaces_and_rejects_conflicts() {
+        assert!(validate_raw_queries(&["artist:foo bar".to_string()], false, false).is_ok());
+
+        assert!(matches!(
+            validate_raw_queries(&[" ".to_string()], false, false),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw query expressions must not be empty"
+        ));
+        assert!(matches!(
+            validate_raw_queries(&["rating:explicit".to_string()], true, false),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw rating filters cannot be combined with rating()"
+        ));
+        assert!(matches!(
+            validate_raw_queries(&["sort:score".to_string()], false, true),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw sort filters cannot be combined with sort()"
+        ));
     }
 }

@@ -116,7 +116,7 @@ pub mod validation;
 pub use autocomplete::TagSuggestion;
 pub use cache::{CacheError, CacheKey, CacheOperation};
 pub use client::generic::Sort;
-pub use client::{Builder, Client, PageResult, RequestPolicy};
+pub use client::{Builder, Client, Continuation, PageResult, Query, RequestPolicy};
 pub use error::{BooruError, ErrorContext, Operation, Provider, Result};
 pub use model::Post;
 

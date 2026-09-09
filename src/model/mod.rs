@@ -48,6 +48,21 @@ pub trait Post {
     /// Returns the URL to the full-size image, if available.
     fn file_url(&self) -> Option<&str>;
 
+    /// Returns the URL to the preview image, if available.
+    fn preview_url(&self) -> Option<&str> {
+        None
+    }
+
+    /// Returns the URL to the sample image, if available.
+    fn sample_url(&self) -> Option<&str> {
+        None
+    }
+
+    /// Returns the parent post ID, if available.
+    fn parent_id(&self) -> Option<u32> {
+        None
+    }
+
     /// Returns the tags associated with this post as a single string.
     fn tags(&self) -> &str;
 
@@ -83,6 +98,20 @@ impl Post for danbooru::DanbooruPost {
 
     fn file_url(&self) -> Option<&str> {
         self.file_url.as_deref()
+    }
+
+    fn preview_url(&self) -> Option<&str> {
+        self.preview_file_url
+            .as_deref()
+            .filter(|url| !url.is_empty())
+    }
+
+    fn sample_url(&self) -> Option<&str> {
+        self.large_file_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn parent_id(&self) -> Option<u32> {
+        self.parent_id
     }
 
     fn tags(&self) -> &str {
@@ -124,6 +153,18 @@ impl Post for gelbooru::GelbooruPost {
         self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
+    fn preview_url(&self) -> Option<&str> {
+        self.preview_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn sample_url(&self) -> Option<&str> {
+        self.sample_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn parent_id(&self) -> Option<u32> {
+        self.parent_id
+    }
+
     fn tags(&self) -> &str {
         &self.tags
     }
@@ -163,6 +204,14 @@ impl Post for safebooru::SafebooruPost {
         self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
+    fn preview_url(&self) -> Option<&str> {
+        self.preview_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn sample_url(&self) -> Option<&str> {
+        self.sample_url.as_deref().filter(|url| !url.is_empty())
+    }
+
     fn tags(&self) -> &str {
         &self.tags
     }
@@ -200,6 +249,18 @@ impl Post for rule34::Rule34Post {
 
     fn file_url(&self) -> Option<&str> {
         self.file_url.as_deref()
+    }
+
+    fn preview_url(&self) -> Option<&str> {
+        self.preview_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn sample_url(&self) -> Option<&str> {
+        self.sample_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn parent_id(&self) -> Option<u32> {
+        self.parent_id
     }
 
     fn tags(&self) -> &str {
@@ -243,6 +304,18 @@ impl Post for konachan::KonachanPost {
 
     fn file_url(&self) -> Option<&str> {
         self.file_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn preview_url(&self) -> Option<&str> {
+        self.preview_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn sample_url(&self) -> Option<&str> {
+        self.sample_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn parent_id(&self) -> Option<u32> {
+        self.parent_id
     }
 
     fn tags(&self) -> &str {
