@@ -2,6 +2,13 @@
 //!
 //! Run with:
 //! `cargo test --features live-tests --test live_contract_tests -- --ignored --nocapture`
+#![cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
 
 use std::sync::OnceLock;
 
