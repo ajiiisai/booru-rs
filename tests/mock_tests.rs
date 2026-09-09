@@ -7,15 +7,12 @@
 //! - Running fast, reliable tests in CI
 //! - Testing without API credentials
 
-use booru_rs::error::BooruError;
-use wiremock::matchers::{method, path, query_param};
-use wiremock::{Mock, MockServer, ResponseTemplate};
-
 #[cfg(feature = "safebooru")]
 mod mock_post_trait {
-    use super::*;
     use booru_rs::model::Post;
     use booru_rs::safebooru::Client;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     /// Test fixture for Safebooru posts
     fn safebooru_posts_json() -> &'static str {
@@ -81,8 +78,16 @@ mod mock_post_trait {
     }
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
 mod mock_autocomplete {
-    use super::*;
+    use wiremock::matchers::{method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
     #[cfg(feature = "danbooru")]
@@ -317,8 +322,12 @@ mod mock_autocomplete {
 
 #[cfg(feature = "safebooru")]
 mod endpoint_config {
-    use super::*;
+    use booru_rs::BooruError;
     use booru_rs::safebooru::Client;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path, query_param},
+    };
 
     #[tokio::test]
     async fn test_trailing_slash_still_routes() {
