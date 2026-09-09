@@ -9,6 +9,7 @@
 //! - `gelbooru::Client` for gelbooru.com, unlimited tags
 //! - `safebooru::Client` for safebooru.org, unlimited tags, SFW only
 //! - `rule34::Client` for api.rule34.xxx, unlimited tags
+//! - `konachan::Client` for konachan.com, unlimited tags
 //!
 //! # Example
 //!

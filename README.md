@@ -34,7 +34,7 @@ Add the crate and a Tokio runtime to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-booru-rs = "1"
+booru-rs = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -42,13 +42,13 @@ The default feature set includes all five providers. Pick providers to trim depe
 
 ```toml
 [dependencies]
-booru-rs = { version = "1", default-features = false, features = ["danbooru"] }
+booru-rs = { version = "2", default-features = false, features = ["danbooru"] }
 ```
 
 Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `konachan`, `download`, and `live-tests`. For downloads:
 
 ```toml
-booru-rs = { version = "1", default-features = false, features = ["safebooru", "download"] }
+booru-rs = { version = "2", default-features = false, features = ["safebooru", "download"] }
 ```
 
 ## Migrate between major versions
@@ -206,7 +206,7 @@ fn build<B: Builder>(builder: B) -> booru_rs::Result<B::Client> {
 Downloads are optional. Enable the `download` feature before importing the module:
 
 ```toml
-booru-rs = { version = "1", features = ["safebooru", "download"] }
+booru-rs = { version = "2", features = ["safebooru", "download"] }
 ```
 
 ```rust
