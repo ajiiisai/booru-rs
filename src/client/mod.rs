@@ -690,9 +690,7 @@ where
                     return Err(error);
                 }
                 attempt += 1;
-                let delay = retry_after
-                    .unwrap_or_else(|| policy.retry.delay_for_attempt(attempt))
-                    .min(policy.retry.max_delay);
+                let delay = retry_after.unwrap_or_else(|| policy.retry.delay_for_attempt(attempt));
                 tokio::time::sleep(delay).await;
             }
         }
@@ -708,8 +706,16 @@ where
 ))]
 fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
-    let seconds = value.trim().parse::<u64>().ok()?;
-    Some(Duration::from_secs(seconds))
+    let value = value.trim();
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(Duration::from_secs(seconds));
+    }
+    let retry_at = httpdate::parse_http_date(value).ok()?;
+    Some(
+        retry_at
+            .duration_since(std::time::SystemTime::now())
+            .unwrap_or(Duration::ZERO),
+    )
 }
 
 #[cfg(test)]
@@ -721,9 +727,11 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     feature = "konachan"
 ))]
 mod tests {
-    use super::{parse_retry_after, validate_random_conflict};
+    use super::{RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict};
+    use crate::error::BooruError;
+    use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime};
 
     #[test]
     fn parses_numeric_retry_after() {
@@ -739,6 +747,51 @@ mod tests {
         headers.insert(RETRY_AFTER, HeaderValue::from_static("tomorrow"));
 
         assert_eq!(parse_retry_after(&headers), None);
+    }
+
+    #[test]
+    fn parses_http_date_retry_after() {
+        let retry_at = SystemTime::now() + Duration::from_secs(60);
+        let value = HeaderValue::from_str(&httpdate::fmt_http_date(retry_at)).unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(RETRY_AFTER, value);
+
+        let delay = parse_retry_after(&headers).unwrap();
+        assert!(delay >= Duration::from_secs(59));
+        assert!(delay <= Duration::from_secs(60));
+    }
+
+    #[tokio::test]
+    async fn server_retry_after_is_not_capped_by_local_max_delay() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "1"))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let policy = RequestPolicy::new()
+            .with_retry_config(RetryConfig::new(1).with_max_delay(Duration::ZERO))
+            .unwrap();
+        let client = reqwest::Client::new();
+        let started = tokio::time::Instant::now();
+
+        let result = execute_with_policy(&policy, || async {
+            client
+                .get(server.uri())
+                .send()
+                .await
+                .map_err(BooruError::from)
+        })
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(BooruError::HttpStatus { status: 429, .. })
+        ));
+        assert!(started.elapsed() >= Duration::from_secs(1));
     }
 
     #[test]
