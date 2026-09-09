@@ -38,10 +38,14 @@ fn validate_filename(filename: &str) -> Result<()> {
         .unwrap_or_default()
         .to_ascii_uppercase();
     let reserved_device_name = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || (stem.len() == 4
-            && (stem.starts_with("COM") || stem.starts_with("LPT"))
-            && stem.as_bytes()[3].is_ascii_digit()
-            && stem.as_bytes()[3] != b'0');
+        || ["COM", "LPT"].iter().any(|prefix| {
+            stem.strip_prefix(prefix).is_some_and(|suffix| {
+                matches!(
+                    suffix,
+                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                )
+            })
+        });
     let has_invalid_character = filename.chars().any(|character| {
         character.is_control() || matches!(character, '<' | '>' | ':' | '"' | '|' | '?' | '*')
     });
@@ -60,7 +64,7 @@ fn validate_filename(filename: &str) -> Result<()> {
 }
 
 fn destination_key(path: &Path) -> PathBuf {
-    PathBuf::from(path.to_string_lossy().to_lowercase())
+    PathBuf::from(path.to_string_lossy().to_uppercase())
 }
 
 fn filename_from_url(url: &str) -> Result<String> {
@@ -1067,6 +1071,9 @@ mod tests {
             "CON",
             "con.txt",
             "LPT9.jpeg",
+            "COM¹.jpg",
+            "com².txt",
+            "LPT³.png",
             "foo\u{0001}bar.jpg",
         ] {
             assert!(matches!(
@@ -1319,6 +1326,64 @@ mod tests {
                 Err(BooruError::DestinationConflict(_))
             ]
         ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_unicode_case_collisions() {
+        struct UnicodeCasePost {
+            hash: String,
+        }
+
+        impl Post for UnicodeCasePost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/image.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                Some(&self.hash)
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        for overwrite in [false, true] {
+            let destination = tempfile::tempdir().unwrap();
+            let mut options = DownloadOptions::default().filename("{md5}.jpg");
+            if overwrite {
+                options = options.overwrite();
+            }
+            let posts = [
+                UnicodeCasePost { hash: "σ".into() },
+                UnicodeCasePost { hash: "ς".into() },
+            ];
+            let results = Downloader::new()
+                .options(options)
+                .download_posts(&posts, destination.path(), 2)
+                .await;
+
+            assert!(matches!(
+                results.as_slice(),
+                [
+                    Err(BooruError::DestinationConflict(_)),
+                    Err(BooruError::DestinationConflict(_))
+                ]
+            ));
+        }
     }
 
     #[tokio::test]
