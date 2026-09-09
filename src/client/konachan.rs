@@ -56,19 +56,16 @@ impl Client {
         Search {
             client: self.clone(),
             query,
-            page: 0,
+            page: 1,
         }
     }
 
-    ///  Will always return `BooruError::PostNotFound` because Konachan doesn't provide direct id lookup
     pub async fn post(&self, id: u32) -> Result<KonachanPost> {
         self.post_inner(id)
             .await
             .with_context(Provider::Konachan, Operation::Post)
     }
 
-    /// Will always return an error because Konachan ignores the id parameter,
-    /// and there is no documented way to fetch a post by id
     async fn post_inner(&self, id: u32) -> Result<KonachanPost> {
         let response = match execute_with_policy(&self.policy, || async {
             Ok(self
