@@ -11,16 +11,16 @@ use booru_rs::error::BooruError;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-/// Test fixture for Safebooru posts
-fn safebooru_posts_json() -> &'static str {
-    include_str!("fixtures/safebooru/posts.json")
-}
-
 #[cfg(feature = "safebooru")]
 mod mock_post_trait {
     use super::*;
     use booru_rs::model::Post;
     use booru_rs::safebooru::Client;
+
+    /// Test fixture for Safebooru posts
+    fn safebooru_posts_json() -> &'static str {
+        include_str!("fixtures/safebooru/posts.json")
+    }
 
     #[tokio::test]
     async fn test_post_trait_methods() {

@@ -19,6 +19,7 @@ fn endpoint(prefix: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.to_string())
 }
 
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 fn optional_credentials(prefix: &str) -> Option<(String, String)> {
     let key_name = format!("BOORU_RS_LIVE_{prefix}_API_KEY");
     let user_name = format!("BOORU_RS_LIVE_{prefix}_USER_ID");
@@ -32,6 +33,7 @@ fn optional_credentials(prefix: &str) -> Option<(String, String)> {
     }
 }
 
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
 fn required_credentials(prefix: &str) -> (String, String) {
     optional_credentials(prefix).unwrap_or_else(|| {
         panic!(
