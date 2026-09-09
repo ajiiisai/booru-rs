@@ -80,19 +80,19 @@ required-features = ["safebooru"]
 
 [[test]]
 name = "konachan_client_tests"
-required-features = ["safebooru"]
+required-features = ["konachan"]
 
 [[test]]
 name = "konachan_tests"
-required-features = ["safebooru"]
+required-features = ["konachan"]
 
 [[test]]
 name = "mock_tests"
-required-features = ["danbooru", "gelbooru", "rule34", "safebooru"]
+required-features = ["danbooru", "gelbooru", "rule34", "safebooru", "konachan"]
 
 [[test]]
 name = "live_contract_tests"
-required-features = ["live-tests", "danbooru", "gelbooru", "rule34", "safebooru"]
+required-features = ["live-tests", "danbooru", "gelbooru", "rule34", "safebooru", "konachan"]
 
 [profile.dev]
 opt-level = 1
