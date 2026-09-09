@@ -290,8 +290,7 @@ mod mock_autocomplete {
             .and(path("/tag.json"))
             .and(query_param("name", "land"))
             .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_string(r#"[{"name":"landscape","count":123}]"#),
+                ResponseTemplate::new(200).set_body_string(r#"[{"name":"landscape","count":123}]"#),
             )
             .mount(&mock_server)
             .await;
