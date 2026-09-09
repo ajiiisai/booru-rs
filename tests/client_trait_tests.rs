@@ -286,4 +286,28 @@ mod surface_tests {
         let _ = search.clone().posts().max_posts(1);
         drop(search.posts().max_posts(1).collect());
     }
+
+    #[test]
+    #[cfg(feature = "konachan")]
+    fn konachan_matches_provider_surface() {
+        use booru_rs::konachan::{Client, KonachanRating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("cat")
+            .tags(["smile", "pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(KonachanRating::Safe)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(KonachanRating::Explicit);
+        assert!(search.query().validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
 }
