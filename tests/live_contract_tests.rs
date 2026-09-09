@@ -187,6 +187,7 @@ async fn safebooru_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Konachan API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "konachan")]
 async fn konachan_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let client = booru_rs::konachan::Client::builder()
@@ -210,7 +211,7 @@ async fn konachan_contract() -> Result<()> {
     let suggestions = client.autocomplete("cat_", 2).await?;
     assert!(
         !suggestions.is_empty(),
-        "Safebooru returned no autocomplete suggestions"
+        "Konachan returned no autocomplete suggestions"
     );
     assert_at_most(suggestions.len(), 2);
 
