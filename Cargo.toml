@@ -79,6 +79,14 @@ name = "safebooru_tests"
 required-features = ["safebooru"]
 
 [[test]]
+name = "konachan_client_tests"
+required-features = ["safebooru"]
+
+[[test]]
+name = "konachan_tests"
+required-features = ["safebooru"]
+
+[[test]]
 name = "mock_tests"
 required-features = ["danbooru", "gelbooru", "rule34", "safebooru"]
 

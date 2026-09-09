@@ -93,14 +93,13 @@ mod konachan {
         assert!(!posts.unwrap().is_empty());
     }
 
-    // Fails due to konachan not supporting direct id lookups
     #[tokio::test]
     #[ignore = "contacts a live booru service; run explicitly with --ignored"]
     async fn get_post_by_id() {
-        let post = client().post(4348760).await;
+        let post = client().post(372496).await;
 
         assert!(post.is_ok());
-        assert_eq!("3e407a7848804119f1064c2aac731545", post.unwrap().md5);
+        assert_eq!("927462dc48e7fedd8dd22e1bf42ae6e3", post.unwrap().md5);
     }
 
     #[tokio::test]

@@ -114,15 +114,14 @@ async fn concurrent_searches_share_one_client() {
     assert!(landscapes.expect("search must succeed").is_empty());
 }
 
-// This test fails due to konachan not having direct id lookup
 #[tokio::test]
 async fn post_returns_single_post() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))
         .and(path("/post.json"))
-        .and(query_param("id", "1"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(single_post_json(1)))
+        .and(query_param("tags", "id:1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1])))
         .mount(&mock_server)
         .await;
 
@@ -131,7 +130,7 @@ async fn post_returns_single_post() {
     let post = client.post(1).await.expect("lookup must succeed");
 
     assert_eq!(post.id, 1);
-    assert_eq!(post.width, 1920);
+    assert_eq!(post.width, 100);
 }
 
 #[tokio::test]
@@ -713,7 +712,6 @@ fn post_serializes_and_round_trips() {
     assert_eq!(restored, post);
 }
 
-// Fails because konachan does not send post id request
 #[tokio::test]
 async fn trait_post_preserves_error_context() {
     let mock_server = MockServer::start().await;
