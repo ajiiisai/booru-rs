@@ -50,7 +50,7 @@ fn ids(posts: &[booru_rs::model::konachan::KonachanPost]) -> Vec<u32> {
 
 async fn mock_pages(mock_server: &MockServer, pages: &[Vec<u32>]) {
     for (pid, ids) in pages.iter().enumerate() {
-        let page = pid+1;
+        let page = pid + 1;
         Mock::given(method("GET"))
             .and(path("/post.json"))
             .and(query_param("page", page.to_string()))
