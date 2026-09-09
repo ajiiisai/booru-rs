@@ -156,6 +156,18 @@ pub trait Client {
     /// Provider-specific continuation for a subsequent page.
     type Continuation: Clone;
 
+    /// Creates an empty query for this client.
+    ///
+    /// This method is available when the provider's query implements the
+    /// shared [`Query`] builder interface. Provider-specific filters remain
+    /// available on the concrete query type.
+    fn query(&self) -> Self::Query
+    where
+        Self::Query: Query,
+    {
+        <Self::Query as Query>::new()
+    }
+
     /// Fetches one page and returns its continuation.
     fn page(
         &self,
@@ -166,6 +178,113 @@ pub trait Client {
     /// Fetches one post by ID.
     fn post(&self, id: u32) -> impl std::future::Future<Output = Result<Self::Post>> + Send;
 }
+
+/// Shared query-builder interface for generic provider callers.
+pub trait Query: Clone + Default + Sized {
+    /// Creates an empty query.
+    fn new() -> Self;
+
+    /// Adds a literal tag to the query.
+    fn tag(self, tag: impl Into<String>) -> Self;
+
+    /// Adds literal tags to the query.
+    fn tags<I, S>(self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>;
+
+    /// Adds a provider query expression without literal-tag validation.
+    fn raw_query(self, expression: impl Into<String>) -> Self;
+
+    /// Adds provider query expressions without literal-tag validation.
+    fn raw_queries<I, S>(self, expressions: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>;
+
+    /// Sets the maximum number of posts to return.
+    fn limit(self, limit: u32) -> Self;
+
+    /// Adds a tag that must not match.
+    fn blacklist_tag(self, tag: impl AsRef<str>) -> Self;
+
+    /// Adds tags that must not match.
+    fn blacklist_tags<I, S>(self, tags: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>;
+
+    /// Requests randomized results.
+    fn random(self) -> Self;
+
+    /// Validates the configured query.
+    fn validate(&self) -> Result<()>;
+}
+
+macro_rules! impl_query {
+    ($module:ident, $feature:literal) => {
+        #[cfg(feature = $feature)]
+        impl Query for $module::Query {
+            fn new() -> Self {
+                $module::Query::new()
+            }
+
+            fn tag(self, tag: impl Into<String>) -> Self {
+                $module::Query::tag(self, tag)
+            }
+
+            fn tags<I, S>(self, tags: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: Into<String>,
+            {
+                $module::Query::tags(self, tags)
+            }
+
+            fn raw_query(self, expression: impl Into<String>) -> Self {
+                $module::Query::raw_query(self, expression)
+            }
+
+            fn raw_queries<I, S>(self, expressions: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: Into<String>,
+            {
+                $module::Query::raw_queries(self, expressions)
+            }
+
+            fn limit(self, limit: u32) -> Self {
+                $module::Query::limit(self, limit)
+            }
+
+            fn blacklist_tag(self, tag: impl AsRef<str>) -> Self {
+                $module::Query::blacklist_tag(self, tag)
+            }
+
+            fn blacklist_tags<I, S>(self, tags: I) -> Self
+            where
+                I: IntoIterator<Item = S>,
+                S: AsRef<str>,
+            {
+                $module::Query::blacklist_tags(self, tags)
+            }
+
+            fn random(self) -> Self {
+                $module::Query::random(self)
+            }
+
+            fn validate(&self) -> Result<()> {
+                $module::Query::validate(self)
+            }
+        }
+    };
+}
+
+impl_query!(danbooru, "danbooru");
+impl_query!(gelbooru, "gelbooru");
+impl_query!(rule34, "rule34");
+impl_query!(safebooru, "safebooru");
+impl_query!(konachan, "konachan");
 
 /// Shared builder interface for generic provider callers.
 ///

@@ -45,6 +45,15 @@ mod mock_post_trait {
             post.file_url(),
             Some("https://example.com/images/1234/abc123.jpg")
         );
+        assert_eq!(
+            post.preview_url(),
+            Some("https://example.com/thumbnails/1234/thumbnail_abc123.jpg")
+        );
+        assert_eq!(
+            post.sample_url(),
+            Some("https://example.com/samples/1234/sample_abc123.jpg")
+        );
+        assert_eq!(post.parent_id(), None);
         assert_eq!(post.tags(), "cat_ears blue_eyes");
         assert_eq!(
             post.tags_iter().collect::<Vec<_>>(),

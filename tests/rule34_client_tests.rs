@@ -489,6 +489,15 @@ async fn post_trait_methods() {
         post.file_url(),
         Some("https://example.com/images/3900/rule34hash123.png")
     );
+    assert_eq!(
+        post.preview_url(),
+        Some("https://example.com/thumbnails/3900/thumbnail_rule34hash123.jpg")
+    );
+    assert_eq!(
+        post.sample_url(),
+        Some("https://example.com/samples/3900/sample_rule34hash123.jpg")
+    );
+    assert_eq!(post.parent_id(), None);
     assert_eq!(post.tags(), "1girl blue_hair");
     assert_eq!(post.score(), Some(75));
     assert_eq!(post.md5(), Some("rule34hash123"));

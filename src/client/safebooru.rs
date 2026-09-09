@@ -49,7 +49,7 @@ impl Client {
     }
 
     pub fn search(&self) -> Search {
-        self.search_with(Query::new())
+        self.search_with(super::Client::query(self))
     }
 
     pub fn search_with(&self, query: Query) -> Search {

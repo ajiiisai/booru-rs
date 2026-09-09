@@ -1,4 +1,4 @@
-use booru_rs::client::{Client, PageResult};
+use booru_rs::client::{Client, PageResult, Query as QueryBuilder};
 use booru_rs::model::Post;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -97,6 +97,46 @@ async fn external_style_client_implements_operation_interface() {
     let posts = collect_pages(&client, FakeQuery).await.unwrap();
     assert_eq!(posts.iter().map(Post::id).collect::<Vec<_>>(), vec![1, 2]);
     assert_eq!(Client::post(&client, 42).await.unwrap().id(), 42);
+}
+
+#[test]
+fn providers_implement_shared_query_builder() {
+    fn build_query<C>(client: &C) -> C::Query
+    where
+        C: Client,
+        C::Query: QueryBuilder,
+    {
+        client
+            .query()
+            .tag("cat_ears")
+            .tags(["blue_eyes"])
+            .raw_query("artist:foo bar")
+            .raw_queries(["score:>10"])
+            .limit(20)
+            .blacklist_tag("watermark")
+            .blacklist_tags(["text"])
+            .random()
+    }
+
+    #[cfg(feature = "danbooru")]
+    let _ = build_query(&booru_rs::danbooru::Client::new().unwrap()).validate();
+    #[cfg(feature = "gelbooru")]
+    let _ = build_query(&booru_rs::gelbooru::Client::new().unwrap()).validate();
+    #[cfg(feature = "rule34")]
+    let _ = build_query(&booru_rs::rule34::Client::new().unwrap()).validate();
+    #[cfg(feature = "safebooru")]
+    let _ = build_query(&booru_rs::safebooru::Client::new().unwrap()).validate();
+    #[cfg(feature = "konachan")]
+    let _ = build_query(&booru_rs::konachan::Client::new().unwrap()).validate();
+}
+
+#[test]
+fn post_trait_optional_accessors_have_compatible_defaults() {
+    let post = FakePost { id: 1 };
+
+    assert_eq!(post.preview_url(), None);
+    assert_eq!(post.sample_url(), None);
+    assert_eq!(post.parent_id(), None);
 }
 
 #[tokio::test]
