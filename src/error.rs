@@ -208,7 +208,8 @@ impl BooruError {
         feature = "danbooru",
         feature = "gelbooru",
         feature = "rule34",
-        feature = "safebooru"
+        feature = "safebooru",
+        feature = "konachan"
     ))]
     pub(crate) fn with_context(self, provider: Provider, operation: Operation) -> Self {
         if matches!(self, Self::Context { .. }) {
@@ -251,7 +252,8 @@ impl BooruError {
         feature = "danbooru",
         feature = "gelbooru",
         feature = "rule34",
-        feature = "safebooru"
+        feature = "safebooru",
+        feature = "konachan"
     ))]
     pub(crate) fn http_status(status: reqwest::StatusCode, body: &str) -> Self {
         const LIMIT: usize = 300;
@@ -306,7 +308,8 @@ impl BooruError {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) trait ResultContext<T> {
     fn with_context(self, provider: Provider, operation: Operation) -> Result<T>;
@@ -316,7 +319,8 @@ pub(crate) trait ResultContext<T> {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 impl<T> ResultContext<T> for Result<T> {
     fn with_context(self, provider: Provider, operation: Operation) -> Result<T> {

@@ -97,7 +97,8 @@ async fn external_style_client_implements_operation_interface() {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 mod builder_tests {
     use booru_rs::client::Builder;
@@ -177,7 +178,8 @@ mod builder_tests {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 mod surface_tests {
     use booru_rs::client::generic::Sort;
