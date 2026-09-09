@@ -50,9 +50,10 @@ fn ids(posts: &[booru_rs::model::konachan::KonachanPost]) -> Vec<u32> {
 
 async fn mock_pages(mock_server: &MockServer, pages: &[Vec<u32>]) {
     for (pid, ids) in pages.iter().enumerate() {
+        let page = pid+1;
         Mock::given(method("GET"))
             .and(path("/post.json"))
-            .and(query_param("page", pid.to_string()))
+            .and(query_param("page", page.to_string()))
             .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(ids)))
             .mount(mock_server)
             .await;
@@ -65,7 +66,7 @@ async fn search_sends_tags_and_limit_in_order() {
 
     Mock::given(method("GET"))
         .and(path("/post.json"))
-        .and(query_param("page", "0"))
+        .and(query_param("page", "1"))
         .and(query_param("limit", "2"))
         .and(query_param("tags", "cat_ears"))
         .respond_with(ResponseTemplate::new(200).set_body_string(posts_json(&[1, 2])))
@@ -501,7 +502,7 @@ async fn page_setter_starts_there() {
 
     let posts = client
         .search()
-        .start_page(2)
+        .start_page(3)
         .send()
         .await
         .expect("search must succeed");
