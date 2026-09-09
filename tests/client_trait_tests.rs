@@ -1,4 +1,12 @@
-use booru_rs::client::{Client, PageResult, Query as QueryBuilder};
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
+use booru_rs::client::Query as QueryBuilder;
+use booru_rs::client::{Client, PageResult};
 use booru_rs::model::Post;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -99,6 +107,13 @@ async fn external_style_client_implements_operation_interface() {
     assert_eq!(Client::post(&client, 42).await.unwrap().id(), 42);
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
 #[test]
 fn providers_implement_shared_query_builder() {
     fn build_query<C>(client: &C) -> C::Query
