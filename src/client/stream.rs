@@ -109,6 +109,7 @@ where
                                 this.done = true;
                                 return Poll::Ready(None);
                             }
+                            this.done = page.next.is_none();
                             this.continuation = page.next.clone();
                             return Poll::Ready(Some(Ok(page)));
                         }

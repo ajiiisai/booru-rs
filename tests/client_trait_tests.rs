@@ -1,5 +1,7 @@
 use booru_rs::client::{Client, PageResult};
 use booru_rs::model::Post;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Clone)]
 struct FakeQuery;
@@ -45,7 +47,10 @@ impl Post for FakePost {
     }
 }
 
-struct FakeClient;
+#[derive(Clone, Default)]
+struct FakeClient {
+    requests: Arc<AtomicUsize>,
+}
 
 impl Client for FakeClient {
     type Query = FakeQuery;
@@ -57,6 +62,7 @@ impl Client for FakeClient {
         _query: Self::Query,
         continuation: Option<Self::Continuation>,
     ) -> booru_rs::Result<PageResult<Self::Post, Self::Continuation>> {
+        self.requests.fetch_add(1, Ordering::Relaxed);
         match continuation {
             None => Ok(PageResult::new(
                 vec![FakePost { id: 1 }],
@@ -87,10 +93,59 @@ async fn collect_pages<C: Client>(client: &C, query: C::Query) -> booru_rs::Resu
 
 #[tokio::test]
 async fn external_style_client_implements_operation_interface() {
-    let client = FakeClient;
+    let client = FakeClient::default();
     let posts = collect_pages(&client, FakeQuery).await.unwrap();
     assert_eq!(posts.iter().map(Post::id).collect::<Vec<_>>(), vec![1, 2]);
     assert_eq!(Client::post(&client, 42).await.unwrap().id(), 42);
+}
+
+#[tokio::test]
+async fn nonempty_final_page_terminates_page_stream() {
+    let client = FakeClient::default();
+    let requests = Arc::clone(&client.requests);
+    let mut pages = booru_rs::client::stream::PageStream::new(client, FakeQuery, None);
+
+    assert_eq!(
+        pages
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .posts
+            .into_iter()
+            .map(|post| post.id)
+            .collect::<Vec<_>>(),
+        vec![1]
+    );
+    assert_eq!(
+        pages
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .posts
+            .into_iter()
+            .map(|post| post.id)
+            .collect::<Vec<_>>(),
+        vec![2]
+    );
+    assert!(pages.next().await.is_none());
+    assert!(pages.next().await.is_none());
+    assert_eq!(requests.load(Ordering::Relaxed), 2);
+}
+
+#[tokio::test]
+async fn nonempty_final_page_terminates_post_stream() {
+    let client = FakeClient::default();
+    let requests = Arc::clone(&client.requests);
+    let pages = booru_rs::client::stream::PageStream::new(client, FakeQuery, None);
+    let mut posts = booru_rs::client::stream::PostStream::new(pages);
+
+    assert_eq!(posts.next().await.unwrap().unwrap().id, 1);
+    assert_eq!(posts.next().await.unwrap().unwrap().id, 2);
+    assert!(posts.next().await.is_none());
+    assert!(posts.next().await.is_none());
+    assert_eq!(requests.load(Ordering::Relaxed), 2);
 }
 
 #[cfg(any(
