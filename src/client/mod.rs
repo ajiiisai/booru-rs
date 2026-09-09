@@ -60,7 +60,8 @@ use std::time::Duration;
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 use crate::error::BooruError;
 use crate::error::Result;
@@ -71,14 +72,16 @@ use crate::retry::RetryConfig;
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 use crate::retry::is_retryable;
 #[cfg(any(
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 use reqwest::header::HeaderMap;
 
@@ -109,6 +112,8 @@ pub mod danbooru;
 #[cfg(feature = "gelbooru")]
 pub mod gelbooru;
 pub mod generic;
+#[cfg(feature = "konachan")]
+pub mod konachan;
 #[cfg(feature = "rule34")]
 pub mod rule34;
 #[cfg(feature = "safebooru")]
@@ -322,6 +327,35 @@ impl Builder for safebooru::ClientBuilder {
     }
 }
 
+#[cfg(feature = "konachan")]
+impl Builder for konachan::ClientBuilder {
+    type Client = konachan::Client;
+
+    fn endpoint(self, url: impl Into<String>) -> Result<Self> {
+        self.endpoint(url)
+    }
+
+    fn http_client(self, client: reqwest::Client) -> Self {
+        self.http_client(client)
+    }
+
+    fn request_policy(self, policy: RequestPolicy) -> Self {
+        self.request_policy(policy)
+    }
+
+    fn retry_config(self, config: RetryConfig) -> Result<Self> {
+        self.retry_config(config)
+    }
+
+    fn rate_limiter(self, limiter: RateLimiter) -> Self {
+        self.rate_limiter(limiter)
+    }
+
+    fn build(self) -> Result<Self::Client> {
+        self.build()
+    }
+}
+
 /// Shared HTTP client with connection pooling and timeouts.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
@@ -343,7 +377,8 @@ pub fn shared_client() -> &'static reqwest::Client {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
     let trimmed = url.trim_end_matches('/');
@@ -396,7 +431,8 @@ pub(crate) fn dapi_query(
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     for tag in tags {
@@ -420,7 +456,8 @@ pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn validate_raw_queries(
     expressions: &[String],
@@ -463,7 +500,8 @@ pub(crate) fn validate_raw_queries(
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn validate_random_conflict(
     tags: &[String],
@@ -511,7 +549,8 @@ pub(crate) fn validate_random_conflict(
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn map_post_lookup_error(error: BooruError, id: u32) -> BooruError {
     match error {
@@ -528,7 +567,8 @@ pub(crate) fn map_post_lookup_error(error: BooruError, id: u32) -> BooruError {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) fn advance_page(current: u32, empty: bool) -> Option<u32> {
     current.checked_add(1).filter(|_| !empty)
@@ -554,7 +594,8 @@ pub(crate) fn parse_post_count_from_label(label: &str) -> Option<u32> {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwest::Response> {
     let status = response.status();
@@ -615,7 +656,8 @@ impl RequestPolicy {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 pub(crate) async fn execute_with_policy<F, Fut>(
     policy: &RequestPolicy,
@@ -661,7 +703,8 @@ where
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
@@ -674,7 +717,8 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 mod tests {
     use super::{parse_retry_after, validate_random_conflict};

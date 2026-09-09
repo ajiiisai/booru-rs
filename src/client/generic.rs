@@ -57,7 +57,8 @@ impl fmt::Display for Sort {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct QueryCore {
@@ -72,7 +73,8 @@ pub(crate) struct QueryCore {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 impl QueryCore {
     pub(crate) fn new() -> Self {
@@ -191,7 +193,8 @@ impl QueryCore {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BuilderCore {
@@ -204,7 +207,8 @@ pub(crate) struct BuilderCore {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 impl BuilderCore {
     pub(crate) fn endpoint(mut self, url: impl Into<String>) -> crate::error::Result<Self> {

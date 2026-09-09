@@ -22,6 +22,7 @@ An async Rust client for Danbooru, Gelbooru, Safebooru, and Rule34.
 | [Gelbooru](https://gelbooru.com) | `booru_rs::gelbooru::Client` | Unlimited | Yes |
 | [Safebooru](https://safebooru.org) | `booru_rs::safebooru::Client` | Unlimited | No |
 | [Rule34](https://rule34.xxx) | `booru_rs::rule34::Client` | Unlimited | Yes |
+| [Konachan](https://konachan.com) | `booru_rs::konachan::Client` | Unlimited | No |
 
 Gelbooru and Rule34 require API credentials for requests. See the [authentication section](#authentication).
 

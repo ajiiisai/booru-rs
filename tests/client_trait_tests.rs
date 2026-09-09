@@ -97,7 +97,8 @@ async fn external_style_client_implements_operation_interface() {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 mod builder_tests {
     use booru_rs::client::Builder;
@@ -158,6 +159,14 @@ mod builder_tests {
         reject_bad_endpoint(booru_rs::safebooru::Client::builder());
         apply_policy(booru_rs::safebooru::Client::builder());
     }
+
+    #[test]
+    #[cfg(feature = "konachan")]
+    fn konachan_builder_implements_shared_trait() {
+        build_with_endpoint(booru_rs::konachan::Client::builder());
+        reject_bad_endpoint(booru_rs::konachan::Client::builder());
+        apply_policy(booru_rs::konachan::Client::builder());
+    }
 }
 
 /// Proves every provider exposes the same query and search surface.
@@ -169,7 +178,8 @@ mod builder_tests {
     feature = "danbooru",
     feature = "gelbooru",
     feature = "rule34",
-    feature = "safebooru"
+    feature = "safebooru",
+    feature = "konachan"
 ))]
 mod surface_tests {
     use booru_rs::client::generic::Sort;
@@ -271,6 +281,30 @@ mod surface_tests {
             .blacklist_tag("spoiler")
             .blacklist_tags(["gore"])
             .exclude_rating(Rule34Rating::Explicit);
+        assert!(search.query().validate().is_ok());
+        let _ = search.clone().pages().max_pages(1);
+        let _ = search.clone().posts().max_posts(1);
+        drop(search.posts().max_posts(1).collect());
+    }
+
+    #[test]
+    #[cfg(feature = "konachan")]
+    fn konachan_matches_provider_surface() {
+        use booru_rs::konachan::{Client, KonachanRating};
+
+        let client = Client::builder().build().unwrap();
+        let search = client
+            .search()
+            .tag("cat")
+            .tags(["smile", "pink_hair"])
+            .raw_query("artist:foo")
+            .raw_queries(["score:>10"])
+            .rating(KonachanRating::Safe)
+            .sort(Sort::Score)
+            .limit(10)
+            .blacklist_tag("spoiler")
+            .blacklist_tags(["gore"])
+            .exclude_rating(KonachanRating::Explicit);
         assert!(search.query().validate().is_ok());
         let _ = search.clone().pages().max_pages(1);
         let _ = search.clone().posts().max_posts(1);

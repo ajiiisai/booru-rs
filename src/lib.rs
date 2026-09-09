@@ -57,6 +57,7 @@
 //! | [Gelbooru](https://gelbooru.com) | `gelbooru::Client` | Unlimited | Yes |
 //! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
 //! | [Rule34](https://rule34.xxx) | `rule34::Client` | Unlimited | Yes |
+//! | [Konachan](https://konachan.com) | `konachan::Client` | Unlimited | No |
 //!
 //! ## Pagination with Async Streams
 //!
@@ -145,4 +146,11 @@ pub mod rule34 {
 pub mod safebooru {
     pub use crate::client::safebooru::*;
     pub use crate::model::safebooru::*;
+}
+
+/// Konachan client and model types.
+#[cfg(feature = "konachan")]
+pub mod konachan {
+    pub use crate::client::konachan::*;
+    pub use crate::model::konachan::*;
 }

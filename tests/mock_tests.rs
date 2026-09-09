@@ -7,19 +7,17 @@
 //! - Running fast, reliable tests in CI
 //! - Testing without API credentials
 
-use booru_rs::error::BooruError;
-use wiremock::matchers::{method, path, query_param};
-use wiremock::{Mock, MockServer, ResponseTemplate};
-
-/// Test fixture for Safebooru posts
-fn safebooru_posts_json() -> &'static str {
-    include_str!("fixtures/safebooru/posts.json")
-}
-
+#[cfg(feature = "safebooru")]
 mod mock_post_trait {
-    use super::*;
     use booru_rs::model::Post;
     use booru_rs::safebooru::Client;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    /// Test fixture for Safebooru posts
+    fn safebooru_posts_json() -> &'static str {
+        include_str!("fixtures/safebooru/posts.json")
+    }
 
     #[tokio::test]
     async fn test_post_trait_methods() {
@@ -80,8 +78,16 @@ mod mock_post_trait {
     }
 }
 
+#[cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
 mod mock_autocomplete {
-    use super::*;
+    use wiremock::matchers::{method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
     #[cfg(feature = "danbooru")]
@@ -142,6 +148,21 @@ mod mock_autocomplete {
     }
 
     #[tokio::test]
+    #[cfg(feature = "konachan")]
+    async fn zero_limit_skips_konachan_request() {
+        let mock_server = MockServer::start().await;
+        let client = booru_rs::konachan::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(client.autocomplete("cat_", 0).await.unwrap().is_empty());
+        assert_eq!(mock_server.received_requests().await.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "danbooru")]
     async fn test_danbooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
@@ -207,6 +228,7 @@ mod mock_autocomplete {
     }
 
     #[tokio::test]
+    #[cfg(feature = "safebooru")]
     async fn test_safebooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
@@ -266,11 +288,46 @@ mod mock_autocomplete {
         assert_eq!(suggestions[0].name, "cat_ears");
         assert_eq!(suggestions[1].name, "cat_girl");
     }
+
+    #[tokio::test]
+    #[cfg(feature = "konachan")]
+    async fn test_konachan_uses_instance_endpoint() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/tag.json"))
+            .and(query_param("name", "land"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(r#"[{"name":"landscape","count":123}]"#),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = booru_rs::konachan::Client::builder()
+            .endpoint(mock_server.uri())
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let suggestions = client
+            .autocomplete("land", 5)
+            .await
+            .expect("complete must succeed");
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].name, "landscape");
+        assert_eq!(suggestions[0].post_count, Some(123));
+    }
 }
 
+#[cfg(feature = "safebooru")]
 mod endpoint_config {
-    use super::*;
+    use booru_rs::BooruError;
     use booru_rs::safebooru::Client;
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path, query_param},
+    };
 
     #[tokio::test]
     async fn test_trailing_slash_still_routes() {
@@ -322,6 +379,7 @@ mod endpoint_config {
 
 mod credential_redaction {
     #[test]
+    #[cfg(all(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
     fn client_debug_output_omits_credentials() {
         let secret = "debug-secret";
         let user = "debug-user";
@@ -344,6 +402,7 @@ mod credential_redaction {
     }
 
     #[tokio::test]
+    #[cfg(feature = "danbooru")]
     async fn request_errors_omit_credentials() {
         let secret = "request-secret";
         let user = "request-user";

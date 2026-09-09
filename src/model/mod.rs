@@ -7,6 +7,8 @@
 pub mod danbooru;
 #[cfg(feature = "gelbooru")]
 pub mod gelbooru;
+#[cfg(feature = "konachan")]
+pub mod konachan;
 #[cfg(feature = "rule34")]
 pub mod rule34;
 #[cfg(feature = "safebooru")]
@@ -213,6 +215,49 @@ impl Post for rule34::Rule34Post {
             None
         } else {
             Some(&self.hash)
+        }
+    }
+
+    fn source(&self) -> Option<&str> {
+        if self.source.is_empty() {
+            None
+        } else {
+            Some(&self.source)
+        }
+    }
+}
+
+#[cfg(feature = "konachan")]
+impl Post for konachan::KonachanPost {
+    fn id(&self) -> u32 {
+        self.id
+    }
+
+    fn width(&self) -> u32 {
+        self.width
+    }
+
+    fn height(&self) -> Option<u32> {
+        Some(self.height)
+    }
+
+    fn file_url(&self) -> Option<&str> {
+        self.file_url.as_deref().filter(|url| !url.is_empty())
+    }
+
+    fn tags(&self) -> &str {
+        &self.tags
+    }
+
+    fn score(&self) -> Option<i64> {
+        Some(i64::from(self.score))
+    }
+
+    fn md5(&self) -> Option<&str> {
+        if self.md5.is_empty() {
+            None
+        } else {
+            Some(&self.md5)
         }
     }
 

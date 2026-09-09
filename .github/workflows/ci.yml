@@ -101,7 +101,7 @@ jobs:
       - name: Check every feature combination
         env:
           RUSTFLAGS: -D warnings
-        run: cargo hack check --feature-powerset --locked
+        run: cargo hack check --feature-powerset --all-targets --locked
       - name: Test the standalone download feature
         run: cargo test --no-default-features --features download --locked
 

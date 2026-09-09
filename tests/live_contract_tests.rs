@@ -2,6 +2,13 @@
 //!
 //! Run with:
 //! `cargo test --features live-tests --test live_contract_tests -- --ignored --nocapture`
+#![cfg(any(
+    feature = "danbooru",
+    feature = "gelbooru",
+    feature = "rule34",
+    feature = "safebooru",
+    feature = "konachan"
+))]
 
 use std::sync::OnceLock;
 
@@ -19,6 +26,7 @@ fn endpoint(prefix: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.to_string())
 }
 
+#[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 fn optional_credentials(prefix: &str) -> Option<(String, String)> {
     let key_name = format!("BOORU_RS_LIVE_{prefix}_API_KEY");
     let user_name = format!("BOORU_RS_LIVE_{prefix}_USER_ID");
@@ -32,6 +40,7 @@ fn optional_credentials(prefix: &str) -> Option<(String, String)> {
     }
 }
 
+#[cfg(any(feature = "gelbooru", feature = "rule34"))]
 fn required_credentials(prefix: &str) -> (String, String) {
     optional_credentials(prefix).unwrap_or_else(|| {
         panic!(
@@ -49,6 +58,7 @@ fn assert_at_most(actual: usize, requested: u32) {
 
 #[tokio::test]
 #[ignore = "contacts the live Danbooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "danbooru")]
 async fn danbooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let mut builder = booru_rs::danbooru::Client::builder()
@@ -84,6 +94,7 @@ async fn danbooru_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Gelbooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "gelbooru")]
 async fn gelbooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let (key, user) = required_credentials("GELBOORU");
@@ -118,6 +129,7 @@ async fn gelbooru_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Rule34 API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "rule34")]
 async fn rule34_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let (key, user) = required_credentials("RULE34");
@@ -152,6 +164,7 @@ async fn rule34_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Safebooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "safebooru")]
 async fn safebooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let client = booru_rs::safebooru::Client::builder()
@@ -176,6 +189,42 @@ async fn safebooru_contract() -> Result<()> {
     assert!(
         !suggestions.is_empty(),
         "Safebooru returned no autocomplete suggestions"
+    );
+    assert_at_most(suggestions.len(), 2);
+
+    let post = posts.first().expect("nonempty search result");
+    let fetched = client.post(post.id).await?;
+    assert_eq!(fetched.id, post.id);
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "contacts the live Konachan API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "konachan")]
+async fn konachan_contract() -> Result<()> {
+    let _guard = live_test_guard().await;
+    let client = booru_rs::konachan::Client::builder()
+        .endpoint(endpoint("KONACHAN", "https://konachan.com"))?
+        .build()?;
+
+    let posts = client.search().tag("landscape").limit(3).send().await?;
+    assert!(
+        !posts.is_empty(),
+        "Konachan returned no posts for landscape"
+    );
+    assert_at_most(posts.len(), 3);
+
+    let page = client.search().tag("landscape").limit(2).page().await?;
+    assert_at_most(page.posts.len(), 2);
+    if let Some(next) = page.next {
+        let next_page = next.page().await?;
+        assert_at_most(next_page.posts.len(), 2);
+    }
+
+    let suggestions = client.autocomplete("cat_", 2).await?;
+    assert!(
+        !suggestions.is_empty(),
+        "Konachan returned no autocomplete suggestions"
     );
     assert_at_most(suggestions.len(), 2);
 

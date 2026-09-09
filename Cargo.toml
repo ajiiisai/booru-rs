@@ -10,11 +10,12 @@ repository = "https://github.com/ajiiisai/booru-rs"
 readme = "README.md"
 
 [features]
-default = ["danbooru", "gelbooru", "safebooru", "rule34"]
+default = ["danbooru", "gelbooru", "safebooru", "rule34", "konachan"]
 danbooru = []
 gelbooru = []
 safebooru = []
 rule34 = []
+konachan = []
 live-tests = []
 download = [
     "dep:tempfile",
@@ -78,12 +79,20 @@ name = "safebooru_tests"
 required-features = ["safebooru"]
 
 [[test]]
+name = "konachan_client_tests"
+required-features = ["konachan"]
+
+[[test]]
+name = "konachan_tests"
+required-features = ["konachan"]
+
+[[test]]
 name = "mock_tests"
-required-features = ["danbooru", "gelbooru", "rule34", "safebooru"]
+required-features = []
 
 [[test]]
 name = "live_contract_tests"
-required-features = ["live-tests", "danbooru", "gelbooru", "rule34", "safebooru"]
+required-features = ["live-tests"]
 
 [profile.dev]
 opt-level = 1
