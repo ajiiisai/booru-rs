@@ -88,11 +88,11 @@ required-features = ["konachan"]
 
 [[test]]
 name = "mock_tests"
-required-features = ["danbooru", "gelbooru", "rule34", "safebooru", "konachan"]
+required-features = []
 
 [[test]]
 name = "live_contract_tests"
-required-features = ["live-tests", "danbooru", "gelbooru", "rule34", "safebooru", "konachan"]
+required-features = ["live-tests"]
 
 [profile.dev]
 opt-level = 1

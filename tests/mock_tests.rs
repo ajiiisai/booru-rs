@@ -16,6 +16,7 @@ fn safebooru_posts_json() -> &'static str {
     include_str!("fixtures/safebooru/posts.json")
 }
 
+#[cfg(feature = "safebooru")]
 mod mock_post_trait {
     use super::*;
     use booru_rs::model::Post;
@@ -156,6 +157,7 @@ mod mock_autocomplete {
     }
 
     #[tokio::test]
+    #[cfg(feature = "danbooru")]
     async fn test_danbooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
@@ -221,6 +223,7 @@ mod mock_autocomplete {
     }
 
     #[tokio::test]
+    #[cfg(feature = "safebooru")]
     async fn test_safebooru_uses_instance_endpoint() {
         let mock_server = MockServer::start().await;
 
@@ -312,6 +315,7 @@ mod mock_autocomplete {
     }
 }
 
+#[cfg(feature = "safebooru")]
 mod endpoint_config {
     use super::*;
     use booru_rs::safebooru::Client;
@@ -366,6 +370,7 @@ mod endpoint_config {
 
 mod credential_redaction {
     #[test]
+    #[cfg(all(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
     fn client_debug_output_omits_credentials() {
         let secret = "debug-secret";
         let user = "debug-user";
@@ -388,6 +393,7 @@ mod credential_redaction {
     }
 
     #[tokio::test]
+    #[cfg(feature = "danbooru")]
     async fn request_errors_omit_credentials() {
         let secret = "request-secret";
         let user = "request-user";

@@ -49,6 +49,7 @@ fn assert_at_most(actual: usize, requested: u32) {
 
 #[tokio::test]
 #[ignore = "contacts the live Danbooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "danbooru")]
 async fn danbooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let mut builder = booru_rs::danbooru::Client::builder()
@@ -84,6 +85,7 @@ async fn danbooru_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Gelbooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "gelbooru")]
 async fn gelbooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let (key, user) = required_credentials("GELBOORU");
@@ -118,6 +120,7 @@ async fn gelbooru_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Rule34 API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "rule34")]
 async fn rule34_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let (key, user) = required_credentials("RULE34");
@@ -152,6 +155,7 @@ async fn rule34_contract() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "contacts the live Safebooru API; opt in with --features live-tests -- --ignored"]
+#[cfg(feature = "safebooru")]
 async fn safebooru_contract() -> Result<()> {
     let _guard = live_test_guard().await;
     let client = booru_rs::safebooru::Client::builder()
