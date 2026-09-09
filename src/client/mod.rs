@@ -984,6 +984,16 @@ mod tests {
     }
 
     #[test]
+    fn empty_blacklist_tag_is_rejected() {
+        let error = QueryCore::new().blacklist_tag("").validate_common().unwrap_err();
+        assert!(matches!(
+            error,
+            BooruError::InvalidTag { tag, reason }
+                if tag.is_empty() && reason == "tag must not be empty"
+        ));
+    }
+
+    #[test]
     fn raw_query_validation_preserves_spaces_and_rejects_conflicts() {
         assert!(validate_raw_queries(&["artist:foo bar".to_string()], false, false).is_ok());
 

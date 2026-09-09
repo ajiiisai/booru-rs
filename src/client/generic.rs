@@ -64,6 +64,7 @@ impl fmt::Display for Sort {
 pub(crate) struct QueryCore {
     pub(crate) tags: Vec<String>,
     pub(crate) raw_queries: Vec<String>,
+    pub(crate) invalid_blacklist_tag: Option<String>,
     pub(crate) rating: Option<String>,
     pub(crate) sort: Option<String>,
     pub(crate) limit: u32,
@@ -81,6 +82,7 @@ impl QueryCore {
         Self {
             tags: Vec::new(),
             raw_queries: Vec::new(),
+            invalid_blacklist_tag: None,
             rating: None,
             sort: None,
             limit: 100,
@@ -135,7 +137,12 @@ impl QueryCore {
     }
 
     pub(crate) fn blacklist_tag(mut self, tag: impl AsRef<str>) -> Self {
-        self.tags.push(format!("-{}", tag.as_ref()));
+        let tag = tag.as_ref();
+        if tag.is_empty() {
+            self.invalid_blacklist_tag = Some(tag.to_string());
+        } else {
+            self.tags.push(format!("-{tag}"));
+        }
         self
     }
 
@@ -161,6 +168,12 @@ impl QueryCore {
     }
 
     pub(crate) fn validate_common(&self) -> crate::error::Result<()> {
+        if let Some(tag) = &self.invalid_blacklist_tag {
+            return Err(crate::error::BooruError::InvalidTag {
+                tag: tag.clone(),
+                reason: "tag must not be empty".to_string(),
+            });
+        }
         super::validate_tags(&self.tags)?;
         super::validate_raw_queries(
             &self.raw_queries,
