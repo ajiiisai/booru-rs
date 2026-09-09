@@ -2,7 +2,7 @@
 
 # booru-rs
 
-An async Rust client for Danbooru, Gelbooru, Safebooru, and Rule34.
+An async Rust client for Danbooru, Gelbooru, Safebooru, Rule34, and Konachan.
 
 ## Features
 
@@ -38,14 +38,14 @@ booru-rs = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-The default feature set includes all four providers. Pick providers to trim dependencies:
+The default feature set includes all five providers. Pick providers to trim dependencies:
 
 ```toml
 [dependencies]
 booru-rs = { version = "1", default-features = false, features = ["danbooru"] }
 ```
 
-Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `download`, and `live-tests`. For downloads:
+Available features are `danbooru`, `gelbooru`, `safebooru`, `rule34`, `konachan`, `download`, and `live-tests`. For downloads:
 
 ```toml
 booru-rs = { version = "1", default-features = false, features = ["safebooru", "download"] }

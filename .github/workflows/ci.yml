@@ -120,6 +120,8 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo doc --all-features --no-deps --locked
+      - name: Build provider-free documentation
+        run: cargo doc --no-default-features --no-deps --locked
 
   minimal-versions:
     name: Check direct dependency bounds

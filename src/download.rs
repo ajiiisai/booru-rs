@@ -32,15 +32,39 @@ use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 
 fn validate_filename(filename: &str) -> Result<()> {
+    let stem = filename
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
+    let reserved_device_name = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ["COM", "LPT"].iter().any(|prefix| {
+            stem.strip_prefix(prefix).is_some_and(|suffix| {
+                matches!(
+                    suffix,
+                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                )
+            })
+        });
+    let has_invalid_character = filename.chars().any(|character| {
+        character.is_control() || matches!(character, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+    });
     if filename.is_empty()
         || filename == "."
         || filename == ".."
         || filename.contains('/')
         || filename.contains('\\')
+        || matches!(filename.chars().last(), Some(' ' | '.'))
+        || reserved_device_name
+        || has_invalid_character
     {
         return Err(BooruError::InvalidFilename(filename.to_string()));
     }
     Ok(())
+}
+
+fn destination_key(path: &Path) -> PathBuf {
+    PathBuf::from(path.to_string_lossy().to_uppercase())
 }
 
 fn filename_from_url(url: &str) -> Result<String> {
@@ -562,7 +586,7 @@ impl Downloader {
         let mut tasks: tokio::task::JoinSet<(usize, Result<DownloadResult>)> =
             tokio::task::JoinSet::new();
         let mut task_indexes = HashMap::new();
-        let mut destinations: HashMap<std::path::PathBuf, Vec<usize>> = HashMap::new();
+        let mut destinations: HashMap<PathBuf, (PathBuf, Vec<usize>)> = HashMap::new();
         let mut filenames = vec![None; posts.len()];
         let mut results: Vec<Option<Result<DownloadResult>>> =
             (0..posts.len()).map(|_| None).collect();
@@ -577,16 +601,18 @@ impl Downloader {
                 results[index] = Some(Err(error));
                 continue;
             }
+            let destination = dest_dir.join(&filename);
             destinations
-                .entry(dest_dir.join(&filename))
-                .or_default()
+                .entry(destination_key(&destination))
+                .or_insert_with(|| (destination, Vec::new()))
+                .1
                 .push(index);
             filenames[index] = Some(filename);
         }
         let conflicts: HashMap<usize, std::path::PathBuf> = destinations
             .into_iter()
-            .filter(|(_, indexes)| indexes.len() > 1)
-            .flat_map(|(destination, indexes)| {
+            .filter(|(_, (_, indexes))| indexes.len() > 1)
+            .flat_map(|(_, (destination, indexes))| {
                 indexes
                     .into_iter()
                     .map(move |index| (index, destination.clone()))
@@ -1030,6 +1056,33 @@ mod tests {
         assert!(validate_filename("image.jpg").is_ok());
     }
 
+    #[test]
+    fn filename_validation_rejects_windows_incompatible_names() {
+        for filename in [
+            "foo:bar.jpg",
+            "foo*bar.jpg",
+            "foo?bar.jpg",
+            "foo\"bar.jpg",
+            "foo<bar.jpg",
+            "foo>bar.jpg",
+            "foo|bar.jpg",
+            "foo.",
+            "foo ",
+            "CON",
+            "con.txt",
+            "LPT9.jpeg",
+            "COM¹.jpg",
+            "com².txt",
+            "LPT³.png",
+            "foo\u{0001}bar.jpg",
+        ] {
+            assert!(matches!(
+                validate_filename(filename),
+                Err(BooruError::InvalidFilename(actual)) if actual == filename
+            ));
+        }
+    }
+
     #[tokio::test]
     async fn timeout_preserves_injected_client_configuration() {
         use wiremock::matchers::{header, method, path};
@@ -1225,6 +1278,112 @@ mod tests {
                 Err(BooruError::DestinationConflict(_))
             ]
         ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_case_insensitive_destination_collisions() {
+        struct CaseVariantPost(String);
+
+        impl Post for CaseVariantPost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some(&self.0)
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                None
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        let posts = [
+            CaseVariantPost("https://example.com/image.jpg".into()),
+            CaseVariantPost("https://example.com/image.JPG".into()),
+        ];
+        let results = Downloader::new()
+            .download_posts(&posts, Path::new("downloads"), 2)
+            .await;
+
+        assert!(matches!(
+            results.as_slice(),
+            [
+                Err(BooruError::DestinationConflict(_)),
+                Err(BooruError::DestinationConflict(_))
+            ]
+        ));
+    }
+
+    #[tokio::test]
+    async fn batch_rejects_unicode_case_collisions() {
+        struct UnicodeCasePost {
+            hash: String,
+        }
+
+        impl Post for UnicodeCasePost {
+            fn id(&self) -> u32 {
+                7
+            }
+            fn width(&self) -> u32 {
+                1
+            }
+            fn height(&self) -> Option<u32> {
+                Some(1)
+            }
+            fn file_url(&self) -> Option<&str> {
+                Some("https://example.com/image.jpg")
+            }
+            fn tags(&self) -> &str {
+                ""
+            }
+            fn score(&self) -> Option<i64> {
+                None
+            }
+            fn md5(&self) -> Option<&str> {
+                Some(&self.hash)
+            }
+            fn source(&self) -> Option<&str> {
+                None
+            }
+        }
+
+        for overwrite in [false, true] {
+            let destination = tempfile::tempdir().unwrap();
+            let mut options = DownloadOptions::default().filename("{md5}.jpg");
+            if overwrite {
+                options = options.overwrite();
+            }
+            let posts = [
+                UnicodeCasePost { hash: "σ".into() },
+                UnicodeCasePost { hash: "ς".into() },
+            ];
+            let results = Downloader::new()
+                .options(options)
+                .download_posts(&posts, destination.path(), 2)
+                .await;
+
+            assert!(matches!(
+                results.as_slice(),
+                [
+                    Err(BooruError::DestinationConflict(_)),
+                    Err(BooruError::DestinationConflict(_))
+                ]
+            ));
+        }
     }
 
     #[tokio::test]
