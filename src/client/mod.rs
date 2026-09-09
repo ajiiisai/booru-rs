@@ -342,7 +342,7 @@ pub trait Builder: Default + Sized {
     ///
     /// # Errors
     ///
-    /// Returns [`BooruError::InvalidUrl`] for blank, unparsable, or
+    /// Returns [`crate::error::BooruError::InvalidUrl`] for blank, unparsable, or
     /// non-HTTP(S) endpoints.
     fn endpoint(self, url: impl Into<String>) -> Result<Self>;
 
