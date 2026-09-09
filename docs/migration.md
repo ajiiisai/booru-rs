@@ -176,6 +176,10 @@ let posts = client.search_with(query).send().await?;
 
 Use `raw_query()` for provider expressions that are not represented by typed filters. Raw expressions may contain spaces; empty expressions are rejected.
 
+Literal tags are validated separately. Builders reject whitespace instead of
+rewriting it; `validation::validate_tag` remains advisory and can suggest
+replacing spaces with underscores.
+
 Use the provider's rating type and the shared `Sort` type:
 
 ```rust

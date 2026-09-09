@@ -213,7 +213,8 @@ impl Query {
         self
     }
 
-    /// Adds a provider query expression without literal-tag validation.
+    /// Adds a raw provider expression; validation rejects empty expressions or
+    /// conflicts with typed rating and sort filters.
     pub fn raw_query(mut self, expression: impl Into<String>) -> Self {
         self.core = self.core.raw_query(expression);
         self

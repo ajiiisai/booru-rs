@@ -53,9 +53,6 @@
 //! # }
 //! ```
 
-use std::sync::LazyLock;
-use std::time::Duration;
-
 #[cfg(any(
     feature = "danbooru",
     feature = "gelbooru",
@@ -84,6 +81,8 @@ use crate::retry::is_retryable;
     feature = "konachan"
 ))]
 use reqwest::header::HeaderMap;
+use std::sync::LazyLock;
+use std::time::Duration;
 
 #[cfg(any(feature = "danbooru", feature = "gelbooru", feature = "rule34"))]
 #[derive(Clone, Default)]
@@ -225,7 +224,8 @@ pub trait Query: Clone + Default + Sized {
         I: IntoIterator<Item = S>,
         S: Into<String>;
 
-    /// Adds a provider query expression without literal-tag validation.
+    /// Adds a raw provider expression; validation rejects empty expressions or
+    /// conflicts with typed rating and sort filters.
     fn raw_query(self, expression: impl Into<String>) -> Self;
 
     /// Adds provider query expressions without literal-tag validation.
@@ -878,7 +878,10 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
     feature = "konachan"
 ))]
 mod tests {
-    use super::{RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict};
+    use super::{
+        RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict,
+        validate_raw_queries, validate_tags,
+    };
     use crate::error::BooruError;
     use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
@@ -967,5 +970,36 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn literal_tag_validation_reports_whitespace_without_normalizing() {
+        let error = validate_tags(&["cat ears".to_string()]).unwrap_err();
+        assert!(matches!(
+            error,
+            BooruError::InvalidTag { tag, reason }
+                if tag == "cat ears" && reason == "tag must not contain whitespace"
+        ));
+    }
+
+    #[test]
+    fn raw_query_validation_preserves_spaces_and_rejects_conflicts() {
+        assert!(validate_raw_queries(&["artist:foo bar".to_string()], false, false).is_ok());
+
+        assert!(matches!(
+            validate_raw_queries(&[" ".to_string()], false, false),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw query expressions must not be empty"
+        ));
+        assert!(matches!(
+            validate_raw_queries(&["rating:explicit".to_string()], true, false),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw rating filters cannot be combined with rating()"
+        ));
+        assert!(matches!(
+            validate_raw_queries(&["sort:score".to_string()], false, true),
+            Err(BooruError::InvalidQuery(message))
+                if message == "raw sort filters cannot be combined with sort()"
+        ));
     }
 }

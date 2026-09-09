@@ -72,7 +72,8 @@ pub enum TagWarning {
         /// Length of the tag.
         length: usize,
     },
-    /// Tag contains unusual characters.
+    /// Tag contains non-standard characters outside alphanumerics and
+    /// printable ASCII punctuation.
     UnusualCharacters {
         /// Characters found that are unusual.
         chars: Vec<char>,
@@ -141,6 +142,9 @@ const DANBOORU_ONLY_META_TAGS: &[&str] = &[
 
 /// Validates a single tag and returns a validation result.
 ///
+/// This helper is advisory. It may suggest a normalized tag, but provider
+/// query builders apply their own literal-tag rules.
+///
 /// This function checks for common mistakes like:
 /// - Spaces instead of underscores
 /// - Empty tags
@@ -161,11 +165,8 @@ const DANBOORU_ONLY_META_TAGS: &[&str] = &[
 /// ```
 #[must_use]
 pub fn validate_tag(tag: &str) -> TagValidation {
-    let mut warnings = Vec::new();
-    let mut normalized = None;
-
-    // Check for empty tag
-    if tag.is_empty() {
+    let trimmed = tag.trim();
+    if trimmed.is_empty() {
         return TagValidation {
             original: tag.to_string(),
             normalized: None,
@@ -174,8 +175,10 @@ pub fn validate_tag(tag: &str) -> TagValidation {
         };
     }
 
+    let mut warnings = Vec::new();
+    let mut normalized = None;
+
     // Check for leading/trailing whitespace
-    let trimmed = tag.trim();
     if trimmed != tag {
         warnings.push(TagWarning::LeadingTrailingWhitespace);
         normalized = Some(trimmed.to_string());
@@ -205,23 +208,9 @@ pub fn validate_tag(tag: &str) -> TagValidation {
         });
     }
 
-    // Check for unusual characters
     let unusual: Vec<char> = working_tag
         .chars()
-        .filter(|c| {
-            !c.is_alphanumeric()
-                && *c != '_'
-                && *c != '-'
-                && *c != ':'
-                && *c != '('
-                && *c != ')'
-                && *c != '<'
-                && *c != '>'
-                && *c != '='
-                && *c != '.'
-                && *c != '*'
-                && *c != '?'
-        })
+        .filter(|c| *c != ' ' && !c.is_alphanumeric() && !c.is_ascii_punctuation())
         .collect();
 
     if !unusual.is_empty() {
@@ -246,7 +235,10 @@ pub fn validate_tag(tag: &str) -> TagValidation {
     }
 }
 
-/// Validates a tag and returns an error if invalid, or the normalized tag if valid.
+/// Validates a tag, returning a normalized value for advisory warnings.
+///
+/// "Strict" rejects fatal validation results. It may still return a normalized
+/// tag for advisory issues such as leading whitespace or spaces between words.
 ///
 /// # Errors
 ///
@@ -311,6 +303,46 @@ mod tests {
     }
 
     #[test]
+    fn test_parenthesized_character_tag_is_not_unusual() {
+        let result = validate_tag("belle_(zenless_zone_zero)");
+        assert!(result.is_valid);
+        assert!(!result.has_warnings());
+        assert!(result.normalized.is_none());
+    }
+
+    #[test]
+    fn test_printable_punctuation_is_not_unusual() {
+        for tag in ["d'arc", "k-on!", "foo+bar", "name@example"] {
+            let result = validate_tag(tag);
+            assert!(result.is_valid);
+            assert!(
+                !result
+                    .warnings
+                    .iter()
+                    .any(|warning| matches!(warning, TagWarning::UnusualCharacters { .. }))
+            );
+        }
+    }
+
+    #[test]
+    fn test_non_printable_and_non_ascii_punctuation_is_unusual() {
+        for (tag, expected) in [
+            ("foo\tbar", '\t'),
+            ("foo\u{7f}bar", '\u{7f}'),
+            ("foo—bar", '—'),
+        ] {
+            let result = validate_tag(tag);
+            assert!(matches!(
+                result.warnings.iter().find_map(|warning| match warning {
+                    TagWarning::UnusualCharacters { chars } => Some(chars),
+                    _ => None,
+                }),
+                Some(chars) if chars == &vec![expected]
+            ));
+        }
+    }
+
+    #[test]
     fn test_spaces_to_underscores() {
         let result = validate_tag("cat ears");
         assert!(result.is_valid);
@@ -326,6 +358,20 @@ mod tests {
             result.warnings.first(),
             Some(TagWarning::EmptyTag)
         ));
+    }
+
+    #[test]
+    fn test_whitespace_only_tag_is_invalid() {
+        for tag in [" ", "\t", " \n ", "\u{a0}"] {
+            let result = validate_tag(tag);
+            assert!(!result.is_valid);
+            assert_eq!(result.normalized, None);
+            assert!(matches!(
+                result.warnings.first(),
+                Some(TagWarning::EmptyTag)
+            ));
+            assert!(validate_tag_strict(tag).is_err());
+        }
     }
 
     #[test]
