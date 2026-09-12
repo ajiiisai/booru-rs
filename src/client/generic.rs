@@ -183,6 +183,34 @@ impl QueryCore {
     }
 }
 
+#[cfg(all(
+    test,
+    any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "safebooru",
+        feature = "konachan"
+    )
+))]
+mod tests {
+    use super::QueryCore;
+    use crate::error::BooruError;
+
+    #[test]
+    fn blacklist_tags_reject_empty_values() {
+        for query in [
+            QueryCore::new().blacklist_tag(""),
+            QueryCore::new().blacklist_tags([""]),
+        ] {
+            assert!(matches!(
+                query.validate_common(),
+                Err(BooruError::InvalidTag { .. })
+            ));
+        }
+    }
+}
+
 /// Shared builder state behind provider clients.
 ///
 /// Holds the HTTP client, endpoint, and request policy. Providers wrap this in
