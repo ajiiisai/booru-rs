@@ -727,7 +727,7 @@ fn common_score_preserves_provider_range() {
         serde_json::from_str::<Vec<_>>(include_str!("fixtures/safebooru/post.json"))
             .unwrap()
             .remove(0);
-    for score in [0, i32::MAX as u32, i32::MAX as u32 + 1, u32::MAX] {
+    for score in [i32::MIN, -1, 0, i32::MAX] {
         post.score = Some(score);
         assert_eq!(post.score(), Some(i64::from(score)));
     }
@@ -951,4 +951,15 @@ fn raw_queries_are_appended() {
         .raw_query("sort:score");
 
     assert_eq!(search.query(), &expected);
+}
+
+#[test]
+fn post_decodes_negative_score() {
+    use booru_rs::model::Post;
+
+    let mut value: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    value[0]["score"] = serde_json::Value::from(-1);
+    let posts = serde_json::from_value::<Vec<booru_rs::safebooru::SafebooruPost>>(value).unwrap();
+    assert_eq!(posts[0].score, Some(-1));
+    assert_eq!(posts[0].score(), Some(-1));
 }
