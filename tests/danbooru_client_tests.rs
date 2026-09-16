@@ -141,6 +141,65 @@ fn tag_limit_matches_old_contract() {
 }
 
 #[test]
+fn tag_limit_ignores_rating_filters() {
+    use booru_rs::danbooru::DanbooruRating;
+
+    let query = Query::new().tags(["1girl", "blue_eyes"]);
+    for filtered in [
+        query.clone().rating(DanbooruRating::General),
+        query.clone().exclude_rating(DanbooruRating::Explicit),
+        query.clone().tag("rating:general"),
+        query.clone().tag("-rating:explicit"),
+        query.raw_query("rating:general"),
+    ] {
+        assert!(filtered.validate().is_ok(), "{filtered:?}");
+    }
+}
+
+#[test]
+fn tag_limit_counts_ordering_filters() {
+    use booru_rs::Sort;
+    use booru_rs::danbooru::DanbooruRating;
+
+    for query in [
+        Query::new().random(),
+        Query::new().sort(Sort::Random),
+        Query::new().sort(Sort::Score),
+        Query::new().tag("order:random"),
+    ] {
+        let query = query.tag("1girl").rating(DanbooruRating::General);
+        assert!(query.validate().is_ok(), "{query:?}");
+        assert!(matches!(
+            query.tag("blue_eyes").validate(),
+            Err(BooruError::TagLimitExceeded {
+                max: 2,
+                actual: 3,
+                ..
+            })
+        ));
+    }
+}
+
+#[test]
+fn tag_limit_still_counts_blacklisted_tags_with_filters() {
+    use booru_rs::danbooru::DanbooruRating;
+
+    let query = Query::new()
+        .tags(["cat_ears", "blue_eyes"])
+        .blacklist_tag("spoiler")
+        .exclude_rating(DanbooruRating::Explicit);
+
+    assert!(matches!(
+        query.validate(),
+        Err(BooruError::TagLimitExceeded {
+            max: 2,
+            actual: 3,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn validate_preflight() {
     assert!(Query::new().tag("cat_ears").validate().is_ok());
     assert!(Query::new().tag("cat ears").validate().is_err());
