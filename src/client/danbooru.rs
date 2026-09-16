@@ -270,11 +270,21 @@ impl Query {
 
     pub fn validate(&self) -> Result<()> {
         self.core.validate_common()?;
-        if self.core.tags.len() > MAX_TAGS {
+        let tag_count = self
+            .core
+            .tags
+            .iter()
+            .filter(|tag| {
+                let term = tag.strip_prefix('-').unwrap_or(tag);
+                !term.starts_with("rating:")
+            })
+            .count()
+            + usize::from(self.core.sort.is_some());
+        if tag_count > MAX_TAGS {
             return Err(BooruError::TagLimitExceeded {
                 client: "DanbooruClient",
                 max: MAX_TAGS,
-                actual: self.core.tags.len(),
+                actual: tag_count,
             });
         }
         Ok(())
