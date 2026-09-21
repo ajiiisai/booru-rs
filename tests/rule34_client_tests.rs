@@ -170,7 +170,7 @@ async fn post_missing_maps_to_not_found() {
     Mock::given(method("GET"))
         .and(path("/index.php"))
         .and(query_param("id", "99999"))
-        .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(""))
         .mount(&mock_server)
         .await;
 
