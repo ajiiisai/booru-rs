@@ -719,6 +719,32 @@ async fn invalid_json_is_parse_error() {
     assert!(error.to_string().starts_with("Safebooru search failed:"));
 }
 
+#[tokio::test]
+async fn present_empty_post_list_is_empty() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "zzznonexistenttagzzz"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#""#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("zzznonexistenttagzzz")
+        .send()
+        .await
+        .expect("empty search must succeed");
+
+    assert!(posts.is_empty());
+}
+
 #[test]
 fn common_score_preserves_provider_range() {
     use booru_rs::model::Post;

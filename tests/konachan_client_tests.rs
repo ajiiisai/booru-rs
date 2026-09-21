@@ -809,6 +809,32 @@ fn post_allows_missing_media_urls() {
     assert_eq!(post.file_url(), None);
 }
 
+#[tokio::test]
+async fn present_empty_post_list_is_empty() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/post.json"))
+        .and(query_param("tags", "zzznonexistenttagzzz"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"[]"#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("zzznonexistenttagzzz")
+        .send()
+        .await
+        .expect("empty search must succeed");
+
+    assert!(posts.is_empty());
+}
+
 #[test]
 fn multiple_tags_validation_succeeds() {
     let search = Client::builder()
