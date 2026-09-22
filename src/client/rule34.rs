@@ -9,6 +9,10 @@ use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
 
 fn decode_posts(text: &str) -> Result<Vec<Rule34Post>> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+
     match serde_json::from_str(text) {
         Ok(posts) => Ok(posts),
         Err(parse_error) => {
@@ -409,10 +413,6 @@ impl Search {
         };
 
         let text = response.text().await?;
-        if text.is_empty() || text == "[]" {
-            return Ok(Vec::new());
-        }
-
         decode_posts(&text)
     }
 }

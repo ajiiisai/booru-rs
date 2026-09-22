@@ -8,6 +8,14 @@ use crate::model::safebooru::{SafebooruPost, SafebooruRating};
 use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
 
+fn decode_posts(text: &str) -> Result<Vec<SafebooruPost>> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Ok(serde_json::from_str(text)?)
+}
+
 #[derive(Debug, Deserialize)]
 struct SafebooruAutocompleteItem {
     value: String,
@@ -96,7 +104,8 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let posts = response.json::<Vec<SafebooruPost>>().await?;
+        let text = response.text().await?;
+        let posts = decode_posts(&text)?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
@@ -365,8 +374,8 @@ impl Search {
         })
         .await?;
 
-        let posts = response.json::<Vec<SafebooruPost>>().await?;
-        Ok(posts)
+        let text = response.text().await?;
+        decode_posts(&text)
     }
 }
 
