@@ -816,10 +816,7 @@ async fn present_empty_post_list_is_empty() {
     Mock::given(method("GET"))
         .and(path("/post.json"))
         .and(query_param("tags", "zzznonexistenttagzzz"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string(r#"[]"#),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"[]"#))
         .mount(&mock_server)
         .await;
 
