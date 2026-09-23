@@ -34,6 +34,7 @@ pub use crate::client::RequestPolicy;
 pub use crate::client::generic::Sort;
 pub use crate::client::{Autocomplete, Builder, Client, Continuation, Query};
 pub use crate::error::{BooruError, Result};
+pub use crate::model::{Post, Rating};
 
 // Autocomplete
 pub use crate::autocomplete::TagSuggestion;

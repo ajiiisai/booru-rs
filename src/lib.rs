@@ -118,7 +118,7 @@ pub use cache::{CacheError, CacheKey, CacheOperation};
 pub use client::generic::Sort;
 pub use client::{Autocomplete, Builder, Client, Continuation, PageResult, Query, RequestPolicy};
 pub use error::{BooruError, ErrorContext, Operation, Provider, Result};
-pub use model::Post;
+pub use model::{Post, Rating};
 
 /// Danbooru client and model types.
 #[cfg(feature = "danbooru")]
