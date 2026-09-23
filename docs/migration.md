@@ -115,7 +115,7 @@ The old `DanbooruClient`, `GelbooruClient`, `SafebooruClient`, and `Rule34Client
 The default feature set still includes all providers. The download API is now optional:
 
 ```toml
-booru-rs = { version = "0.3", default-features = false, features = ["safebooru", "download"] }
+booru-rs = { version = "2", default-features = false, features = ["safebooru", "download"] }
 ```
 
 Enable `download` before importing `booru_rs::download` or its prelude re-exports.
@@ -362,7 +362,7 @@ if let Some(directory) = post.directory.as_deref() {
 Add the feature to the dependency declaration:
 
 ```toml
-booru-rs = { version = "0.3", features = ["safebooru", "download"] }
+booru-rs = { version = "2", features = ["safebooru", "download"] }
 ```
 
 Then use the downloader with a provider post:
