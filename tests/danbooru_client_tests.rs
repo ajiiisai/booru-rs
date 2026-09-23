@@ -99,6 +99,27 @@ async fn search_sends_tags_limit_and_credentials() {
 }
 
 #[tokio::test]
+async fn zero_limit_returns_empty_without_request() {
+    let mock_server = MockServer::start().await;
+    let client = test_client(&mock_server);
+
+    let posts = client.search().limit(0).send().await.unwrap();
+    assert!(posts.is_empty());
+
+    let page = client.search().limit(0).page().await.unwrap();
+    assert!(page.posts.is_empty());
+    assert!(page.next.is_none());
+
+    let mut pages = client.search().limit(0).pages();
+    assert!(pages.next().await.is_none());
+
+    let mut posts = client.search().limit(0).posts();
+    assert!(posts.next().await.is_none());
+
+    assert!(mock_server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn third_tag_rejected_before_request() {
     let mock_server = MockServer::start().await;
     let client = test_client(&mock_server);
@@ -108,6 +129,7 @@ async fn third_tag_rejected_before_request() {
         .tag("one")
         .tag("two")
         .tag("three")
+        .limit(0)
         .send()
         .await;
 
@@ -119,6 +141,7 @@ async fn third_tag_rejected_before_request() {
             ..
         }
     ));
+    assert!(mock_server.received_requests().await.unwrap().is_empty());
 }
 
 #[test]

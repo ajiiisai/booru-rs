@@ -236,6 +236,8 @@ pub trait Query: Clone + Default + Sized {
         S: Into<String>;
 
     /// Sets the maximum number of posts to return.
+    ///
+    /// A zero limit returns no posts without sending a request.
     fn limit(self, limit: u32) -> Self;
 
     /// Adds a tag that must not match.
