@@ -117,7 +117,7 @@ impl Post for danbooru::DanbooruPost {
     }
 
     fn file_url(&self) -> Option<&str> {
-        self.file_url.as_deref()
+        self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
     fn preview_url(&self) -> Option<&str> {
@@ -143,7 +143,7 @@ impl Post for danbooru::DanbooruPost {
     }
 
     fn md5(&self) -> Option<&str> {
-        self.md5.as_deref()
+        self.md5.as_deref().filter(|hash| !hash.is_empty())
     }
 
     fn source(&self) -> Option<&str> {
@@ -205,7 +205,7 @@ impl Post for gelbooru::GelbooruPost {
     }
 
     fn md5(&self) -> Option<&str> {
-        Some(&self.md5)
+        (!self.md5.is_empty()).then_some(&self.md5)
     }
 
     fn source(&self) -> Option<&str> {
@@ -264,7 +264,7 @@ impl Post for safebooru::SafebooruPost {
     }
 
     fn md5(&self) -> Option<&str> {
-        Some(&self.hash)
+        (!self.hash.is_empty()).then_some(&self.hash)
     }
 
     fn source(&self) -> Option<&str> {
@@ -302,7 +302,7 @@ impl Post for rule34::Rule34Post {
     }
 
     fn file_url(&self) -> Option<&str> {
-        self.file_url.as_deref()
+        self.file_url.as_deref().filter(|url| !url.is_empty())
     }
 
     fn preview_url(&self) -> Option<&str> {

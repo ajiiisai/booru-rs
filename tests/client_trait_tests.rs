@@ -187,6 +187,23 @@ fn common_rating_preserves_known_and_unknown_values() {
     );
 }
 
+#[cfg(all(feature = "safebooru", feature = "rule34"))]
+#[test]
+fn empty_media_and_hash_strings_are_absent() {
+    let mut safebooru: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/safebooru/post.json")).unwrap();
+    safebooru[0]["hash"] = "".into();
+    let safebooru: Vec<booru_rs::safebooru::SafebooruPost> =
+        serde_json::from_value(safebooru).unwrap();
+    assert_eq!(safebooru[0].md5(), None);
+
+    let mut rule34: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    rule34[0]["file_url"] = "".into();
+    let rule34: Vec<booru_rs::rule34::Rule34Post> = serde_json::from_value(rule34).unwrap();
+    assert_eq!(rule34[0].file_url(), None);
+}
+
 #[tokio::test]
 async fn nonempty_final_page_terminates_page_stream() {
     let client = FakeClient::default();
