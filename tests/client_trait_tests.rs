@@ -145,6 +145,19 @@ fn providers_implement_shared_query_builder() {
     let _ = build_query(&booru_rs::konachan::Client::new().unwrap()).validate();
 }
 
+#[cfg(all(feature = "danbooru", feature = "safebooru"))]
+#[tokio::test]
+async fn two_providers_share_autocomplete_interface() {
+    async fn suggestions<C: booru_rs::Autocomplete>(client: &C) -> booru_rs::Result<usize> {
+        Ok(client.autocomplete("cat_", 0).await?.len())
+    }
+
+    let danbooru = booru_rs::danbooru::Client::new().unwrap();
+    let safebooru = booru_rs::safebooru::Client::new().unwrap();
+    assert_eq!(suggestions(&danbooru).await.unwrap(), 0);
+    assert_eq!(suggestions(&safebooru).await.unwrap(), 0);
+}
+
 #[test]
 fn post_trait_optional_accessors_have_compatible_defaults() {
     let post = FakePost { id: 1 };
