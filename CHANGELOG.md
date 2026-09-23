@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0](https://github.com/ajiiisai/booru-rs/compare/v1.1.0...v2.0.0) - 2026-09-23
+
+### Added
+
+- *(error)* support context for external providers ([#75](https://github.com/ajiiisai/booru-rs/pull/75))
+- *(model)* expose common post ratings ([#73](https://github.com/ajiiisai/booru-rs/pull/73))
+- *(client)* expose generic autocomplete ([#72](https://github.com/ajiiisai/booru-rs/pull/72))
+- expand shared query, post, and pagination APIs ([#57](https://github.com/ajiiisai/booru-rs/pull/57))
+- add Konachan ([#55](https://github.com/ajiiisai/booru-rs/pull/55))
+- add shared builder trait for generic providers ([#48](https://github.com/ajiiisai/booru-rs/pull/48))
+
+### Fixed
+
+- *(model)* treat empty media and hash strings as absent ([#74](https://github.com/ajiiisai/booru-rs/pull/74))
+- *(client)* bound HTTP error body reads ([#71](https://github.com/ajiiisai/booru-rs/pull/71))
+- *(client)* reject endpoint URLs with request data ([#70](https://github.com/ajiiisai/booru-rs/pull/70))
+- *(client)* continue pagination across sparse pages ([#69](https://github.com/ajiiisai/booru-rs/pull/69))
+- *(ci)* run required checks on stacked pull requests ([#78](https://github.com/ajiiisai/booru-rs/pull/78))
+- make zero search limits return no posts ([#68](https://github.com/ajiiisai/booru-rs/pull/68))
+- update rustls for RUSTSEC-2026-0285 ([#67](https://github.com/ajiiisai/booru-rs/pull/67))
+- reject empty blacklist tags ([#61](https://github.com/ajiiisai/booru-rs/pull/61))
+- *(rule34,safebooru)* queries that produce empty results properly map to an empty array, or a PostNotFound error ([#66](https://github.com/ajiiisai/booru-rs/pull/66))
+- count sort filters toward the Danbooru tag limit and exempt ratings ([#63](https://github.com/ajiiisai/booru-rs/pull/63))
+- *(safebooru)* use signed integer for score ([#62](https://github.com/ajiiisai/booru-rs/pull/62))
+- harden downloads and release documentation ([#58](https://github.com/ajiiisai/booru-rs/pull/58))
+- correct pagination, download verification, and retries ([#56](https://github.com/ajiiisai/booru-rs/pull/56))
+- verify downloads against post MD5 ([#47](https://github.com/ajiiisai/booru-rs/pull/47))
+- add batch download progress and harden content handling ([#46](https://github.com/ajiiisai/booru-rs/pull/46))
+- clarify disabled retry and cache defaults ([#45](https://github.com/ajiiisai/booru-rs/pull/45))
+- reject sort conflicts with random() ([#44](https://github.com/ajiiisai/booru-rs/pull/44))
+- allow missing file URLs for Gelbooru and Safebooru ([#43](https://github.com/ajiiisai/booru-rs/pull/43))
+- use crate version for Danbooru User-Agent ([#42](https://github.com/ajiiisai/booru-rs/pull/42))
+- reject HTML downloads and support custom request headers ([#40](https://github.com/ajiiisai/booru-rs/pull/40))
+
+### Other
+
+- use 2.x in migration dependency examples ([#76](https://github.com/ajiiisai/booru-rs/pull/76))
+- update 2.0 dependency examples and provider list
+- add 1.x to 2.x migration notes ([#54](https://github.com/ajiiisai/booru-rs/pull/54))
+- [**breaking**] mark extensible structs non_exhaustive ([#53](https://github.com/ajiiisai/booru-rs/pull/53))
+- add new provider guide, parity tests, and README rewrite ([#52](https://github.com/ajiiisai/booru-rs/pull/52))
+- [**breaking**] unify page type and builder core across providers ([#51](https://github.com/ajiiisai/booru-rs/pull/51))
+- share query builder core across providers ([#50](https://github.com/ajiiisai/booru-rs/pull/50))
+- [**breaking**] share page and post streams across providers ([#49](https://github.com/ajiiisai/booru-rs/pull/49))
+
 ## [1.1.0](https://github.com/ajiiisai/booru-rs/compare/v1.0.0...v1.1.0) - 2026-09-07
 
 ### Added
