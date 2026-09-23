@@ -8,6 +8,7 @@
 use booru_rs::client::Query as QueryBuilder;
 use booru_rs::client::{Client, PageResult};
 use booru_rs::model::Post;
+use booru_rs::{BooruError, Operation, Provider};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -105,6 +106,21 @@ async fn external_style_client_implements_operation_interface() {
     let posts = collect_pages(&client, FakeQuery).await.unwrap();
     assert_eq!(posts.iter().map(Post::id).collect::<Vec<_>>(), vec![1, 2]);
     assert_eq!(Client::post(&client, 42).await.unwrap().id(), 42);
+}
+
+#[test]
+fn external_adapter_can_attach_error_context() {
+    let error = BooruError::InvalidQuery("unsupported filter".into())
+        .with_context(Provider::Custom("MyBooru"), Operation::Search);
+    let context = error.context().unwrap();
+
+    assert_eq!(context.provider, Provider::Custom("MyBooru"));
+    assert_eq!(context.operation, Operation::Search);
+    assert!(matches!(
+        error.source_error(),
+        BooruError::InvalidQuery(message) if message == "unsupported filter"
+    ));
+    assert!(error.to_string().starts_with("MyBooru search failed"));
 }
 
 #[cfg(any(
