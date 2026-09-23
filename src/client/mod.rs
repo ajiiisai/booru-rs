@@ -211,6 +211,40 @@ pub trait Client {
     fn post(&self, id: u32) -> impl std::future::Future<Output = Result<Self::Post>> + Send;
 }
 
+/// Tag suggestions for clients that support autocomplete.
+///
+/// This capability is separate from [`Client`], so an external adapter can
+/// support searches without implementing autocomplete.
+pub trait Autocomplete {
+    /// Returns up to `limit` suggestions for a tag prefix.
+    fn autocomplete(
+        &self,
+        query: &str,
+        limit: u32,
+    ) -> impl std::future::Future<Output = Result<Vec<crate::autocomplete::TagSuggestion>>> + Send;
+}
+
+macro_rules! impl_autocomplete {
+    ($module:ident, $feature:literal) => {
+        #[cfg(feature = $feature)]
+        impl Autocomplete for $module::Client {
+            async fn autocomplete(
+                &self,
+                query: &str,
+                limit: u32,
+            ) -> Result<Vec<crate::autocomplete::TagSuggestion>> {
+                $module::Client::autocomplete(self, query, limit).await
+            }
+        }
+    };
+}
+
+impl_autocomplete!(danbooru, "danbooru");
+impl_autocomplete!(gelbooru, "gelbooru");
+impl_autocomplete!(rule34, "rule34");
+impl_autocomplete!(safebooru, "safebooru");
+impl_autocomplete!(konachan, "konachan");
+
 /// Shared query-builder interface for generic provider callers.
 pub trait Query: Clone + Default + Sized {
     /// Creates an empty query.

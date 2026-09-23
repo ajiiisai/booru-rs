@@ -123,6 +123,16 @@ for suggestion in suggestions {
 }
 ```
 
+For generic code, add the `Autocomplete` trait bound. All five built-in clients implement it:
+
+```rust
+use booru_rs::{Autocomplete, Result, TagSuggestion};
+
+async fn suggest<C: Autocomplete>(client: &C, prefix: &str) -> Result<Vec<TagSuggestion>> {
+    client.autocomplete(prefix, 10).await
+}
+```
+
 ### Paginate
 
 Use `page()` when you need continuation metadata:
