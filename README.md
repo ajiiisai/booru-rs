@@ -155,6 +155,21 @@ while let Some(post) = posts.next().await {
 }
 ```
 
+### Display posts from different providers
+
+`Post` exposes common media fields and a response rating. Unknown ratings keep their original value, and a missing rating returns `None`.
+
+```rust
+use booru_rs::Post;
+
+fn card(post: &impl Post) {
+    let image = post.preview_url().or_else(|| post.sample_url()).or_else(|| post.file_url());
+    println!("#{}: {:?} {:?}", post.id(), post.rating(), image);
+}
+```
+
+Post IDs are unique within a site. Keep the client endpoint alongside the ID when you combine results from different sites.
+
 ### Handle errors
 
 `BooruError` is non-exhaustive. Match the cases you need and keep a fallback arm:

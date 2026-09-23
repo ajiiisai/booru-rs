@@ -14,6 +14,21 @@ pub mod rule34;
 #[cfg(feature = "safebooru")]
 pub mod safebooru;
 
+/// A provider's response rating, with unfamiliar values preserved.
+///
+/// `General` and `Safe` remain separate because providers use both names.
+/// An absent rating is represented by `None` in [`Post::rating`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Rating<'a> {
+    General,
+    Safe,
+    Sensitive,
+    Questionable,
+    Explicit,
+    Unknown(&'a str),
+}
+
 /// Common interface for post types across different booru sites.
 ///
 /// This trait provides access to the fields that are common across all
@@ -79,6 +94,11 @@ pub trait Post {
 
     /// Returns the source URL for the image, if available.
     fn source(&self) -> Option<&str>;
+
+    /// Returns the response rating, preserving unknown provider values.
+    fn rating(&self) -> Option<Rating<'_>> {
+        None
+    }
 }
 
 // Implement Post trait for all post types
@@ -133,6 +153,17 @@ impl Post for danbooru::DanbooruPost {
             Some(&self.source)
         }
     }
+
+    fn rating(&self) -> Option<Rating<'_>> {
+        use danbooru::{DanbooruPostRating as Response, DanbooruRating as Known};
+        self.rating.as_ref().map(|rating| match rating {
+            Response::Known(Known::General) => Rating::General,
+            Response::Known(Known::Sensitive) => Rating::Sensitive,
+            Response::Known(Known::Questionable) => Rating::Questionable,
+            Response::Known(Known::Explicit) => Rating::Explicit,
+            Response::Unknown(value) => Rating::Unknown(value),
+        })
+    }
 }
 
 #[cfg(feature = "gelbooru")]
@@ -184,6 +215,18 @@ impl Post for gelbooru::GelbooruPost {
             Some(&self.source)
         }
     }
+
+    fn rating(&self) -> Option<Rating<'_>> {
+        use gelbooru::{GelbooruPostRating as Response, GelbooruRating as Known};
+        Some(match &self.rating {
+            Response::Known(Known::General) => Rating::General,
+            Response::Known(Known::Safe) => Rating::Safe,
+            Response::Known(Known::Sensitive) => Rating::Sensitive,
+            Response::Known(Known::Questionable) => Rating::Questionable,
+            Response::Known(Known::Explicit) => Rating::Explicit,
+            Response::Unknown(value) => Rating::Unknown(value),
+        })
+    }
 }
 
 #[cfg(feature = "safebooru")]
@@ -230,6 +273,17 @@ impl Post for safebooru::SafebooruPost {
         } else {
             Some(&self.source)
         }
+    }
+
+    fn rating(&self) -> Option<Rating<'_>> {
+        use safebooru::{SafebooruPostRating as Response, SafebooruRating as Known};
+        Some(match &self.rating {
+            Response::Known(Known::General) => Rating::General,
+            Response::Known(Known::Safe) => Rating::Safe,
+            Response::Known(Known::Questionable) => Rating::Questionable,
+            Response::Known(Known::Explicit) => Rating::Explicit,
+            Response::Unknown(value) => Rating::Unknown(value),
+        })
     }
 }
 
@@ -286,6 +340,18 @@ impl Post for rule34::Rule34Post {
             Some(&self.source)
         }
     }
+
+    fn rating(&self) -> Option<Rating<'_>> {
+        use rule34::{Rule34PostRating as Response, Rule34Rating as Known};
+        Some(match &self.rating {
+            Response::Known(Known::General) => Rating::General,
+            Response::Known(Known::Safe) => Rating::Safe,
+            Response::Known(Known::Sensitive) => Rating::Sensitive,
+            Response::Known(Known::Questionable) => Rating::Questionable,
+            Response::Known(Known::Explicit) => Rating::Explicit,
+            Response::Unknown(value) => Rating::Unknown(value),
+        })
+    }
 }
 
 #[cfg(feature = "konachan")]
@@ -340,5 +406,15 @@ impl Post for konachan::KonachanPost {
         } else {
             Some(&self.source)
         }
+    }
+
+    fn rating(&self) -> Option<Rating<'_>> {
+        use konachan::{KonachanPostRating as Response, KonachanRating as Known};
+        Some(match &self.rating {
+            Response::Known(Known::Safe) => Rating::Safe,
+            Response::Known(Known::Questionable) => Rating::Questionable,
+            Response::Known(Known::Explicit) => Rating::Explicit,
+            Response::Unknown(value) => Rating::Unknown(value),
+        })
     }
 }

@@ -165,6 +165,26 @@ fn post_trait_optional_accessors_have_compatible_defaults() {
     assert_eq!(post.preview_url(), None);
     assert_eq!(post.sample_url(), None);
     assert_eq!(post.parent_id(), None);
+    assert_eq!(post.rating(), None);
+}
+
+#[cfg(all(feature = "safebooru", feature = "rule34"))]
+#[test]
+fn common_rating_preserves_known_and_unknown_values() {
+    use booru_rs::Rating;
+
+    let safebooru: Vec<booru_rs::safebooru::SafebooruPost> =
+        serde_json::from_str(include_str!("fixtures/safebooru/post.json")).unwrap();
+    assert_eq!(safebooru[0].rating(), Some(Rating::General));
+
+    let mut rule34: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/rule34/posts.json")).unwrap();
+    rule34[0]["rating"] = "new-provider-rating".into();
+    let rule34: Vec<booru_rs::rule34::Rule34Post> = serde_json::from_value(rule34).unwrap();
+    assert_eq!(
+        rule34[0].rating(),
+        Some(Rating::Unknown("new-provider-rating"))
+    );
 }
 
 #[tokio::test]
