@@ -114,7 +114,7 @@ async fn post_missing_maps_to_not_found() {
     Mock::given(method("GET"))
         .and(path("/index.php"))
         .and(query_param("id", "99999"))
-        .respond_with(ResponseTemplate::new(200).set_body_string("[]"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(""))
         .mount(&mock_server)
         .await;
 
@@ -719,6 +719,29 @@ async fn invalid_json_is_parse_error() {
     assert!(error.to_string().starts_with("Safebooru search failed:"));
 }
 
+#[tokio::test]
+async fn present_empty_post_list_is_empty() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/index.php"))
+        .and(query_param("tags", "zzznonexistenttagzzz"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#""#))
+        .mount(&mock_server)
+        .await;
+
+    let client = test_client(&mock_server);
+
+    let posts = client
+        .search()
+        .tag("zzznonexistenttagzzz")
+        .send()
+        .await
+        .expect("empty search must succeed");
+
+    assert!(posts.is_empty());
+}
+
 #[test]
 fn common_score_preserves_provider_range() {
     use booru_rs::model::Post;
@@ -727,7 +750,7 @@ fn common_score_preserves_provider_range() {
         serde_json::from_str::<Vec<_>>(include_str!("fixtures/safebooru/post.json"))
             .unwrap()
             .remove(0);
-    for score in [0, i32::MAX as u32, i32::MAX as u32 + 1, u32::MAX] {
+    for score in [i32::MIN, -1, 0, i32::MAX] {
         post.score = Some(score);
         assert_eq!(post.score(), Some(i64::from(score)));
     }
@@ -951,4 +974,15 @@ fn raw_queries_are_appended() {
         .raw_query("sort:score");
 
     assert_eq!(search.query(), &expected);
+}
+
+#[test]
+fn post_decodes_negative_score() {
+    use booru_rs::model::Post;
+
+    let mut value: serde_json::Value = serde_json::from_str(single_post_fixture()).unwrap();
+    value[0]["score"] = serde_json::Value::from(-1);
+    let posts = serde_json::from_value::<Vec<booru_rs::safebooru::SafebooruPost>>(value).unwrap();
+    assert_eq!(posts[0].score, Some(-1));
+    assert_eq!(posts[0].score(), Some(-1));
 }

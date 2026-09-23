@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SafebooruPost {
     pub id: u32,
-    pub score: Option<u32>,
+    pub score: Option<i32>,
     /// Image height in pixels, if available.
     pub height: Option<u32>,
     pub width: u32,
