@@ -421,3 +421,60 @@ mod surface_tests {
         drop(search.posts().max_posts(1).collect());
     }
 }
+
+#[derive(Clone, Default)]
+struct SparseClient {
+    requests: Arc<AtomicUsize>,
+}
+
+impl Client for SparseClient {
+    type Query = FakeQuery;
+    type Post = FakePost;
+    type Continuation = FakeContinuation;
+
+    async fn page(
+        &self,
+        _query: Self::Query,
+        continuation: Option<Self::Continuation>,
+    ) -> booru_rs::Result<PageResult<Self::Post, Self::Continuation>> {
+        self.requests.fetch_add(1, Ordering::Relaxed);
+        Ok(match continuation {
+            None => PageResult::new(vec![FakePost { id: 1 }], Some(FakeContinuation(1))),
+            Some(FakeContinuation(1)) => PageResult::new(vec![], Some(FakeContinuation(2))),
+            Some(FakeContinuation(2)) => PageResult::new(vec![FakePost { id: 2 }], None),
+            Some(FakeContinuation(_)) => unreachable!(),
+        })
+    }
+
+    async fn post(&self, id: u32) -> booru_rs::Result<Self::Post> {
+        Ok(FakePost { id })
+    }
+}
+
+#[tokio::test]
+async fn sparse_page_preserves_continuation_in_page_stream() {
+    let client = SparseClient::default();
+    let requests = Arc::clone(&client.requests);
+    let mut pages = booru_rs::client::stream::PageStream::new(client, FakeQuery, None);
+
+    assert_eq!(pages.next().await.unwrap().unwrap().posts[0].id, 1);
+    let sparse = pages.next().await.unwrap().unwrap();
+    assert!(sparse.posts.is_empty());
+    assert!(sparse.next.is_some());
+    assert_eq!(pages.next().await.unwrap().unwrap().posts[0].id, 2);
+    assert!(pages.next().await.is_none());
+    assert_eq!(requests.load(Ordering::Relaxed), 3);
+}
+
+#[tokio::test]
+async fn post_stream_skips_sparse_page() {
+    let client = SparseClient::default();
+    let requests = Arc::clone(&client.requests);
+    let pages = booru_rs::client::stream::PageStream::new(client, FakeQuery, None);
+    let mut posts = booru_rs::client::stream::PostStream::new(pages);
+
+    assert_eq!(posts.next().await.unwrap().unwrap().id, 1);
+    assert_eq!(posts.next().await.unwrap().unwrap().id, 2);
+    assert!(posts.next().await.is_none());
+    assert_eq!(requests.load(Ordering::Relaxed), 3);
+}

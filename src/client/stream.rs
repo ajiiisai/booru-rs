@@ -1,7 +1,7 @@
 //! Shared async streams for paginating provider results.
 //!
 //! [`PageStream`] fetches one page at a time through the [`Client`] trait and
-//! stops at the first empty page. [`PostStream`] flattens those pages into
+//! stops when a page has no continuation. [`PostStream`] flattens those pages into
 //! individual posts. Providers alias these types instead of reimplementing
 //! the polling logic:
 //!
@@ -29,7 +29,9 @@ type PendingPage<C> = Pin<
 
 /// Stream of result pages for a provider client.
 ///
-/// Pages stop at an empty page or when `max_pages` is reached. Build one from
+/// A terminal empty page is omitted. Empty pages with a continuation are
+/// yielded, so an adapter can represent sparse results. The stream also stops
+/// when `max_pages` is reached. Build one from
 /// a provider search, or directly from a client and query for generic code.
 pub struct PageStream<C: Client> {
     client: C,
@@ -105,7 +107,7 @@ where
                     Poll::Ready(result) => match result {
                         Ok(page) => {
                             this.fetched = this.fetched.saturating_add(1);
-                            if page.posts.is_empty() {
+                            if page.posts.is_empty() && page.next.is_none() {
                                 this.continuation = None;
                                 this.done = true;
                                 return Poll::Ready(None);
@@ -140,7 +142,8 @@ where
 /// Stream of individual posts across result pages.
 ///
 /// Buffers each fetched page and yields its posts one at a time. Stops at an
-/// empty page or when `max_posts` is reached.
+/// terminal page or when `max_posts` is reached. Intermediate empty pages are
+/// skipped.
 pub struct PostStream<C: Client> {
     pages: PageStream<C>,
     buffer: std::vec::IntoIter<C::Post>,
@@ -209,6 +212,11 @@ where
             }
             match Pin::new(&mut this.pages).poll_next(cx) {
                 Poll::Ready(Some(Ok(page))) => {
+                    if page.posts.is_empty() {
+                        // Yield to the executor before fetching another sparse page.
+                        cx.waker().wake_by_ref();
+                        return Poll::Pending;
+                    }
                     this.buffer = page.posts.into_iter();
                 }
                 Poll::Ready(Some(Err(error))) => return Poll::Ready(Some(Err(error))),

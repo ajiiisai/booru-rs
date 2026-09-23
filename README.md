@@ -136,7 +136,7 @@ if let Some(next) = page.next {
 }
 ```
 
-Use `pages()` or `posts()` for streams. Both stop at an empty page and accept a bound:
+Use `pages()` or `posts()` for streams. Both stop after the final page and accept a bound. A page stream yields an empty page if the provider supplies a continuation; a post stream skips it.
 
 ```rust
 let mut posts = client.search().tag("landscape").posts().max_posts(500);
