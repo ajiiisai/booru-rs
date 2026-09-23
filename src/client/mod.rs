@@ -588,7 +588,7 @@ pub(crate) fn dapi_query(
 ))]
 pub(crate) fn validate_tags(tags: &[String]) -> Result<()> {
     for tag in tags {
-        if tag.is_empty() {
+        if tag.is_empty() || tag.strip_prefix('-').is_some_and(str::is_empty) {
             return Err(BooruError::InvalidTag {
                 tag: tag.clone(),
                 reason: "tag must not be empty".to_string(),
