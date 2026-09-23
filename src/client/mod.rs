@@ -755,13 +755,26 @@ pub(crate) fn parse_post_count_from_label(label: &str) -> Option<u32> {
     feature = "safebooru",
     feature = "konachan"
 ))]
-pub(crate) async fn ensure_success(response: reqwest::Response) -> Result<reqwest::Response> {
+pub(crate) async fn ensure_success(mut response: reqwest::Response) -> Result<reqwest::Response> {
     let status = response.status();
     if status.is_success() {
         return Ok(response);
     }
-    let body = response.text().await.unwrap_or_default();
-    Err(BooruError::http_status(status, &body))
+    const MAX_ERROR_BODY_BYTES: usize = 4096;
+    let mut body = Vec::with_capacity(MAX_ERROR_BODY_BYTES);
+    while body.len() < MAX_ERROR_BODY_BYTES {
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                let remaining = MAX_ERROR_BODY_BYTES - body.len();
+                body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+            }
+            Ok(None) | Err(_) => break,
+        }
+    }
+    Err(BooruError::http_status(
+        status,
+        &String::from_utf8_lossy(&body),
+    ))
 }
 
 /// Request policies shared by provider clients.
@@ -893,6 +906,38 @@ mod tests {
     use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
     use std::time::{Duration, SystemTime};
+
+    #[tokio::test]
+    async fn error_body_excerpt_is_bounded() {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut request_prefix = [0; 3];
+            socket.read_exact(&mut request_prefix).unwrap();
+            socket
+                .write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 100000\r\n\r\n")
+                .unwrap();
+            socket.write_all(&vec![b'a'; 4096]).unwrap();
+            released.recv().unwrap();
+        });
+        let response = reqwest::Client::new().get(url).send().await.unwrap();
+        let result =
+            tokio::time::timeout(Duration::from_secs(2), super::ensure_success(response)).await;
+        release.send(()).unwrap();
+        server.join().unwrap();
+        let error = result
+            .expect("status error must not wait for the full body")
+            .unwrap_err();
+        let BooruError::HttpStatus { status, message } = error else {
+            panic!("expected HTTP status error");
+        };
+        assert_eq!(status, 503);
+        assert_eq!(message.chars().count(), 301);
+    }
 
     #[test]
     fn endpoint_rejects_request_parts_and_credentials() {
