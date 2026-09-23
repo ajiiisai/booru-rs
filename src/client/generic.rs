@@ -134,6 +134,10 @@ impl QueryCore {
         self
     }
 
+    pub(crate) fn has_zero_limit(&self) -> bool {
+        self.limit == 0
+    }
+
     pub(crate) fn blacklist_tag(mut self, tag: impl AsRef<str>) -> Self {
         self.tags.push(format!("-{}", tag.as_ref()));
         self

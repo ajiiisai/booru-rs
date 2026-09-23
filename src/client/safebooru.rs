@@ -353,6 +353,9 @@ impl Search {
 
     async fn fetch_inner(&self) -> Result<Vec<SafebooruPost>> {
         self.query.validate()?;
+        if self.query.core.has_zero_limit() {
+            return Ok(Vec::new());
+        }
         let tags = self.query.core.assemble_tags(SORT_PREFIX);
 
         let response = execute_with_policy(&self.client.policy, || async {

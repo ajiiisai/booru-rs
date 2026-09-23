@@ -381,6 +381,9 @@ impl Search {
 
     async fn fetch_inner(&self) -> Result<Vec<Rule34Post>> {
         self.query.validate()?;
+        if self.query.core.has_zero_limit() {
+            return Ok(Vec::new());
+        }
         let tags = self.query.core.assemble_tags(SORT_PREFIX);
 
         let query = super::dapi_query(
