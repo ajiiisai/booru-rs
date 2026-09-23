@@ -17,6 +17,8 @@ pub enum Provider {
     Safebooru,
     /// Konachan
     Konachan,
+    /// A third-party provider with a static display name.
+    Custom(&'static str),
 }
 
 impl std::fmt::Display for Provider {
@@ -27,6 +29,7 @@ impl std::fmt::Display for Provider {
             Self::Rule34 => "Rule34",
             Self::Safebooru => "Safebooru",
             Self::Konachan => "Konachan",
+            Self::Custom(name) => name,
         })
     }
 }
@@ -204,14 +207,12 @@ impl From<reqwest::Error> for BooruError {
 }
 
 impl BooruError {
-    #[cfg(any(
-        feature = "danbooru",
-        feature = "gelbooru",
-        feature = "rule34",
-        feature = "safebooru",
-        feature = "konachan"
-    ))]
-    pub(crate) fn with_context(self, provider: Provider, operation: Operation) -> Self {
+    /// Attaches provider and operation context to an error.
+    ///
+    /// Existing context takes precedence so wrappers do not hide the provider
+    /// that produced the original failure.
+    #[must_use]
+    pub fn with_context(self, provider: Provider, operation: Operation) -> Self {
         if matches!(self, Self::Context { .. }) {
             self
         } else {
