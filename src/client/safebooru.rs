@@ -467,7 +467,7 @@ impl super::Client for Client {
 /// Stream of result pages for [`Search::pages`].
 ///
 /// Alias for the shared [`super::stream::PageStream`] over this provider. Pages
-/// stop at an empty page and can be bounded with `max_pages`.
+/// stop after the final page and can be bounded with `max_pages`.
 pub type PageStream = super::stream::PageStream<Client>;
 
 /// Stream of individual posts for [`Search::posts`].
