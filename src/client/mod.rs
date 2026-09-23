@@ -535,13 +535,17 @@ pub fn shared_client() -> &'static reqwest::Client {
     feature = "konachan"
 ))]
 pub(crate) fn validate_endpoint(url: &str) -> Result<String> {
-    let trimmed = url.trim_end_matches('/');
-    let parsed =
-        reqwest::Url::parse(trimmed).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
-    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+    let parsed = reqwest::Url::parse(url).map_err(|_| BooruError::InvalidUrl(url.to_string()))?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
         return Err(BooruError::InvalidUrl(url.to_string()));
     }
-    Ok(trimmed.to_string())
+    Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
 
 #[cfg(any(feature = "gelbooru", feature = "rule34"))]
@@ -882,13 +886,32 @@ fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
 ))]
 mod tests {
     use super::{
-        RequestPolicy, execute_with_policy, parse_retry_after, validate_random_conflict,
-        validate_raw_queries, validate_tags,
+        RequestPolicy, execute_with_policy, parse_retry_after, validate_endpoint,
+        validate_random_conflict, validate_raw_queries, validate_tags,
     };
     use crate::error::BooruError;
     use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
     use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn endpoint_rejects_request_parts_and_credentials() {
+        for url in [
+            "https://example.com/?page=1",
+            "https://example.com/#fragment",
+            "https://user@example.com",
+            "https://user:password@example.com",
+        ] {
+            assert!(matches!(
+                validate_endpoint(url),
+                Err(BooruError::InvalidUrl(_))
+            ));
+        }
+        assert_eq!(
+            validate_endpoint("https://example.com/api///").unwrap(),
+            "https://example.com/api"
+        );
+    }
 
     #[test]
     fn parses_numeric_retry_after() {
