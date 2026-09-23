@@ -24,8 +24,8 @@ After:
 println!("{}", post.file_url.as_deref().unwrap_or("(no url)"));
 ```
 
-Generic code over `booru_rs::model::Post` is unaffected. Its `file_url()`
-already returned `Option<&str>` and now maps empty strings to `None` as well.
+Generic code over `booru_rs::model::Post` still receives `Option<&str>`.
+`file_url()` and `md5()` now map empty strings to `None` for every provider.
 
 ### Expect `PageResult` from pages and streams
 
