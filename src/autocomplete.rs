@@ -112,51 +112,21 @@ mod tests {
     }
 
     #[test]
-    fn test_category_name_general() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(0);
-        assert_eq!(tag.category_name(), Some("general"));
-    }
-
-    #[test]
-    fn test_category_name_artist() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(1);
-        assert_eq!(tag.category_name(), Some("artist"));
-    }
-
-    #[test]
-    fn test_category_name_copyright() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(3);
-        assert_eq!(tag.category_name(), Some("copyright"));
-    }
-
-    #[test]
-    fn test_category_name_character() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(4);
-        assert_eq!(tag.category_name(), Some("character"));
-    }
-
-    #[test]
-    fn test_category_name_meta() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(5);
-        assert_eq!(tag.category_name(), Some("meta"));
-    }
-
-    #[test]
-    fn test_category_name_unknown() {
-        let mut tag = TagSuggestion::new("test", "test");
-        tag.category = Some(99);
-        assert_eq!(tag.category_name(), Some("unknown"));
-    }
-
-    #[test]
-    fn test_category_name_none() {
-        let tag = TagSuggestion::new("test", "test");
-        assert_eq!(tag.category_name(), None);
+    fn category_name_mapping() {
+        for (category, expected) in [
+            (Some(0), Some("general")),
+            (Some(1), Some("artist")),
+            (Some(3), Some("copyright")),
+            (Some(4), Some("character")),
+            (Some(5), Some("meta")),
+            (Some(99), Some("unknown")),
+            (Some(255), Some("unknown")),
+            (None, None),
+        ] {
+            let mut tag = TagSuggestion::new("test", "test");
+            tag.category = category;
+            assert_eq!(tag.category_name(), expected, "category {category:?}");
+        }
     }
 
     #[test]
