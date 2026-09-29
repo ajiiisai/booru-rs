@@ -95,8 +95,21 @@ mod mock_post_trait {
     feature = "konachan"
 ))]
 mod mock_autocomplete {
+    use wiremock::MockServer;
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "konachan"
+    ))]
     use wiremock::matchers::{method, path, query_param};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "konachan"
+    ))]
+    use wiremock::{Mock, ResponseTemplate};
 
     #[tokio::test]
     #[cfg(feature = "danbooru")]
