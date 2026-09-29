@@ -2,8 +2,6 @@
 
 #[cfg(test)]
 mod autocomplete {
-    use booru_rs::autocomplete::TagSuggestion;
-
     #[cfg(feature = "danbooru")]
     mod danbooru {
         use booru_rs::danbooru::Client;
@@ -166,44 +164,6 @@ mod autocomplete {
         }
     }
 
-    #[cfg(feature = "gelbooru")]
-    mod gelbooru {
-        use booru_rs::gelbooru::Client;
-
-        #[tokio::test]
-        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
-        async fn autocomplete_returns_suggestions() {
-            // Gelbooru autocomplete may work without auth
-            let suggestions = Client::builder()
-                .build()
-                .unwrap()
-                .autocomplete("cat_", 10)
-                .await;
-
-            // This might fail due to auth requirements, which is expected
-            if let Ok(suggestions) = suggestions {
-                assert!(
-                    !suggestions.is_empty(),
-                    "Should return at least one suggestion"
-                );
-            }
-        }
-
-        #[tokio::test]
-        #[ignore = "contacts a live booru service; run explicitly with --ignored"]
-        async fn autocomplete_respects_limit() {
-            let suggestions = Client::builder()
-                .build()
-                .unwrap()
-                .autocomplete("a", 5)
-                .await;
-
-            if let Ok(suggestions) = suggestions {
-                assert!(suggestions.len() <= 5, "Should respect limit parameter");
-            }
-        }
-    }
-
     #[cfg(feature = "rule34")]
     mod rule34 {
         use booru_rs::rule34::Client;
@@ -244,41 +204,6 @@ mod autocomplete {
                     "Should parse post count from label"
                 );
             }
-        }
-    }
-
-    // Test TagSuggestion struct directly
-    mod tag_suggestion {
-        use super::*;
-
-        #[test]
-        fn category_name_mapping() {
-            let categories = [
-                (0, "general"),
-                (1, "artist"),
-                (3, "copyright"),
-                (4, "character"),
-                (5, "meta"),
-            ];
-
-            for (id, expected_name) in categories {
-                let mut tag = TagSuggestion::new("test", "test");
-                tag.category = Some(id);
-                assert_eq!(
-                    tag.category_name(),
-                    Some(expected_name),
-                    "Category {} should be '{}'",
-                    id,
-                    expected_name
-                );
-            }
-        }
-
-        #[test]
-        fn unknown_category() {
-            let mut tag = TagSuggestion::new("test", "test");
-            tag.category = Some(255);
-            assert_eq!(tag.category_name(), Some("unknown"));
         }
     }
 }

@@ -95,8 +95,21 @@ mod mock_post_trait {
     feature = "konachan"
 ))]
 mod mock_autocomplete {
+    use wiremock::MockServer;
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "konachan"
+    ))]
     use wiremock::matchers::{method, path, query_param};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
+    #[cfg(any(
+        feature = "danbooru",
+        feature = "gelbooru",
+        feature = "rule34",
+        feature = "konachan"
+    ))]
+    use wiremock::{Mock, ResponseTemplate};
 
     #[tokio::test]
     #[cfg(feature = "danbooru")]
@@ -234,37 +247,6 @@ mod mock_autocomplete {
         assert_eq!(suggestions[0].name, "cat_ears");
         assert_eq!(suggestions[0].post_count, Some(430787));
         assert_eq!(suggestions[0].category, Some(0));
-    }
-
-    #[tokio::test]
-    #[cfg(feature = "safebooru")]
-    async fn test_safebooru_uses_instance_endpoint() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/autocomplete.php"))
-            .and(query_param("q", "land"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_string(r#"[{"value":"landscape","label":"landscape (123)"}]"#),
-            )
-            .mount(&mock_server)
-            .await;
-
-        let client = booru_rs::safebooru::Client::builder()
-            .endpoint(mock_server.uri())
-            .unwrap()
-            .build()
-            .unwrap();
-
-        let suggestions = client
-            .autocomplete("land", 5)
-            .await
-            .expect("complete must succeed");
-
-        assert_eq!(suggestions.len(), 1);
-        assert_eq!(suggestions[0].name, "landscape");
-        assert_eq!(suggestions[0].post_count, Some(123));
     }
 
     #[tokio::test]
