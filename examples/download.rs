@@ -1,8 +1,7 @@
-//! Example: Download images from Safebooru
+//! Download Safebooru images individually, with progress, and as a batch.
 //!
-//! This example demonstrates how to use the download helper to fetch images.
-//!
-//! Run with: cargo run --example download
+//! Run with `nix develop -c cargo run --example download --features download`.
+//! The downloader skips files that already exist in `downloads/`.
 
 use booru_rs::prelude::*;
 use booru_rs::safebooru::Client as Safebooru;
@@ -10,78 +9,45 @@ use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let dest_dir = Path::new("./downloads");
-
-    // Fetch some posts
     let client = Safebooru::new()?;
     let posts = client
         .search()
         .tag("landscape")
         .rating(SafebooruRating::General)
-        .limit(3)
+        .limit(5)
         .send()
         .await?;
-
-    println!("Found {} posts to download", posts.len());
-
-    // Create a downloader
+    let dest_dir = Path::new("downloads");
     let downloader = Downloader::new();
 
-    // Download each post
-    for post in &posts {
-        match downloader.download_post(post, dest_dir).await {
-            Ok(result) => {
-                if result.skipped {
-                    println!("Skipped (already exists): {}", result.path.display());
-                } else {
-                    println!(
-                        "Downloaded: {} ({} bytes)",
-                        result.path.display(),
-                        result.size
-                    );
-                }
-            }
-            Err(e) => {
-                eprintln!("Failed to download post {}: {}", post.id, e);
-            }
-        }
-    }
+    let Some((first, remaining)) = posts.split_first() else {
+        println!("No posts found");
+        return Ok(());
+    };
+    let result = downloader.download_post(first, dest_dir).await?;
+    print_result(&result);
 
-    // Example with progress callback
-    println!("\nDownloading with progress...");
-    if let Some(post) = posts.first() {
-        let result = downloader
-            .download_post_with_progress(post, dest_dir, |progress| {
-                if let Some(total) = progress.total {
-                    let percent = (progress.downloaded as f64 / total as f64) * 100.0;
-                    println!(
-                        "  Post {}: {:.1}% ({}/{})",
-                        progress.post_id, percent, progress.downloaded, total
-                    );
-                } else {
-                    println!("  Post {}: {} bytes", progress.post_id, progress.downloaded);
-                }
-            })
-            .await?;
+    let Some((second, remaining)) = remaining.split_first() else {
+        return Ok(());
+    };
+    let result = downloader
+        .download_post_with_progress(second, dest_dir, |progress| {
+            println!("Post {}: {} bytes", progress.post_id, progress.downloaded);
+        })
+        .await?;
+    print_result(&result);
 
-        println!(
-            "Completed: {} ({} bytes)",
-            result.path.display(),
-            result.size
-        );
-    }
-
-    // Example with concurrent downloads
-    println!("\nConcurrent download of {} posts...", posts.len());
-    let results = downloader.download_posts(&posts, dest_dir, 3).await;
-
-    for (i, result) in results.iter().enumerate() {
+    let results = downloader.download_posts(remaining, dest_dir, 3).await;
+    for (post, result) in remaining.iter().zip(results) {
         match result {
-            Ok(r) => println!("  [{}] {} - {} bytes", i + 1, r.path.display(), r.size),
-            Err(e) => eprintln!("  [{}] Failed: {}", i + 1, e),
+            Ok(result) => print_result(&result),
+            Err(error) => eprintln!("Post {}: {error}", post.id),
         }
     }
-
-    println!("\nDone!");
     Ok(())
+}
+
+fn print_result(result: &DownloadResult) {
+    let action = if result.skipped { "Skipped" } else { "Saved" };
+    println!("{action} {}: {} bytes", result.path.display(), result.size);
 }
