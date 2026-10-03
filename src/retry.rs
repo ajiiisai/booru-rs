@@ -1,7 +1,16 @@
-//! Retry logic with exponential backoff for transient failures.
+//! # Retry failed operations
 //!
-//! This module provides utilities for automatically retrying failed requests
-//! with exponential backoff delays.
+//! Provider clients use no retries by default.
+//! Enable retries with the provider builder's `retry_config()` method or [`crate::RequestPolicy::with_retry_config`].
+//!
+//! [`RetryConfig::default()`] permits three retries after the first attempt.
+//! The delay grows with exponential backoff, up to `max_delay`.
+//! Provider clients use a valid `Retry-After` response header instead of the computed delay.
+//! That header can specify a delay above `max_delay`.
+//!
+//! Use [`is_retryable`] to classify an error.
+//! Use [`with_retry`] for an application operation that returns [`crate::Result`].
+//! This helper uses the configured backoff and has no access to HTTP response headers.
 
 use std::future::Future;
 use std::time::Duration;
@@ -15,8 +24,7 @@ pub const DEFAULT_MAX_DELAY_MS: u64 = 5000;
 
 /// Configuration for retry behavior.
 ///
-/// New fields may be added in minor releases. Prefer the constructors and
-/// `with_*` methods instead of a literal.
+/// Use constructors and `with_*` methods instead of struct literals.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct RetryConfig {
@@ -24,7 +32,8 @@ pub struct RetryConfig {
     pub max_retries: u32,
     /// Initial delay before the first retry.
     pub initial_delay: Duration,
-    /// Maximum delay between retries.
+    /// Maximum computed backoff delay. Provider clients can use a longer
+    /// delay from a `Retry-After` response header.
     pub max_delay: Duration,
     /// Multiplier applied to delay after each retry (for exponential backoff).
     pub backoff_factor: f64,
@@ -105,10 +114,17 @@ impl RetryConfig {
     }
 }
 
-/// Determines if an error is retryable.
+/// Returns whether an error permits a retry.
 ///
-/// Only transient network errors should be retried. Parse errors,
-/// authentication errors, and not-found errors are not retryable.
+/// Retryable errors are:
+///
+/// - Request timeouts, connection errors, request errors, or HTTP 5xx statuses.
+/// - [`BooruError::RateLimited`].
+/// - [`BooruError::HttpStatus`] with status 429 or 500 through 599.
+///
+/// Provider context delegates to the underlying error.
+/// Parse errors, authentication errors, missing posts, and invalid queries
+/// do not permit a retry.
 pub fn is_retryable(error: &BooruError) -> bool {
     match error {
         BooruError::Context { source, .. } => is_retryable(source),
@@ -148,17 +164,34 @@ pub fn is_retryable(error: &BooruError) -> bool {
     }
 }
 
-/// Executes an async operation with retry logic.
+/// Repeats an operation after a retryable failure, up to `max_retries` times.
+///
+/// The first attempt does not count as a retry.
+/// Each retry uses the delay from `config`. This helper does not inspect `Retry-After` headers.
 ///
 /// # Example
 ///
-/// ```ignore
-/// use booru_rs::retry::{with_retry, RetryConfig};
+/// ```
+/// use booru_rs::{BooruError, retry::{RetryConfig, with_retry}};
+/// use std::{cell::Cell, time::Duration};
 ///
-/// let result = with_retry(RetryConfig::default(), || async {
-///     // Your fallible async operation here
+/// #[tokio::main]
+/// async fn main() -> booru_rs::Result<()> {
+///     let attempts = Cell::new(0);
+///     let config = RetryConfig::new(1).with_initial_delay(Duration::ZERO);
+///     let value = with_retry(config, || async {
+///         attempts.set(attempts.get() + 1);
+///         if attempts.get() == 1 {
+///             Err(BooruError::RateLimited)
+///         } else {
+///             Ok(42)
+///         }
+///     }).await?;
+///
+///     assert_eq!(value, 42);
+///     assert_eq!(attempts.get(), 2);
 ///     Ok(())
-/// }).await;
+/// }
 /// ```
 pub async fn with_retry<F, Fut, T>(config: RetryConfig, mut operation: F) -> Result<T>
 where

@@ -839,7 +839,10 @@ impl RequestPolicy {
         Self::default()
     }
 
-    /// Sets the retry configuration after validating it.
+    /// Sets the retry configuration after validation.
+    ///
+    /// A valid `Retry-After` response header replaces the computed backoff
+    /// delay, even when the header exceeds [`RetryConfig::max_delay`].
     pub fn with_retry_config(mut self, config: RetryConfig) -> Result<Self> {
         config.validate()?;
         self.retry = config;
