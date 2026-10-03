@@ -1,55 +1,53 @@
-//! Client implementations for various booru sites.
+//! # Provider clients
 //!
-//! This module provides shared HTTP execution helpers used by the
-//! provider clients.
+//! Each provider has a `Client`, `ClientBuilder`, `Query`, and `Search`.
+//! Clients hold request configuration. Queries hold filters and a page size.
 //!
-//! # Available Clients
+//! The provider modules are `danbooru`, `gelbooru`, `safebooru`, `rule34`, and `konachan`.
+//! Each module requires its site feature. All five features belong to the default set.
 //!
-//! - `danbooru::Client` for danbooru.donmai.us, 2 tag limit
-//! - `gelbooru::Client` for gelbooru.com, unlimited tags
-//! - `safebooru::Client` for safebooru.org, unlimited tags, SFW only
-//! - `rule34::Client` for api.rule34.xxx, unlimited tags
-//! - `konachan::Client` for konachan.com, unlimited tags
+//! Danbooru permits two query tags. The sort filter counts toward this limit, but typed rating filters do not.
+//! Other clients impose no local tag limit. Site limits still apply.
+//! Gelbooru and Rule34 require an API key and user ID for post requests.
+//! Set these credentials with the provider's `ClientBuilder::set_credentials`.
 //!
-//! # Example
+//! ## Search and fetch posts
 //!
 //! ```no_run
 //! # #[cfg(feature = "danbooru")]
 //! use booru_rs::danbooru::Client;
 //!
 //! # #[cfg(feature = "danbooru")]
-//! # async fn example() -> booru_rs::error::Result<()> {
+//! # async fn example() -> booru_rs::Result<()> {
 //! let client = Client::new()?;
-//! let posts = client
-//!     .search()
-//!     .tag("cat_ears")
-//!     .limit(10)
-//!     .send()
-//!     .await?;
-//!
-//! // Get a specific post by ID
+//! let posts = client.search().tag("cat_ears").limit(10).send().await?;
 //! let post = client.post(12345).await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! # Custom HTTP Client
+//! Use `page()` for posts and a continuation, or `pages()` and `posts()` for streams.
+//! The shared [`Client`], [`Query`], and [`Builder`] traits support generic code across providers.
+//! [`Autocomplete`] provides tag suggestions as a separate capability.
 //!
-//! By default, all clients share a connection-pooled HTTP client.
+//! ## Configure HTTP requests
+//!
+//! Default clients share an HTTP client with a 30-second request timeout and a 10-second connection timeout.
+//! Retries and rate limits require explicit configuration through [`RequestPolicy`] or the provider builder.
+//!
+//! To set a different timeout, supply a custom HTTP client:
 //!
 //! ```no_run
 //! # #[cfg(feature = "safebooru")]
 //! use booru_rs::safebooru::Client;
+//! use std::time::Duration;
 //!
 //! # #[cfg(feature = "safebooru")]
-//! # async fn example() -> booru_rs::error::Result<()> {
-//! let custom_client = reqwest::Client::builder()
-//!     .timeout(std::time::Duration::from_secs(60))
-//!     .build()
-//!     .unwrap();
-//!
-//! let client = Client::builder().http_client(custom_client).build()?;
-//! let posts = client.search().tag("nature").send().await?;
+//! # async fn example() -> booru_rs::Result<()> {
+//! let http = reqwest::Client::builder()
+//! 	.timeout(Duration::from_secs(60))
+//! 	.build()?;
+//! let client = Client::builder().http_client(http).build()?;
 //! # Ok(())
 //! # }
 //! ```
