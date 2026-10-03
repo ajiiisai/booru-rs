@@ -1,30 +1,38 @@
-//! Response caching for booru API requests.
+//! # Cache response data
 //!
-//! This module provides an in-memory cache for API responses to reduce
-//! redundant network requests and improve performance.
+//! An in-memory cache for values that implement Serde serialization.
+//! Provider clients do not use this cache automatically. The application manages cache reads and writes.
 //!
-//! # Example
+//! `Cache::new()` and `CacheConfig::default()` disable storage.
+//! Select a preset to enable storage:
 //!
-//! ```no_run
+//! | Configuration | Expiration | Maximum entries |
+//! | --- | --- | --- |
+//! | `CacheConfig::short_lived()` | 60 seconds | 100 |
+//! | `CacheConfig::long_lived()` | 1 hour | 1,000 |
+//!
+//! ## Store and read a value
+//!
+//! ```rust
 //! use booru_rs::cache::{Cache, CacheConfig};
-//! use std::time::Duration;
 //!
-//! # async fn example() -> Result<(), booru_rs::cache::CacheError> {
-//! // Create a cache with 5-minute TTL and 1000 max entries
-//! let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
-//!
-//! // Check cache before making request
-//! let key = "danbooru:cat_ears:limit=10".to_string();
-//! if let Some(cached) = cache.get::<Vec<u32>>(&key).await? {
-//!     println!("Cache hit!");
-//! } else {
-//!     // Make request and cache result
-//!     let result = vec![1, 2, 3];
-//!     cache.insert(key, &result).await?;
+//! #[tokio::main]
+//! async fn main() -> Result<(), booru_rs::cache::CacheError> {
+//! 	let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
+//! 	let key = "example".to_string();
+//! 	cache.insert(key.clone(), &vec![1_u32, 2, 3]).await?;
+//! 	let cached: Option<Vec<u32>> = cache.get(&key).await?;
+//! 	assert_eq!(cached, Some(vec![1, 2, 3]));
+//! 	Ok(())
 //! }
-//! # Ok(())
-//! # }
 //! ```
+//!
+//! `get()` returns `Ok(None)` for missing or expired entries.
+//! Read each value with the same type that you used for the write.
+//! Serialization and deserialization failures return [`CacheError`].
+//!
+//! Use [`CacheKey`] to separate requests by endpoint, authentication identity, query, and continuation.
+//! Clone [`Cache`] to share its entries across tasks.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -173,7 +181,7 @@ impl CacheConfig {
         Self::default()
     }
 
-    /// Creates a short-lived cache suitable for real-time data.
+    /// Sets a 60-second expiration and a limit of 100 entries.
     #[must_use]
     pub fn short_lived() -> Self {
         Self {
@@ -182,7 +190,7 @@ impl CacheConfig {
         }
     }
 
-    /// Creates a long-lived cache suitable for static data.
+    /// Sets a one-hour expiration and a limit of 1,000 entries.
     #[must_use]
     pub fn long_lived() -> Self {
         Self {
@@ -209,36 +217,13 @@ impl CacheEntry {
     }
 }
 
-/// An in-memory cache for API responses.
+/// A shared in-memory cache with expiration and an entry limit.
 ///
-/// The cache stores serialized data and automatically expires entries
-/// after a configurable TTL. It uses LRU eviction when the max entry
-/// limit is reached.
-///
-/// # Thread Safety
-///
-/// `Cache` is `Send`, `Sync`, and `Clone`, making it safe to share
-/// across tasks and threads.
-///
-/// # Example
-///
-/// ```no_run
-/// use booru_rs::cache::{Cache, CacheConfig};
-///
-/// # async fn example() -> Result<(), booru_rs::cache::CacheError> {
-/// let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
-///
-/// // Cache a search result
-/// let posts = vec!["post1".to_string(), "post2".to_string()];
-/// cache.insert("my_search".to_string(), &posts).await?;
-///
-/// // Retrieve later
-/// if let Some(cached) = cache.get::<Vec<String>>(&"my_search".to_string()).await? {
-///     println!("Got {} posts from cache", cached.len());
-/// }
-/// # Ok(())
-/// # }
-/// ```
+/// The cache stores serialized values. At capacity, it removes the least
+/// recently accessed entry to make space for a new key.
+/// [`Cache::get`] removes an expired entry on access.
+/// Use [`Cache::cleanup_expired`] to remove other expired entries.
+/// Clones share entries across tasks and threads.
 #[derive(Clone)]
 pub struct Cache<K = String>
 where
