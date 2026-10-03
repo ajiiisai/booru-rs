@@ -1,104 +1,74 @@
 //! # booru-rs
 //!
-//! An async Rust client for various booru image board APIs.
+//! An async Rust client for Danbooru, Gelbooru, Safebooru, Rule34, and Konachan.
+//! Each site has a reusable client, typed query filters, and a post model.
 //!
-//! This library provides a unified interface for querying multiple booru sites
-//! including Danbooru, Gelbooru, Safebooru, and Rule34.
+//! ## Search posts
 //!
-//! ## Features
-//!
-//! - **Type-safe API**: Compile-time checks ensure you use the correct rating types for each booru
-//! - **Async/await**: Built on tokio and reqwest for efficient async I/O
-//! - **Connection pooling**: Shared HTTP client with automatic connection reuse
-//! - **Proper error handling**: No panics, all errors are returned as `Result` types
-//! - **Common trait**: Use the [`Post`] trait for generic code across booru sites
-//! - **Async streams**: Paginate through results with async iterators
-//! - **Image downloads**: Download images with progress tracking and concurrent downloads
-//! - **Opt-in retries**: Retry transient failures with exponential backoff via `RequestPolicy`
-//! - **Rate limiting**: Protect against API throttling
-//! - **Opt-in response caching**: Reduce redundant API calls with `Cache`
-//! - **Tag validation**: Catch common mistakes before making requests
-//! - **Tag autocomplete**: Get tag suggestions as users type
-//!
-//! ## Quick Start
-//!
-//! The easiest way to get started is with the [`prelude`]:
+//! The application supplies the Tokio runtime. Reuse the client across requests:
 //!
 //! ```no_run
 //! # #[cfg(feature = "danbooru")]
-//! use booru_rs::danbooru::Client;
+//! use booru_rs::danbooru::{Client, DanbooruRating};
 //!
 //! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
-//! async fn main() -> booru_rs::error::Result<()> {
-//!     let client = Client::new()?;
-//!     let posts = client
-//!         .search()
-//!         .tag("cat_ears")
-//!         .limit(10)
-//!         .send()
-//!         .await?;
+//! async fn main() -> booru_rs::Result<()> {
+//! 	let client = Client::new()?;
+//! 	let posts = client
+//! 		.search()
+//! 		.tag("cat_ears")
+//! 		.rating(DanbooruRating::General)
+//! 		.limit(10)
+//! 		.send()
+//! 		.await?;
 //!
-//!     for post in posts {
-//!         println!("Post {}: {:?}", post.id, post.file_url);
-//!     }
-//!
-//!     Ok(())
+//! 	for post in posts {
+//! 		if let Some(url) = post.file_url {
+//! 			println!("{}: {url}", post.id);
+//! 		}
+//! 	}
+//! 	Ok(())
 //! }
 //! # #[cfg(not(feature = "danbooru"))]
 //! # fn main() {}
 //! ```
 //!
-//! ## Supported Sites
+//! ## Sites and features
 //!
-//! | Site | Client | Tag Limit | Auth Required |
-//! |------|--------|-----------|---------------|
-//! | [Danbooru](https://danbooru.donmai.us) | `danbooru::Client` | 2 | No |
-//! | [Gelbooru](https://gelbooru.com) | `gelbooru::Client` | Unlimited | Yes |
-//! | [Safebooru](https://safebooru.org) | `safebooru::Client` | Unlimited | No |
-//! | [Rule34](https://rule34.xxx) | `rule34::Client` | Unlimited | Yes |
-//! | [Konachan](https://konachan.com) | `konachan::Client` | Unlimited | No |
+//! All five site features belong to the default set:
 //!
-//! ## Pagination with Async Streams
+//! | Feature | Client | API credentials |
+//! | --- | --- | --- |
+//! | `danbooru` | `danbooru::Client` | Optional |
+//! | `gelbooru` | `gelbooru::Client` | Required for post requests |
+//! | `safebooru` | `safebooru::Client` | Not required |
+//! | `rule34` | `rule34::Client` | Required for post requests |
+//! | `konachan` | `konachan::Client` | Not required |
 //!
-//! Iterate through all results with `posts()`:
+//! Gelbooru and Rule34 accept an API key and user ID through `ClientBuilder::set_credentials`.
+//! Danbooru accepts an API key and username through the same method.
+//! Danbooru permits two query tags. The sort filter counts toward this limit, but typed rating filters do not.
+//! Other clients impose no local tag limit. Site limits still apply.
 //!
-//! ```no_run
-//! # #[cfg(feature = "safebooru")]
-//! use booru_rs::safebooru::Client;
+//! The `download` feature enables the image downloader.
+//! The `live-tests` feature enables optional tests against site APIs.
 //!
-//! # #[cfg(feature = "safebooru")]
-//! # async fn example() -> booru_rs::error::Result<()> {
-//! let client = Client::new()?;
-//! let mut stream = client
-//!     .search()
-//!     .tag("landscape")
-//!     .limit(100)
-//!     .posts()
-//!     .max_posts(500);
+//! ## API modules
 //!
-//! while let Some(post) = stream.next().await {
-//!     println!("Post #{}", post?.id);
-//! }
-//! # Ok(())
-//! # }
-//! ```
+//! - [`client`]: queries, builders, pagination streams, and request policies.
+//!   Clients use no retries or rate limiter by default.
+//! - [`model`]: provider models and the shared [`Post`] and [`Rating`] types.
+//!   Media URLs and response ratings can be absent.
+//! - [`autocomplete`]: tag suggestions for clients that implement [`Autocomplete`].
+//! - [`cache`]: an in-memory cache that your application manages.
+//! - [`retry`] and [`ratelimit`]: optional request policies.
+//! - `download`: image downloads, progress callbacks, and optional MD5 checks.
+//! - [`error`]: [`BooruError`], provider context, and error category helpers.
+//! - [`prelude`]: common imports for application code.
 //!
-//! ## Generic Code with the Post Trait
-//!
-//! Use the [`Post`] trait to write code that works with any booru:
-//!
-//! ```no_run
-//! use booru_rs::prelude::*;
-//! use booru_rs::model::Post;
-//!
-//! fn print_post(post: &impl Post) {
-//!     let height = post.height()
-//!         .map(|height| height.to_string())
-//!         .unwrap_or_else(|| "unknown".into());
-//!     println!("#{}: {}x{}", post.id(), post.width(), height);
-//! }
-//! ```
+//! See the [README](https://github.com/ajiiisai/booru-rs#readme) for installation and
+//! [examples](https://github.com/ajiiisai/booru-rs/tree/main/examples) for complete programs.
 
 pub mod autocomplete;
 pub mod cache;
