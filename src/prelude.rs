@@ -1,33 +1,36 @@
-//! Convenient re-exports for common usage patterns.
+//! # Common imports
 //!
-//! This module provides a single import for the most commonly used types,
-//! making it easier to get started with the library.
-//!
-//! # Example
+//! The prelude exports shared traits, request policies, errors, and provider model types.
+//! Provider model exports follow their site features. Download exports require the `download` feature.
+//! Import the provider client separately:
 //!
 //! ```no_run
 //! # #[cfg(feature = "danbooru")]
-//! use booru_rs::danbooru::Client;
+//! use booru_rs::danbooru::Client as Danbooru;
+//! # #[cfg(feature = "danbooru")]
+//! use booru_rs::prelude::*;
 //!
 //! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
-//! async fn main() -> booru_rs::error::Result<()> {
-//!     let client = Client::new()?;
-//!     let posts = client
-//!         .search()
-//!         .tag("cat_ears")
-//!         .rating(booru_rs::model::danbooru::DanbooruRating::General)
-//!         .sort(booru_rs::client::generic::Sort::Score)
-//!         .limit(10)
-//!         .send()
-//!         .await?;
+//! async fn main() -> Result<()> {
+//! 	let client = Danbooru::new()?;
+//! 	let posts = client
+//! 		.search()
+//! 		.tag("cat_ears")
+//! 		.rating(DanbooruRating::General)
+//! 		.sort(Sort::Score)
+//! 		.limit(10)
+//! 		.send()
+//! 		.await?;
 //!
-//!     println!("Found {} posts", posts.len());
-//!     Ok(())
+//! 	println!("{} posts", posts.len());
+//! 	Ok(())
 //! }
 //! # #[cfg(not(feature = "danbooru"))]
 //! # fn main() {}
 //! ```
+//!
+//! The alias `Danbooru` distinguishes the provider client from the shared `Client` trait.
 
 // Core traits and types
 pub use crate::client::RequestPolicy;
