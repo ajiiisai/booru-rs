@@ -45,8 +45,8 @@
 //! # #[cfg(feature = "safebooru")]
 //! # async fn example() -> booru_rs::Result<()> {
 //! let http = reqwest::Client::builder()
-//! 	.timeout(Duration::from_secs(60))
-//! 	.build()?;
+//!     .timeout(Duration::from_secs(60))
+//!     .build()?;
 //! let client = Client::builder().http_client(http).build()?;
 //! # Ok(())
 //! # }

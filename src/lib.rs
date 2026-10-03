@@ -14,21 +14,21 @@
 //! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
 //! async fn main() -> booru_rs::Result<()> {
-//! 	let client = Client::new()?;
-//! 	let posts = client
-//! 		.search()
-//! 		.tag("cat_ears")
-//! 		.rating(DanbooruRating::General)
-//! 		.limit(10)
-//! 		.send()
-//! 		.await?;
+//!     let client = Client::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
+//!         .rating(DanbooruRating::General)
+//!         .limit(10)
+//!         .send()
+//!         .await?;
 //!
-//! 	for post in posts {
-//! 		if let Some(url) = post.file_url {
-//! 			println!("{}: {url}", post.id);
-//! 		}
-//! 	}
-//! 	Ok(())
+//!     for post in posts {
+//!         if let Some(url) = post.file_url {
+//!             println!("{}: {url}", post.id);
+//!         }
+//!     }
+//!     Ok(())
 //! }
 //! # #[cfg(not(feature = "danbooru"))]
 //! # fn main() {}

@@ -13,18 +13,18 @@
 //! # #[cfg(feature = "danbooru")]
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//! 	let client = Danbooru::new()?;
-//! 	let posts = client
-//! 		.search()
-//! 		.tag("cat_ears")
-//! 		.rating(DanbooruRating::General)
-//! 		.sort(Sort::Score)
-//! 		.limit(10)
-//! 		.send()
-//! 		.await?;
+//!     let client = Danbooru::new()?;
+//!     let posts = client
+//!         .search()
+//!         .tag("cat_ears")
+//!         .rating(DanbooruRating::General)
+//!         .sort(Sort::Score)
+//!         .limit(10)
+//!         .send()
+//!         .await?;
 //!
-//! 	println!("{} posts", posts.len());
-//! 	Ok(())
+//!     println!("{} posts", posts.len());
+//!     Ok(())
 //! }
 //! # #[cfg(not(feature = "danbooru"))]
 //! # fn main() {}

@@ -18,12 +18,12 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), booru_rs::cache::CacheError> {
-//! 	let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
-//! 	let key = "example".to_string();
-//! 	cache.insert(key.clone(), &vec![1_u32, 2, 3]).await?;
-//! 	let cached: Option<Vec<u32>> = cache.get(&key).await?;
-//! 	assert_eq!(cached, Some(vec![1, 2, 3]));
-//! 	Ok(())
+//!     let cache: Cache<String> = Cache::with_config(CacheConfig::long_lived());
+//!     let key = "example".to_string();
+//!     cache.insert(key.clone(), &vec![1_u32, 2, 3]).await?;
+//!     let cached: Option<Vec<u32>> = cache.get(&key).await?;
+//!     assert_eq!(cached, Some(vec![1, 2, 3]));
+//!     Ok(())
 //! }
 //! ```
 //!
