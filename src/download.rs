@@ -2,8 +2,13 @@
 //!
 //! This module provides helpers for downloading images from booru posts,
 //! with support for progress tracking and concurrent downloads.
-//! Responses labeled `text/html` or `application/xhtml+xml` are rejected before
-//! writing a file. Other content types, including missing headers, are accepted.
+//! The downloader rejects `text/*`, `application/json`, `application/xml`, and media types
+//! with an `+xml` suffix or `html` in the name before it creates a file.
+//! It accepts `image/svg+xml` and other content types, including missing or empty headers.
+//! Media type checks ignore case and parameters.
+//!
+//! An existing destination must be a regular file. Metadata checks follow symlinks,
+//! so a symlink to a regular file is permitted. Other destination types return an I/O error.
 //!
 //! # Example
 //!
@@ -65,6 +70,19 @@ fn validate_filename(filename: &str) -> Result<()> {
 
 fn destination_key(path: &Path) -> PathBuf {
     PathBuf::from(path.to_string_lossy().to_uppercase())
+}
+
+async fn destination_metadata(path: &Path) -> Result<Option<std::fs::Metadata>> {
+    match tokio::fs::metadata(path).await {
+        Ok(metadata) if metadata.is_file() => Ok(Some(metadata)),
+        Ok(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "download destination is not a regular file",
+        )
+        .into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn filename_from_url(url: &str) -> Result<String> {
@@ -182,7 +200,12 @@ async fn stream_response_to_file(
         if error.error.kind() != std::io::ErrorKind::AlreadyExists {
             return Err(BooruError::Io(error.error));
         }
-        let metadata = tokio::fs::metadata(dest_path).await?;
+        let metadata = destination_metadata(dest_path).await?.ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "download destination does not exist",
+            )
+        })?;
         return Ok(DownloadResult {
             path: dest_path.to_path_buf(),
             size: metadata.len(),
@@ -424,8 +447,9 @@ impl Downloader {
         let dest_path = dest_dir.join(&filename);
 
         // Check if file exists
-        if tokio::fs::try_exists(&dest_path).await? && !self.options.overwrite {
-            let metadata = tokio::fs::metadata(&dest_path).await?;
+        if let Some(metadata) = destination_metadata(&dest_path).await?
+            && !self.options.overwrite
+        {
             return Ok(DownloadResult {
                 path: dest_path,
                 size: metadata.len(),
@@ -640,8 +664,9 @@ impl Downloader {
                 let result = async {
                     let dest_path = dest.join(&filename);
 
-                    if tokio::fs::try_exists(&dest_path).await? && !options.overwrite {
-                        let metadata = tokio::fs::metadata(&dest_path).await?;
+                    if let Some(metadata) = destination_metadata(&dest_path).await?
+                        && !options.overwrite
+                    {
                         return Ok(DownloadResult {
                             path: dest_path,
                             size: metadata.len(),
@@ -834,6 +859,94 @@ mod tests {
                 .await
                 .remove(0),
             _ => unreachable!(),
+        }
+    }
+
+    #[tokio::test]
+    async fn existing_directory_destinations_return_errors() {
+        use wiremock::MockServer;
+
+        let server = MockServer::start().await;
+        let post = Md5Post {
+            id: 1,
+            url: format!("{}/image.jpg", server.uri()),
+            md5: None,
+        };
+        for overwrite in [false, true] {
+            let options = DownloadOptions {
+                overwrite,
+                ..DownloadOptions::default()
+            };
+            let downloader = Downloader::new().options(options);
+            for mode in 0..4 {
+                let destination = tempfile::tempdir().unwrap();
+                let target = destination.path().join("1.jpg");
+                std::fs::create_dir(&target).unwrap();
+                let error = download_post_using(&downloader, &post, destination.path(), mode)
+                    .await
+                    .unwrap_err();
+                assert!(
+                    matches!(error, BooruError::Io(error) if error.kind() == std::io::ErrorKind::InvalidInput)
+                );
+                assert!(target.is_dir());
+                assert_eq!(std::fs::read_dir(destination.path()).unwrap().count(), 1);
+            }
+        }
+        assert!(server.received_requests().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn directory_destination_races_return_errors() {
+        use wiremock::matchers::method;
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        for mode in 0..4 {
+            let server = MockServer::start().await;
+            let destination = tempfile::tempdir().unwrap();
+            let target = destination.path().join("1.jpg");
+            let race_target = target.clone();
+            Mock::given(method("GET"))
+                .respond_with(move |_: &wiremock::Request| {
+                    std::fs::create_dir(&race_target).unwrap();
+                    ResponseTemplate::new(200).set_body_bytes(b"image bytes".to_vec())
+                })
+                .expect(1)
+                .mount(&server)
+                .await;
+            let post = Md5Post {
+                id: 1,
+                url: format!("{}/image.jpg", server.uri()),
+                md5: None,
+            };
+            let error = download_post_using(&Downloader::new(), &post, destination.path(), mode)
+                .await
+                .unwrap_err();
+            assert!(matches!(error, BooruError::Io(_)));
+            assert!(target.is_dir());
+            assert_eq!(std::fs::read_dir(destination.path()).unwrap().count(), 1);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn symlink_to_regular_file_destinations_are_skipped() {
+        for mode in 0..4 {
+            let destination = tempfile::tempdir().unwrap();
+            let source = destination.path().join("source.jpg");
+            std::fs::write(&source, b"existing bytes").unwrap();
+            let target = destination.path().join("1.jpg");
+            std::os::unix::fs::symlink(&source, &target).unwrap();
+            let post = Md5Post {
+                id: 1,
+                url: "http://127.0.0.1:1/image.jpg".to_string(),
+                md5: None,
+            };
+            let result = download_post_using(&Downloader::new(), &post, destination.path(), mode)
+                .await
+                .unwrap();
+            assert!(result.skipped);
+            assert_eq!(result.size, 14);
+            assert_eq!(std::fs::read(target).unwrap(), b"existing bytes");
         }
     }
 
