@@ -66,6 +66,83 @@ fn ids(posts: &[booru_rs::model::danbooru::DanbooruPost]) -> Vec<u32> {
 }
 
 #[tokio::test]
+async fn custom_user_agent_is_preserved_for_all_operations() {
+    let server = MockServer::start().await;
+    let user_agent = "ExampleApp/1.0 (user #123)";
+    for (endpoint, body) in [
+        ("/posts.json", posts_json(&[1])),
+        ("/posts/1.json", single_post_json(1)),
+        ("/autocomplete.json", "[]".to_string()),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(endpoint))
+            .and(header("User-Agent", user_agent))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .expect(1)
+            .mount(&server)
+            .await;
+    }
+    let client = Client::builder()
+        .endpoint(server.uri())
+        .unwrap()
+        .http_client(
+            reqwest::Client::builder()
+                .user_agent(user_agent)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    client.search().send().await.unwrap();
+    client.post(1).await.unwrap();
+    client.autocomplete("cat", 1).await.unwrap();
+}
+
+#[tokio::test]
+async fn invalid_json_is_not_retried() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = Client::builder()
+        .endpoint(server.uri())
+        .unwrap()
+        .retry_config(RetryConfig::new(2).with_initial_delay(Duration::ZERO))
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let error = client.search().send().await.unwrap_err();
+    assert!(error.is_parse_error());
+    assert!(!booru_rs::retry::is_retryable(&error));
+}
+
+#[tokio::test]
+async fn reqwest_json_errors_remain_non_retryable_parse_errors() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let error = reqwest::Client::new()
+        .get(server.uri())
+        .send()
+        .await
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap_err();
+    let error = BooruError::from(error);
+    assert!(error.is_parse_error());
+    assert!(!error.is_network_error());
+    assert!(!booru_rs::retry::is_retryable(&error));
+}
+
+#[tokio::test]
 async fn search_sends_tags_limit_and_credentials() {
     let mock_server = MockServer::start().await;
 

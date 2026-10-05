@@ -125,7 +125,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let data = response.json::<GelbooruResponse>().await?;
+        let data = serde_json::from_slice::<GelbooruResponse>(&response)?;
         data.posts
             .into_iter()
             .next()
@@ -167,7 +167,7 @@ impl Client {
             Err(error) => return Err(error),
         };
 
-        let items: Vec<GelbooruAutocompleteItem> = response.json().await?;
+        let items: Vec<GelbooruAutocompleteItem> = serde_json::from_slice(&response)?;
 
         Ok(items
             .into_iter()
@@ -440,7 +440,7 @@ impl Search {
             Err(error) => return Err(error),
         };
 
-        let data = response.json::<GelbooruResponse>().await?;
+        let data = serde_json::from_slice::<GelbooruResponse>(&response)?;
         Ok(data.posts)
     }
 }

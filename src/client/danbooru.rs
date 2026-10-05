@@ -1,4 +1,3 @@
-use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::Deserialize;
 
 use super::{RequestPolicy, Secret, execute_with_policy};
@@ -8,16 +7,6 @@ use crate::error::{BooruError, Operation, Provider, Result, ResultContext};
 use crate::model::danbooru::*;
 use crate::ratelimit::RateLimiter;
 use crate::retry::RetryConfig;
-
-/// Danbooru requires a User-Agent header for requests.
-fn get_headers() -> HeaderMap {
-    let mut headers = HeaderMap::with_capacity(1);
-    headers.insert(
-        header::USER_AGENT,
-        HeaderValue::from_static(concat!("booru-rs/", env!("CARGO_PKG_VERSION"))),
-    );
-    headers
-}
 
 #[derive(Debug, Deserialize)]
 struct DanbooruAutocompleteItem {
@@ -123,7 +112,6 @@ impl Client {
             Ok(self
                 .http
                 .get(format!("{}/posts/{id}.json", self.endpoint))
-                .headers(get_headers())
                 .query(&query)
                 .send()
                 .await?)
@@ -134,7 +122,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let post = response.json::<DanbooruPost>().await?;
+        let post = serde_json::from_slice::<DanbooruPost>(&response)?;
         Ok(post)
     }
 
@@ -153,7 +141,6 @@ impl Client {
             Ok(self
                 .http
                 .get(format!("{}/autocomplete.json", self.endpoint))
-                .headers(get_headers())
                 .query(&[
                     ("search[query]", query),
                     ("search[type]", "tag_query"),
@@ -162,9 +149,8 @@ impl Client {
                 .send()
                 .await?)
         })
-        .await?
-        .json::<Vec<DanbooruAutocompleteItem>>()
         .await?;
+        let response = serde_json::from_slice::<Vec<DanbooruAutocompleteItem>>(&response)?;
 
         Ok(response
             .into_iter()
@@ -426,14 +412,13 @@ impl Search {
                 .client
                 .http
                 .get(format!("{}/posts.json", self.client.endpoint))
-                .headers(get_headers())
                 .query(&query)
                 .send()
                 .await?)
         })
         .await?;
 
-        let posts = response.json::<Vec<DanbooruPost>>().await?;
+        let posts = serde_json::from_slice::<Vec<DanbooruPost>>(&response)?;
         Ok(posts)
     }
 }
@@ -501,6 +486,8 @@ impl ClientBuilder {
         self
     }
 
+    /// Sets the HTTP client. Set its User-Agent to identify your application.
+    /// Requests preserve the headers that you set on this client.
     pub fn http_client(mut self, client: reqwest::Client) -> Self {
         self.core = self.core.http_client(client);
         self

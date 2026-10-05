@@ -90,7 +90,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let posts = response.json::<Vec<KonachanPost>>().await?;
+        let posts = serde_json::from_slice::<Vec<KonachanPost>>(&response)?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
 
@@ -119,7 +119,7 @@ impl Client {
         })
         .await?;
 
-        let suggestions = response.json::<Vec<KonachanAutocompleteItem>>().await?;
+        let suggestions = serde_json::from_slice::<Vec<KonachanAutocompleteItem>>(&response)?;
         Ok(suggestions
             .into_iter()
             .take(limit as usize)
@@ -362,7 +362,7 @@ impl Search {
         })
         .await?;
 
-        let posts = response.json::<Vec<KonachanPost>>().await?;
+        let posts = serde_json::from_slice::<Vec<KonachanPost>>(&response)?;
         Ok(posts)
     }
 }

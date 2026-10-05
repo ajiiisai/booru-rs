@@ -397,7 +397,8 @@ where
 
 /// Generates a cache key from request parameters.
 ///
-/// This creates a consistent key format for caching booru API responses.
+/// The key is a JSON array of the client, query terms, limit, and page.
+/// This format replaces the delimiter-based format. Old keys do not match new keys.
 /// Query terms retain the order provided by the caller.
 ///
 /// # Example
@@ -411,13 +412,8 @@ where
 /// ```
 #[must_use]
 pub fn cache_key(client: &str, tags: &[String], limit: u32, page: u32) -> String {
-    format!(
-        "{}:{}:limit={}:page={}",
-        client,
-        tags.join(","),
-        limit,
-        page
-    )
+    serde_json::to_string(&(client, tags, limit, page))
+        .expect("cache key serialization cannot fail")
 }
 
 #[cfg(test)]
@@ -539,9 +535,28 @@ mod tests {
             10,
             0,
         );
-        assert!(key.starts_with("danbooru:"));
-        assert!(key.contains("limit=10"));
-        assert!(key.contains("page=0"));
+        assert_eq!(key, r#"["danbooru",["blue_eyes","cat_ears"],10,0]"#);
+    }
+
+    #[test]
+    fn cache_key_separates_delimiters_and_empty_terms() {
+        for ((client_a, tags_a), (client_b, tags_b)) in [
+            (("provider", vec!["a,b"]), ("provider", vec!["a", "b"])),
+            (("provider:a", vec!["b"]), ("provider", vec!["a:b"])),
+            (("provider", vec![]), ("provider", vec![""])),
+            (("provider", vec!["a,", "b"]), ("provider", vec!["a", ",b"])),
+        ] {
+            let tags_a = tags_a.into_iter().map(str::to_string).collect::<Vec<_>>();
+            let tags_b = tags_b.into_iter().map(str::to_string).collect::<Vec<_>>();
+            assert_ne!(
+                cache_key(client_a, &tags_a, 10, 0),
+                cache_key(client_b, &tags_b, 10, 0)
+            );
+        }
+        let tags = vec!["\"\\\n雪".to_string()];
+        let key = cache_key("provider:\"", &tags, 10, 0);
+        let decoded: (String, Vec<String>, u32, u32) = serde_json::from_str(&key).unwrap();
+        assert_eq!(decoded, ("provider:\"".to_string(), tags, 10, 0));
     }
 
     #[test]

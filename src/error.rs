@@ -278,7 +278,7 @@ impl BooruError {
     pub fn is_network_error(&self) -> bool {
         match self {
             Self::Context { source, .. } => source.is_network_error(),
-            Self::Request(error) => !error.is_decode(),
+            Self::Request(_) => !self.is_parse_error(),
             _ => false,
         }
     }
@@ -289,7 +289,16 @@ impl BooruError {
         match self {
             Self::Context { source, .. } => source.is_parse_error(),
             Self::Parse(_) => true,
-            Self::Request(error) => error.is_decode(),
+            Self::Request(error) => {
+                let mut source = std::error::Error::source(error);
+                while let Some(error) = source {
+                    if error.is::<serde_json::Error>() {
+                        return true;
+                    }
+                    source = error.source();
+                }
+                false
+            }
             _ => false,
         }
     }
