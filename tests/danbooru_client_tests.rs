@@ -66,6 +66,40 @@ fn ids(posts: &[booru_rs::model::danbooru::DanbooruPost]) -> Vec<u32> {
 }
 
 #[tokio::test]
+async fn custom_user_agent_is_preserved_for_all_operations() {
+    let server = MockServer::start().await;
+    let user_agent = "ExampleApp/1.0 (user #123)";
+    for (endpoint, body) in [
+        ("/posts.json", posts_json(&[1])),
+        ("/posts/1.json", single_post_json(1)),
+        ("/autocomplete.json", "[]".to_string()),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(endpoint))
+            .and(header("User-Agent", user_agent))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body))
+            .expect(1)
+            .mount(&server)
+            .await;
+    }
+    let client = Client::builder()
+        .endpoint(server.uri())
+        .unwrap()
+        .http_client(
+            reqwest::Client::builder()
+                .user_agent(user_agent)
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap();
+
+    client.search().send().await.unwrap();
+    client.post(1).await.unwrap();
+    client.autocomplete("cat", 1).await.unwrap();
+}
+
+#[tokio::test]
 async fn search_sends_tags_limit_and_credentials() {
     let mock_server = MockServer::start().await;
 

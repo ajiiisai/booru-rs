@@ -545,6 +545,7 @@ impl Builder for konachan::ClientBuilder {
 /// Shared HTTP client with connection pooling and timeouts.
 static SHARED_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
+        .user_agent(concat!("booru-rs/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .pool_max_idle_per_host(10)
