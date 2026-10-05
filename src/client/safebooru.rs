@@ -104,7 +104,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let text = response.text().await?;
+        let text = String::from_utf8_lossy(&response);
         let posts = decode_posts(&text)?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
@@ -130,7 +130,7 @@ impl Client {
         })
         .await?;
 
-        let suggestions = response.json::<Vec<SafebooruAutocompleteItem>>().await?;
+        let suggestions = serde_json::from_slice::<Vec<SafebooruAutocompleteItem>>(&response)?;
         Ok(suggestions
             .into_iter()
             .take(limit as usize)
@@ -377,7 +377,7 @@ impl Search {
         })
         .await?;
 
-        let text = response.text().await?;
+        let text = String::from_utf8_lossy(&response);
         decode_posts(&text)
     }
 }

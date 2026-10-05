@@ -122,7 +122,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let text = response.text().await?;
+        let text = String::from_utf8_lossy(&response);
         let posts = decode_posts(&text)?;
         posts.into_iter().next().ok_or(BooruError::PostNotFound(id))
     }
@@ -157,7 +157,7 @@ impl Client {
             Err(error) => return Err(error),
         };
 
-        let items: Vec<Rule34AutocompleteItem> = response.json().await?;
+        let items: Vec<Rule34AutocompleteItem> = serde_json::from_slice(&response)?;
 
         Ok(items
             .into_iter()
@@ -415,7 +415,7 @@ impl Search {
             Err(error) => return Err(error),
         };
 
-        let text = response.text().await?;
+        let text = String::from_utf8_lossy(&response);
         decode_posts(&text)
     }
 }

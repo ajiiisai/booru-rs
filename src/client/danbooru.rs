@@ -122,7 +122,7 @@ impl Client {
             Err(error) => return Err(super::map_post_lookup_error(error, id)),
         };
 
-        let post = response.json::<DanbooruPost>().await?;
+        let post = serde_json::from_slice::<DanbooruPost>(&response)?;
         Ok(post)
     }
 
@@ -149,9 +149,8 @@ impl Client {
                 .send()
                 .await?)
         })
-        .await?
-        .json::<Vec<DanbooruAutocompleteItem>>()
         .await?;
+        let response = serde_json::from_slice::<Vec<DanbooruAutocompleteItem>>(&response)?;
 
         Ok(response
             .into_iter()
@@ -419,7 +418,7 @@ impl Search {
         })
         .await?;
 
-        let posts = response.json::<Vec<DanbooruPost>>().await?;
+        let posts = serde_json::from_slice::<Vec<DanbooruPost>>(&response)?;
         Ok(posts)
     }
 }

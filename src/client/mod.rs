@@ -34,6 +34,7 @@
 //!
 //! Default clients share an HTTP client with a 30-second request timeout and a 10-second connection timeout.
 //! Retries and rate limits require explicit configuration through [`RequestPolicy`] or the provider builder.
+//! Retries include failures in response body transfers. JSON parse errors do not cause retries.
 //!
 //! To set a different timeout, supply a custom HTTP client:
 //!
@@ -858,7 +859,7 @@ impl RequestPolicy {
     }
 }
 
-/// Executes a request under the configured limiter and retry policy.
+/// Fetches a response body under the limiter and retry policy.
 #[cfg(any(
     feature = "danbooru",
     feature = "gelbooru",
@@ -869,7 +870,7 @@ impl RequestPolicy {
 pub(crate) async fn execute_with_policy<F, Fut>(
     policy: &RequestPolicy,
     mut operation: F,
-) -> Result<reqwest::Response>
+) -> Result<Vec<u8>>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<reqwest::Response>>,
@@ -885,7 +886,15 @@ where
         let (result, retry_after) = match operation().await {
             Ok(response) => {
                 let retry_after = parse_retry_after(response.headers());
-                (ensure_success(response).await, retry_after)
+                let result = match ensure_success(response).await {
+                    Ok(response) => response
+                        .bytes()
+                        .await
+                        .map(|bytes| bytes.to_vec())
+                        .map_err(BooruError::from),
+                    Err(error) => Err(error),
+                };
+                (result, retry_after)
             }
             Err(error) => (Err(error), None),
         };
@@ -942,6 +951,91 @@ mod tests {
     use crate::retry::RetryConfig;
     use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
     use std::time::{Duration, SystemTime};
+
+    async fn check_body_retry(stall: bool, fail_all: bool) {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + Duration::from_secs(3);
+            let mut attempts = 0;
+            while attempts < 2 && std::time::Instant::now() < deadline {
+                let (mut socket, _) = match listener.accept() {
+                    Ok(connection) => connection,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(5));
+                        continue;
+                    }
+                    Err(error) => panic!("{error}"),
+                };
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(1)))
+                    .unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    socket.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                }
+                attempts += 1;
+                if attempts == 1 || fail_all {
+                    socket
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\n[",
+                        )
+                        .unwrap();
+                    if stall {
+                        std::thread::sleep(Duration::from_millis(150));
+                    }
+                } else {
+                    socket
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]",
+                        )
+                        .unwrap();
+                }
+            }
+            attempts
+        });
+        let policy = RequestPolicy::new()
+            .with_retry_config(RetryConfig::new(1).with_initial_delay(Duration::ZERO))
+            .unwrap();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_millis(100))
+            .build()
+            .unwrap();
+        let result = execute_with_policy(&policy, || async {
+            client.get(&url).send().await.map_err(BooruError::from)
+        })
+        .await;
+
+        assert_eq!(server.join().unwrap(), 2);
+        if fail_all {
+            let error = result.unwrap_err();
+            assert!(error.is_network_error());
+            assert!(!error.is_parse_error());
+            assert!(crate::retry::is_retryable(&error));
+        } else {
+            assert_eq!(result.unwrap(), b"[]");
+        }
+    }
+
+    #[tokio::test]
+    async fn truncated_response_body_is_retried() {
+        check_body_retry(false, false).await;
+    }
+
+    #[tokio::test]
+    async fn response_body_timeout_is_retried() {
+        check_body_retry(true, false).await;
+    }
+
+    #[tokio::test]
+    async fn response_body_retries_stop_at_configured_limit() {
+        check_body_retry(false, true).await;
+    }
 
     #[tokio::test]
     async fn error_body_excerpt_is_bounded() {

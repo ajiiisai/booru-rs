@@ -118,7 +118,7 @@ impl RetryConfig {
 ///
 /// Retryable errors are:
 ///
-/// - Request timeouts, connection errors, request errors, or HTTP 5xx statuses.
+/// - Request timeouts, connection errors, body errors, request errors, or HTTP 5xx statuses.
 /// - [`BooruError::RateLimited`].
 /// - [`BooruError::HttpStatus`] with status 429 or 500 through 599.
 ///
@@ -138,7 +138,7 @@ pub fn is_retryable(error: &BooruError) -> bool {
                 return status.is_server_error();
             }
             // Retry on other transient request errors
-            e.is_request()
+            e.is_request() || e.is_body() || (e.is_decode() && !error.is_parse_error())
         }
         // Don't retry parse errors, auth errors, or not found
         BooruError::Parse(_) => false,
