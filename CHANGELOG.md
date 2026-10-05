@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1](https://github.com/ajiiisai/booru-rs/compare/v2.0.0...v2.0.1) - 2026-10-05
+
+### Fixed
+
+- preserve client headers and correct retries, cache keys, and downloads ([#83](https://github.com/ajiiisai/booru-rs/pull/83))
+
+### Other
+
+- correct retry behavior and test the example
+- simplify examples and correct setup commands
+- use spaces in Rust examples to satisfy Clippy
+- correct client limits and request configuration
+- clarify release triggers and retry steps
+- demonstrate prelude imports in the example
+- correct cache presets and show active storage
+- focus migration guide on version changes
+- simplify crate overview and correct site limits
+- clarify provider guide and add missing steps
+- simplify README and correct API details
+- bump thiserror from 2.0.20 to 2.0.21 in the rust-minor group ([#80](https://github.com/ajiiisai/booru-rs/pull/80))
+- *(autocomplete)* remove redundant coverage and silent-pass checks ([#81](https://github.com/ajiiisai/booru-rs/pull/81))
+
 ## [2.0.0](https://github.com/ajiiisai/booru-rs/compare/v1.1.0...v2.0.0) - 2026-09-23
 
 ### Added
